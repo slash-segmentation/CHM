@@ -1,0 +1,3 @@
+[submodule "wrappers/panfishCHM"]
+	path = wrappers/panfishCHM
+	url = git@github.com:slash-segmentation/panfishCHM.git
