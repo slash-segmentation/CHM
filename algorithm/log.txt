@@ -1,0 +1,160 @@
+[?1h=
+                                                                                              < M A T L A B (R) >
+                                                                                    Copyright 1984-2011 The MathWorks, Inc.
+                                                                                     R2011b (7.13.0.564) 64-bit (glnxa64)
+                                                                                                August 13, 2011
+
+ 
+To get started, type one of these: helpwin, helpdesk, or demo.
+For product information, visit www.mathworks.com.
+ 
+
+DIPlib 2.4.1 (Apr  2 2012 - Release [on Linuxa64 (with OpenMP)])
+    Scientific Image Analysis Library
+    Quantitative Imaging Group, Delft University of Technology 1995-2012
+    info@diplib.org
+
+
+dipIO 2.4.1 (Apr  2 2012 - Release)
+    File I/O library for DIPlib
+    Quantitative Imaging Group, Delft University of Technology 1999-2012
+    info@diplib.org
+
+[?1h={Warning: Found 1 pre-existing parallel job(s) created by matlabpool that are running.
+You can use   'matlabpool close force local'    or create a configuration for the distcomp.localscheduler object and use   'matlabpool close force <configurationName>'    to remove all jobs created by
+matlabpool.} 
+{> In distcomp.interactiveclient.pRemoveOldJobs at 55
+  In distcomp.interactiveclient.start at 58
+  In MatlabpoolHelper>MatlabpoolHelper.doOpen at 250
+  In MatlabpoolHelper>MatlabpoolHelper.doMatlabpool at 102
+  In matlabpool at 131
+  In TrainScript at 3} 
+Starting matlabpool using the 'local' configuration ... connected to 12 labs.
+{Warning: Directory already exists.} 
+{> In TrainScript at 26} 
+Extracting features ... stage 1 level 0 
+start learning LDNN ... stage 1 level 0 
+Run clustering...Done. It took 231.248541  
+Number of training samples = 3517713 
+Epoch No. 1 ... error = 0.255247 
+Epoch No. 2 ... error = 0.244359 
+Epoch No. 3 ... error = 0.240627 
+Epoch No. 4 ... error = 0.237935 
+Epoch No. 5 ... error = 0.235833 
+Epoch No. 6 ... error = 0.234136 
+Epoch No. 7 ... error = 0.232669 
+Epoch No. 8 ... error = 0.231355 
+Epoch No. 9 ... error = 0.230231 
+Epoch No. 10 ... error = 0.229258 
+Epoch No. 11 ... error = 0.228391 
+Epoch No. 12 ... error = 0.227624 
+Epoch No. 13 ... error = 0.226943 
+Epoch No. 14 ... error = 0.226353 
+Epoch No. 15 ... error = 0.225781 
+Generating outputs ... stage 1 level 0 
+Extracting features ... stage 1 level 1 
+start learning LDNN ... stage 1 level 1 
+Run clustering...Done. It took 133.813200  
+Number of training samples = 1715000 
+Epoch No. 1 ... error = 0.221517 
+Epoch No. 2 ... error = 0.210805 
+Epoch No. 3 ... error = 0.207931 
+Epoch No. 4 ... error = 0.205855 
+Epoch No. 5 ... error = 0.203939 
+Epoch No. 6 ... error = 0.202485 
+Epoch No. 7 ... error = 0.201469 
+Epoch No. 8 ... error = 0.200555 
+Epoch No. 9 ... error = 0.199948 
+Epoch No. 10 ... error = 0.199274 
+Epoch No. 11 ... error = 0.198613 
+Epoch No. 12 ... error = 0.198305 
+Epoch No. 13 ... error = 0.197746 
+Epoch No. 14 ... error = 0.197445 
+Epoch No. 15 ... error = 0.197124 
+Generating outputs ... stage 1 level 1 
+Extracting features ... stage 1 level 2 
+start learning LDNN ... stage 1 level 2 
+Run clustering...Done. It took 31.335811  
+Number of training samples = 428750 
+Epoch No. 1 ... error = 0.226529 
+Epoch No. 2 ... error = 0.208623 
+Epoch No. 3 ... error = 0.203279 
+Epoch No. 4 ... error = 0.200162 
+Epoch No. 5 ... error = 0.198327 
+Epoch No. 6 ... error = 0.197184 
+Epoch No. 7 ... error = 0.196139 
+Epoch No. 8 ... error = 0.195111 
+Epoch No. 9 ... error = 0.194261 
+Epoch No. 10 ... error = 0.193292 
+Epoch No. 11 ... error = 0.192719 
+Epoch No. 12 ... error = 0.192141 
+Epoch No. 13 ... error = 0.191653 
+Epoch No. 14 ... error = 0.191123 
+Epoch No. 15 ... error = 0.190732 
+Generating outputs ... stage 1 level 2 
+Extracting features ... stage 1 level 3 
+start learning LDNN ... stage 1 level 3 
+Run clustering...Done. It took 4.085634  
+Number of training samples = 108416 
+Epoch No. 1 ... error = 0.259221 
+Epoch No. 2 ... error = 0.228933 
+Epoch No. 3 ... error = 0.222170 
+Epoch No. 4 ... error = 0.218750 
+Epoch No. 5 ... error = 0.215881 
+Epoch No. 6 ... error = 0.214144 
+Epoch No. 7 ... error = 0.213168 
+Epoch No. 8 ... error = 0.211857 
+Epoch No. 9 ... error = 0.210707 
+Epoch No. 10 ... error = 0.209597 
+Epoch No. 11 ... error = 0.208922 
+Epoch No. 12 ... error = 0.208208 
+Epoch No. 13 ... error = 0.207064 
+Epoch No. 14 ... error = 0.206487 
+Epoch No. 15 ... error = 0.205610 
+Generating outputs ... stage 1 level 3 
+Extracting features ... stage 1 level 4 
+start learning LDNN ... stage 1 level 4 
+Run clustering...Done. It took 0.527358  
+Number of training samples = 27104 
+Epoch No. 1 ... error = 0.306830 
+Epoch No. 2 ... error = 0.270910 
+Epoch No. 3 ... error = 0.252412 
+Epoch No. 4 ... error = 0.242256 
+Epoch No. 5 ... error = 0.235637 
+Epoch No. 6 ... error = 0.231909 
+Epoch No. 7 ... error = 0.228706 
+Epoch No. 8 ... error = 0.226080 
+Epoch No. 9 ... error = 0.223480 
+Epoch No. 10 ... error = 0.221718 
+Epoch No. 11 ... error = 0.221455 
+Epoch No. 12 ... error = 0.219615 
+Epoch No. 13 ... error = 0.219639 
+Epoch No. 14 ... error = 0.219064 
+Epoch No. 15 ... error = 0.217712 
+Generating outputs ... stage 1 level 4 
+Extracting features ... stage 2 level 0 
+start learning LDNN ... stage 2 level 0 
+Run clustering...Done. It took 308.264204  
+Number of training samples = 3517713 
+Epoch No. 1 ... error = 0.176169 
+Epoch No. 2 ... error = 0.172357 
+Epoch No. 3 ... error = 0.169909 
+Epoch No. 4 ... error = 0.168194 
+Epoch No. 5 ... error = 0.167135 
+Epoch No. 6 ... error = 0.166184 
+Generating outputs ... stage 2 level 0 
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+Your MATLAB session has timed out.  All license keys have been returned.
+>> 
+Your MATLAB session has timed out.  All license keys have been returned.
+>> Killed
