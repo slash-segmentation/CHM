@@ -36,15 +36,17 @@ Nlevel = 4;
 filestr = dir(fullfile(trainpath, '*.png'));
 ntr = length(filestr);
 PixN = zeros(Nlevel+1,1);
-for l = 0:Nlevel
-    for i = 1:ntr
-        temp = MyDownSample(imread(fullfile(trainpath, filestr(i).name)),l);
+for i = 1:ntr
+    im = imread(fullfile(trainpath, filestr(i).name))
+    for l = 0:Nlevel
+        temp = MyDownSample(im,l);
         PixN(l+1) = PixN(l+1) + numel(temp);
     end
 end
-tempfeat = Filterbank(imread(fullfile(trainpath, filestr(1).name)));
+im = imread(fullfile(trainpath, filestr(1).name))
+tempfeat = Filterbank(im);
 Nfeat = size(tempfeat,1);
-tempfeat = ConstructNeighborhoodsS(imread(fullfile(trainpath, filestr(1).name)));
+tempfeat = ConstructNeighborhoodsS(im);
 Nfeatcontext = size(tempfeat,1);
 
 param.ntr = ntr;
