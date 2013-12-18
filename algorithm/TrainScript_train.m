@@ -1,6 +1,9 @@
 function TrainScript_train(trainpath,labelpath,savingpath,Nstage,Nlevel);
 
-  try 
+  try
+    
+    TrainScript_trainTimer = tic;
+ 
     if ~strcmp(trainpath(end),'/') 
         trainpath = [trainpath '/'];
     end
@@ -26,9 +29,16 @@ function TrainScript_train(trainpath,labelpath,savingpath,Nstage,Nlevel);
             PixN(l+1) = PixN(l+1) + numel(temp);
         end
     end
+    Filterbank_Timer = tic;
     tempfeat = Filterbank(imread([trainpath filestr(1).name]));
+    fprintf('Running Filterbank on %s took %f seconds\n\n',filestr(1).name,toc(Filterbank_Timer));
+
     Nfeat = size(tempfeat,1);
+
+    ConstructNeighborhoodsS_Timer = tic;
     tempfeat = ConstructNeighborhoodsS(imread([trainpath filestr(1).name]));
+    fprintf('Running ConstructNeighborhoodsS on %s took %f seconds\n\n',filestr(1).name,toc(ConstructNeighborhoodsS_Timer));
+
     Nfeatcontext = size(tempfeat,1);
 
     param.ntr = ntr;
@@ -43,12 +53,17 @@ function TrainScript_train(trainpath,labelpath,savingpath,Nstage,Nlevel);
         for l = 0:Nlevel
             param.level = l;
             param.PixN = PixN(l+1);
+            trainCHM_Timer = tic;
             model = trainCHM(trainpath,labelpath,savingpath,param);
+
+            fprintf('Running trainCHM on stage %d and level %d took %f seconds\n',s,l,toc(trainCHM_Timer));
             if s==Nstage, break; end
         end
     end
 
     save([savingpath 'param.mat'],'param');
+
+    fprintf('Running TrainScript_train on %d input images took %f seconds\n\n',ntr,toc(TrainScript_trainTimer));
 
   catch err
         fprintf('Caught Fatal Exception: %s\n',err.getReport());
