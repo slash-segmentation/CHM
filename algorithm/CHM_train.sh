@@ -1,13 +1,14 @@
 #!/bin/bash
 
-if [[ $# != 3 ]]; then
-  echo "usage: $0 train_folder label_folder working_folder";
+if [[ $# < 2 || $# > 3 ]]; then
+  echo "usage: $0 train_folder label_folder [model_folder=./temp/]";
   exit
 fi
 
 trainfolder=$1;
 labelfolder=$2;
-workfolder=$3;
+workfolder=./temp/;
+if [[ $# > 2 ]]; then workfolder=$3; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink

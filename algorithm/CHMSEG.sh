@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ $# < 4 || $# > 4 ]]; then
-  echo "usage: $0 trainfolder labelfolder testfolder outputfolder";
+if [[ $# < 4 || $# > 5 ]]; then
+  echo "usage: $0 train_folder label_folder test_folder output_folder [model_folder=./temp/]";
   exit
 fi
 
@@ -11,6 +11,8 @@ trainfolder=$1;
 labelfolder=$2;
 testfolder=$3;
 testoutput=$4;
+workfolder=./temp/;
+if [[ $# > 4 ]]; then workfolder=$5; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
@@ -29,7 +31,7 @@ else
 fi
 
 # Run the main matlab script
-matlab -nodisplay -singleCompThread -r "run_from_shell('TrainScript(''${trainfolder}'',''${labelfolder}'',''${testfolder}'',''${testoutput}'');');";
+matlab -nodisplay -singleCompThread -r "run_from_shell('TrainScript(''${trainfolder}'',''${labelfolder}'',''${testfolder}'',''${testoutput}'',''${workfolder}'');');";
 matlab_err=$?;
 
 # Cleanup

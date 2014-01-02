@@ -1,6 +1,6 @@
-function TrainScript(trainpath,labelpath,testpath,savingpath,outputpath);
-if nargin < 4 || nargin > 5; error('moj_seg must have 4 to 5 input arguments'); end
-if nargin == 4; outputpath = fullfile(savingpath, 'output_testImages'); end
+function TrainScript(trainpath,labelpath,testpath,outputpath,savingpath);
+if nargin < 4 || nargin > 5; error('TrainScript must have 4 to 5 input arguments'); end
+if nargin == 4; savingpath = fullfile('.', 'temp'); end
 
 opened_pool = 0;
 try; if ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;

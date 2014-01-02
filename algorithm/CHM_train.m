@@ -8,8 +8,8 @@ function CHM_train(trainpath, labelpath, savingpath)
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));
 addpath(genpath(fullfile(my_path, 'FilterStuff')));
 
-files_tr = get_files(trainpath);
-files_la = get_files(labelpath);
+files_tr = GetFiles(trainpath);
+files_la = GetFiles(labelpath);
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
 % Parameters
