@@ -1,11 +1,12 @@
 function output = testCHM(I,savingpath,param)
 
 Nfeatcontext = param.Nfeatcontext;
-clabels{param.Nlevel+1} = [];
 Nlevel = param.Nlevel;
-for stage = 1:param.Nstage
+Nstage = param.Nstage;
+clabels{Nlevel} = [];
+for stage = 1:Nstage
     
-    for level = 0:param.Nlevel
+    for level = 0:Nlevel
 
         if stage==1 || level~=0
             img = MyDownSample(I,level);
@@ -18,7 +19,7 @@ for stage = 1:param.Nstage
                 fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
             end
             X = [fv;fvcontext];
-            load([savingpath 'MODEL_level' num2str(level) '_stage' num2str(stage)]);
+            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]));
             [~, Y_floats] = EvaluateAndOrNetMX(X,model);
             clabels{level+1} = reshape(Y_floats,size(img));
 
@@ -34,11 +35,11 @@ for stage = 1:param.Nstage
                 fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
             end
             X = [fv;fvcontext];
-            load([savingpath 'MODEL_level' num2str(level) '_stage' num2str(stage)]);
+            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]));
             [~, Y_floats] = EvaluateAndOrNetMX(X,model);
             clabels{level+1} = reshape(Y_floats,size(img));
         end
         
-        if stage==param.Nstage, output = clabels{1}; break; end
+        if stage==Nstage, output = clabels{1}; break; end
     end
 end

@@ -1,16 +1,13 @@
 #!/bin/bash
 
-if [[ $# < 4 || $# > 4 ]]; then
-  echo "usage: $0 trainfolder labelfolder testfolder outputfolder";
+if [[ $# != 3 ]]; then
+  echo "usage: $0 train_folder label_folder working_folder";
   exit
 fi
 
-date;
-
 trainfolder=$1;
 labelfolder=$2;
-testfolder=$3;
-testoutput=$4;
+workfolder=$3;
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
@@ -28,14 +25,12 @@ else
     export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 fi
 
-# Run the main matlab script
-matlab -nodisplay -singleCompThread -r "run_from_shell('TrainScript(''${trainfolder}'',''${labelfolder}'',''${testfolder}'',''${testoutput}'');');";
+# Run the main matlab script (has JVM and single comp thread because of parallel toolbox usage) 
+matlab -nodisplay -singleCompThread -r "run_from_shell('CHM_train(''${trainfolder}'',''${labelfolder}'',''${workfolder}'');');";
 matlab_err=$?;
 
 # Cleanup
-stty sane # restor terminal settings
+stty sane # restore terminal settings
 if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
-
-date
 
 exit $matlab_err

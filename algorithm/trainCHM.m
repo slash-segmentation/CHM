@@ -1,17 +1,9 @@
-function model = trainCHM(trainpath,labelpath,savingpath,param)
+function model = trainCHM(files_tr,files_la,savingpath,stage,level,PixN,param)
 
-
-ntr = param.ntr;
-PixN = param.PixN;
+ntr = length(files_tr);
 Nfeat = param.Nfeat;
-level = param.level;
-stage = param.stage;
 Nfeatcontext = param.Nfeatcontext;
 Nlevel = param.Nlevel;
-
-filestr = dir([trainpath '*.png']);
-filesla = dir([labelpath '*.png']);
-
 
 % Feature Extraction
 fprintf('Extracting features ... stage %d level %d \n',stage,level);
@@ -21,19 +13,19 @@ if stage==1 || level~=0
     DD = zeros(1,PixN);
     COUNTER = 0;
     for i = 1:ntr
-        img = imread([trainpath filestr(i).name]);
+        [~,filename,~] = fileparts(files_tr{i});
+        img = imread(files_tr{i});
         img = MyDownSample(img,level);
         fv = Filterbank(img);
 
         fvcontext = zeros(level*Nfeatcontext,numel(img));
         for j = 0:level-1
-            Contextpath = [savingpath 'output_level' num2str(j) '_stage' num2str(stage) '/'];
-            temp = load([Contextpath 'slice' num2str(i)]);
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], filename), 'clabels');
             temp = MyDownSample(temp.clabels,level-j);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
         end
 
-        temp = imread([labelpath filesla(i).name]);
+        temp = imread(files_la{i});
         clabels = double(temp>0);
         clabels = Mymaxpooling(clabels,level);
         D = reshape(clabels,1,numel(clabels));
@@ -47,20 +39,20 @@ else
     DD = zeros(1,PixN);
     COUNTER = 0;
     for i = 1:ntr
-        img = imread([trainpath filestr(i).name]);
+        [~,filename,~] = fileparts(files_tr{i});
+        img = imread(files_tr{i});
         img = MyDownSample(img,level);
         fv = Filterbank(img);
 
         fvcontext = zeros((Nlevel+1)*Nfeatcontext,numel(img));
         for j = 0:Nlevel
-            Contextpath = [savingpath 'output_level' num2str(j) '_stage' num2str(stage-1) '/'];
-            temp = load([Contextpath 'slice' num2str(i)]);
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], filename), 'clabels');
             temp = MyUpSample(temp.clabels,j);
             temp = temp(1:size(img,1),1:size(img,2),:);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
         end
 
-        temp = imread([labelpath filesla(i).name]);
+        temp = imread(files_la{i});
         clabels = double(temp>0);
         clabels = Mymaxpooling(clabels,level);
         D = reshape(clabels,1,numel(clabels));
@@ -88,27 +80,26 @@ if PixN > 6000000 % increase this for real problems
     DD = DD(:,ind);
 end
 % Learning the Classifier
-fprintf('start learning LDNN ... stage %d level %d \n',stage,level);
+fprintf('Start learning LDNN ... stage %d level %d \n',stage,level);
 opt.level = level;
 opt.stage = stage;
-tic;model = LearnAndOrNetMEX( X,DD,opt);Time = toc;
-save([savingpath 'MODEL_level' num2str(level) '_stage' num2str(stage)] , 'model','Time', '-v7.3');
+tic;model = LearnAndOrNetMEX(X,DD,opt);Time = toc;
+save(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]), 'model','Time', '-v7.3');
 % Write the outputs
 fprintf('Generating outputs ... stage %d level %d \n',stage,level);
-str = [savingpath 'output_level' num2str(level) '_stage' num2str(stage) '/'];
-mkdir(str);
+str = fullfile(savingpath, ['output_level' num2str(level) '_stage' num2str(stage)]);
+if exist(str,'file')~=7; mkdir(str); end
 
-trOutput{ntr} = [];
 if stage==1 || level~=0
     parfor i = 1:ntr
-        img = imread([trainpath filestr(i).name]);
+        [~,filename,~] = fileparts(files_tr{i});
+        img = imread(files_tr{i});
         img = MyDownSample(img,level);
         fv = Filterbank(img);
 
         fvcontext = zeros(level*Nfeatcontext,numel(img));
         for j = 0:level-1
-            Contextpath = [savingpath 'output_level' num2str(j) '_stage' num2str(stage) '/'];
-            temp = load([Contextpath 'slice' num2str(i)]);
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], filename), 'clabels');
             temp = MyDownSample(temp.clabels,level-j);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
         end
@@ -116,18 +107,19 @@ if stage==1 || level~=0
         X = [fv;fvcontext];
         [~, Y_floats] = EvaluateAndOrNetMX(X,model);
         clabels = reshape(Y_floats,size(img));
-        trOutput{i} = clabels;
+        parsave(fullfile(str,filename),clabels);
+        %? imwrite(clabels, fullfile(str, [filename ext]));
     end
 else
     parfor i = 1:ntr
-        img = imread([trainpath filestr(i).name]);
+        [~,filename,~] = fileparts(files_tr{i});
+        img = imread(files_tr{i});
         img = MyDownSample(img,level);
         fv = Filterbank(img);
 
         fvcontext = zeros((Nlevel+1)*Nfeatcontext,numel(img));
         for j = 0:Nlevel
-            Contextpath = [savingpath 'output_level' num2str(j) '_stage' num2str(stage-1) '/'];
-            temp = load([Contextpath 'slice' num2str(i)]);
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], filename), 'clabels');
             temp = MyUpSample(temp.clabels,j);
             temp = temp(1:size(img,1),1:size(img,2),:);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
@@ -136,13 +128,10 @@ else
         X = [fv;fvcontext];
         [~, Y_floats] = EvaluateAndOrNetMX(X,model);
         clabels = reshape(Y_floats,size(img));
-        trOutput{i} = clabels;
+        parsave(fullfile(str,filename),clabels);
+        %? imwrite(clabels, fullfile(str, [filename ext]));
     end
 end
 
-for i = 1:ntr
-    clabels = trOutput{i};
-    save([str 'slice' num2str(i)],'clabels','-v7.3');
-end
-
-
+function parsave(path, clabels)
+save(path,'clabels','-v7.3');

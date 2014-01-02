@@ -1,91 +1,73 @@
-function TrainScript(trainpath,labelpath,testpath,savingpath);
-if ~matlabpool('size')
-	matlabpool open 12;
-end
+function TrainScript(trainpath,labelpath,testpath,savingpath,outputpath);
+if nargin < 4 || nargin > 5; error('moj_seg must have 4 to 5 input arguments'); end
+if nargin == 4; outputpath = fullfile(savingpath, 'output_testImages'); end
 
-if ~strcmp(trainpath(end),'/') 
-    trainpath = [trainpath '/'];
-end
+opened_pool = 0;
+try; if ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
 
-if ~strcmp(testpath(end),'/')
-    testpath = [testpath '/'];
-end
+%trainpath  = fullfile('.', 'trainImages'); %path to the training images
+%labelpath  = fullfile('.', 'trainLabels'); %path to the training labels
+%testpath   = fullfile('.', 'testImages');  %path to the test images
+%savingpath = fullfile('.', 'temp');        %path to save temporary files to
+%outputpath = fullfile('.', 'output');      %path to save output images to
 
-if ~strcmp(labelpath(end),'/')
-    labelpath = [labelpath '/'];
-end
+files_tr = GetFiles(trainpath);
+files_la = GetFiles(labelpath);
+files_te = GetFiles(testpath);
 
-if ~strcmp(savingpath(end),'/')
-    savingpath = [savingpath '/'];
-end
-
-
-%trainpath = './trainImages/'; %path to the training Images
-%labelpath = './trainLabels/'; %path to the training Labels
-%savingpath = './temp/'; %path to save results and temporary files
-mkdir(savingpath);
+if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
 %add path to functions required for feature extraction.
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));
 addpath(genpath(fullfile(my_path, 'FilterStuff')));
 
+
 % parameters
 Nstage = 2;
 Nlevel = 4;
 % Only for preallocation purpose
-filestr = dir(fullfile(trainpath, '*.png'));
-ntr = length(filestr);
 PixN = zeros(Nlevel+1,1);
-for i = 1:ntr
-    im = imread(fullfile(trainpath, filestr(i).name))
+for i = 1:length(files_tr)
+    im = imread(files_tr{i});
     for l = 0:Nlevel
         temp = MyDownSample(im,l);
         PixN(l+1) = PixN(l+1) + numel(temp);
     end
 end
-im = imread(fullfile(trainpath, filestr(1).name))
+im = imread(files_tr{1});
 tempfeat = Filterbank(im);
 Nfeat = size(tempfeat,1);
 tempfeat = ConstructNeighborhoodsS(im);
 Nfeatcontext = size(tempfeat,1);
 
-param.ntr = ntr;
-param.PixN = PixN;
+save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3'); % don't need to save this for this run, but to be able to run CHM_test_single/CHM_test_multiple later we need it
+
 param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;
 param.Nlevel = Nlevel;
+param.Nstage = Nstage;
 
 
 % Train the CHM
 for s = 1:Nstage
-    param.stage = s;
     for l = 0:Nlevel
-        param.level = l;
-        param.PixN = PixN(l+1);
-        model = trainCHM(trainpath,labelpath,savingpath,param);
+        model = trainCHM(files_tr,files_la,savingpath,s,l,PixN(l+1),param); % uses Nfeat, Nfeatcontext, and NLevel from param
         if s==Nstage, break; end
     end
 end
 
 % Test CHM
-param.Nstage = Nstage;
-%testpath = './testImages/'; %path to the test Images
-fileste = dir(fullfile(testpath, '*.png')); 
-str = fullfile(savingpath, 'output_testImages/');
-mkdir(str);
-outputs{length(fileste)} = [];
-parfor i = 1:length(fileste)
-    img = imread(fullfile(testpath, fileste(i).name));
-    clabels = testCHM(img,savingpath,param);
-    outputs{i} = clabels;
+if exist(outputpath,'file')~=7; mkdir(outputpath); end
+parfor i = 1:length(files_te)
+    [~,filename,ext] = fileparts(files_te{i});
+    img = imread(files_te{i});
+    clabels = testCHM(img,savingpath,param); % uses Nfeatcontext, NLevel, and NStage from param
+    %parsave(fullfile(outputpath, filename), clabels);
+    imwrite(clabels, fullfile(outputpath, [filename ext]));
 end
 
-for i = 1:length(fileste)
- clabels = outputs{i};
- save(fullfile(str, ['slice' num2str(i)]),'clabels','-v7.3');
- imwrite(clabels,fullfile(str, fileste(i).name));
-end
-if matlabpool('size')
-	matlabpool close
-end
-    
+if opened_pool; matlabpool close; end
+
+
+function parsave(path, clabels)
+save(path,'clabels','-v7.3');

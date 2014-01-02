@@ -1,4 +1,5 @@
 function feat = Filterbank(I)
+if strcmpi(I, 'count'); feat = 6; return; end;
 
 haar = ConstructHaar(I);
 Hog = ConstructHOG(I);
