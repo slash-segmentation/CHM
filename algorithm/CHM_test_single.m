@@ -1,6 +1,8 @@
 function CHM_test_single(input_file,output_file,savingpath)
+if nargin < 2 || nargin > 3; error('CHM_test_single must have 2 to 3 input arguments'); end
+if nargin == 2; savingpath = fullfile('.', 'temp'); end
 
-param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3');
+param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 
 % Add path to functions required for feature extraction.
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));

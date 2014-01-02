@@ -1,8 +1,6 @@
 function CHM_train(trainpath, labelpath, savingpath)
-% 
-% 
-% 
-
+if nargin < 2 || nargin > 3; error('CHM_train must have 2 to 3 input arguments'); end
+if nargin == 2; savingpath = fullfile('.', 'temp'); end
 
 % Add path to functions required for feature extraction.
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));
