@@ -7,7 +7,7 @@ function output = GetFiles(x);
 %  * path with numerical pattern - get all files matching the pattern (pattern must have #s in it and end with a ;5-15 or other numbers, the #s are replaced by the values at the end with leading zeros as necessary)
 %  * path with wildcard pattern  - get all files matching the pattern (* in the pattern means any number of any characters)
 if iscellstr(x);
-    output = cellfun(@(f) exists(f, 'file'), x);
+    output = cellfun(@(f) exist(f, 'file'), x);
     bad    = x{output~=2};
     if length(bad) ~= 0;
         for i = 1:length(bad); disp ['No such file "' bad{i} '"']; end;
@@ -16,7 +16,7 @@ if iscellstr(x);
         output = x{:};
     end;
 elseif ischar(x) && isvector(x);
-    type = exists(x, 'file');
+    type = exist(x, 'file');
     if type == 7;
         % is a directory, grab all PNGs there
         pngs = dir(fullfile(x, '*.png'));
@@ -66,7 +66,7 @@ function output = get_files_numerical(x);
     n = 0;
     for i = lower:upper;
         f = sprintf(pattern, i);
-        if exists(f, 'file') ~= 2;
+        if exist(f, 'file') ~= 2;
             disp ['No such file "' f '"'];
         else;
             n = n + 1;
