@@ -53,7 +53,7 @@ function output = get_files_multiple_listing(x);
 
 function output = get_files_numerical(x);
     tokens = regexp(x, '^([^#]*)(#+)([^#;]*);(\d+)-(\d+)$', 'tokens');
-    if length(tokens) ~= 1: output = 0; return; end;
+    if length(tokens) ~= 1; output = 0; return; end;
     a = tokens{1}{1};
     digits = length(tokens{1}{2});
     b = tokens{1}{3};
