@@ -8,12 +8,12 @@ function output = GetFiles(x);
 %  * path with wildcard pattern  - get all files matching the pattern (* in the pattern means any number of any characters)
 if iscellstr(x);
     output = cellfun(@(f) exist(f, 'file'), x);
-    bad    = x{output~=2};
+    bad    = x(output~=2);
     if length(bad) ~= 0;
         for i = 1:length(bad); disp(['No such file "' bad{i} '"']); end;
-        output = x{output==2};
+        output = x(output==2);
     else;
-        output = x{:};
+        output = x(:);
     end;
 elseif ischar(x) && isvector(x);
     type = exist(x, 'file');
@@ -21,8 +21,8 @@ elseif ischar(x) && isvector(x);
         % is a directory, grab all PNGs there
         pngs = dir(fullfile(x, '*.png'));
         n = length(pngs);
-        disp(['No PNG files in "' x '"']);
         output = cell(1,n);
+        if n == 0; disp(['No PNG files in "' x '"']); return; end;
         for i = 1:n; output{i} = fullfile(x, pngs(i).name); end;
     elseif type == 2;
         % is a single file
@@ -33,7 +33,7 @@ elseif ischar(x) && isvector(x);
         output = get_files_numerical(x);        if iscellstr(output); return; end;
         output = get_files_wildcard(x);         if iscellstr(output); return; end;
         disp(['No such file "' x '"']);
-        output = {};
+        output = cell(1,0);
     end
 else
     err = MException('GetFiles:ArgumentTypeException', 'Argument to GetFiles was not a usable type');
@@ -73,7 +73,7 @@ function output = get_files_numerical(x);
             output{n} = f;
         end;
     end;
-    output = output{1:n};
+    output = output(1:n);
 
 function output = get_files_wildcard(x);
     if length(strfind(x, '*')) == 0; output = 0; return; end;
