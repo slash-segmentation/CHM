@@ -22,19 +22,19 @@ for i = 1:length(files_tr)
     % Original: for l = 0:Nlevel; PixN(l+1) = PixN(l+1) + numel(MyDownSample(im,l)); end;
     
     % Faster (2.7x) but assumes MyDownSample(im,n) == MyDownSample(MyDownSample(im,1),n-1) and MyDownSample(im,0) == im
-    PixNb(1) = PixNb(1) + numel(im);
+    PixN(1) = PixN(1) + numel(im);
     for l = 1:Nlevel
         im = MyDownSample(im,1);
-        PixNb(l+1) = PixNb(l+1) + numel(im);
+        PixN(l+1) = PixN(l+1) + numel(im);
     end
     
     % Even faster (5.1x of original) but assumes that MyDownSample always halves image size (rounded up) for each level
     %[w,h] = size(imread(files_tr{i}));
-    %PixNc(1) = PixNc(1) + w*h;
+    %PixN(1) = PixN(1) + w*h;
     %for l = 1:Nlevel
     %    w = floor((w + 1) / 2);
     %    h = floor((h + 1) / 2);
-    %    PixNc(l+1) = PixNc(l+1) + w*h;
+    %    PixN(l+1) = PixN(l+1) + w*h;
     %end
 end
 toc
