@@ -53,8 +53,6 @@ param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;
 param.Nlevel = Nlevel;
 
-exit();
-
 opened_pool = 0;
 try; if ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
 
