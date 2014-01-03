@@ -10,7 +10,7 @@ if iscellstr(x);
     output = cellfun(@(f) exist(f, 'file'), x);
     bad    = x{output~=2};
     if length(bad) ~= 0;
-        for i = 1:length(bad); disp ['No such file "' bad{i} '"']; end;
+        for i = 1:length(bad); disp(['No such file "' bad{i} '"']); end;
         output = x{output==2};
     else;
         output = x{:};
@@ -21,7 +21,7 @@ elseif ischar(x) && isvector(x);
         % is a directory, grab all PNGs there
         pngs = dir(fullfile(x, '*.png'));
         n = length(pngs);
-        disp ['No PNG files in "' x '"'];
+        disp(['No PNG files in "' x '"']);
         output = cell(1,n);
         for i = 1:n; output{i} = fullfile(x, pngs(i).name); end;
     elseif type == 2;
@@ -32,7 +32,7 @@ elseif ischar(x) && isvector(x);
         output = get_files_multiple_listing(x); if iscellstr(output); return; end;
         output = get_files_numerical(x);        if iscellstr(output); return; end;
         output = get_files_wildcard(x);         if iscellstr(output); return; end;
-        disp ['No such file "' x '"'];
+        disp(['No such file "' x '"']);
         output = {};
     end
 else
@@ -42,7 +42,7 @@ end
 
 
 function output = get_files_multiple_listing(x);
-    files = regexp(x, ',', 'split'); % only in newer versions of MATLAB: strsplit(x,',');
+    files = regexp(x, ',', 'split'); % only in newer versions of MATLAB: strsplit(x, ',')
     if length(files) <= 1; output = 0; return; end;
     output = {};
     for i = 1:length(files);
@@ -67,7 +67,7 @@ function output = get_files_numerical(x);
     for i = lower:upper;
         f = sprintf(pattern, i);
         if exist(f, 'file') ~= 2;
-            disp ['No such file "' f '"'];
+            disp(['No such file "' f '"']);
         else;
             n = n + 1;
             output{n} = f;
