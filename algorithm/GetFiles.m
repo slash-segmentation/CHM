@@ -42,7 +42,7 @@ end
 
 
 function output = get_files_multiple_listing(x);
-    files = strsplit(x,',')
+    files = regexp(x, ',', 'split'); % only in newer versions of MATLAB: strsplit(x,',');
     if length(files) <= 1; output = 0; return; end;
     output = {};
     for i = 1:length(files);
@@ -61,7 +61,7 @@ function output = get_files_numerical(x);
     upper = str2num(tokens{1}{5});
     if upper < lower; output = 0; return; end;
     
-    output = cell{1,(upper-lower+1)};
+    output = cell(1,(upper-lower+1));
     pattern = [a '%0' num2str(digits) 'd' b];
     n = 0;
     for i = lower:upper;
@@ -77,9 +77,9 @@ function output = get_files_numerical(x);
 
 function output = get_files_wildcard(x);
     if length(strfind(x, '*')) == 0; output = 0; return; end;
-    [folder, ~, ~] = fileparts(x)
+    [folder, ~, ~] = fileparts(x);
     pngs = dir(x);
     n = length(pngs);
     if n == 0; output = 0; return; end;
-    output = cell(1,n)
+    output = cell(1,n);
     for i = 1:n; output{i} = fullfile(folder, pngs(i).name); end;
