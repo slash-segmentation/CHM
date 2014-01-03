@@ -16,7 +16,6 @@ Nlevel = 4;
 
 % Only for preallocation purpose
 PixN = zeros(Nlevel+1,1);
-tic;
 for i = 1:length(files_tr)
     im = imread(files_tr{i});
     % Original: for l = 0:Nlevel; PixN(l+1) = PixN(l+1) + numel(MyDownSample(im,l)); end;
@@ -37,15 +36,10 @@ for i = 1:length(files_tr)
     %    PixN(l+1) = PixN(l+1) + w*h;
     %end
 end
-toc
 
 im = imread(files_tr{1});
-tic;
 Nfeat = Filterbank('count'); % size(Filterbank(im),1);
-toc
-tic;
 Nfeatcontext = size(ConstructNeighborhoodsS(im),1); % TODO: make shortcut function for getting size?
-toc
 
 save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3');
 
