@@ -36,7 +36,7 @@ elseif ischar(x) && isvector(x);
         output = {};
     end
 else
-    err = MException('GetFiles:ArgumentTypeException', 'Argument to get_files was not a usable type');
+    err = MException('GetFiles:ArgumentTypeException', 'Argument to GetFiles was not a usable type');
     throw(err);
 end
 
@@ -47,7 +47,7 @@ function output = get_files_multiple_listing(x);
     output = {};
     for i = 1:length(files);
         if length(files(i)) ~= 0;
-            output = [output,get_files(files{i}];
+            output = [output,GetFiles(files{i})];
         end;
     end;
 
