@@ -38,7 +38,7 @@ for i = 1:length(files_tr)
 end
 
 im = imread(files_tr{1});
-Nfeat = Filterbank('count'); % size(Filterbank(im),1);
+Nfeat = size(Filterbank(im),1);
 Nfeatcontext = size(ConstructNeighborhoodsS(im),1); % TODO: make shortcut function for getting size?
 
 save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3');

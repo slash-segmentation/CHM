@@ -34,7 +34,7 @@ for i = 1:length(files_tr)
         PixN(l+1) = PixN(l+1) + numel(temp);
     end
 end
-im = imread(files_tr{1});
+%im = imread(files_tr{1});
 tempfeat = Filterbank(im);
 Nfeat = size(tempfeat,1);
 tempfeat = ConstructNeighborhoodsS(im);
