@@ -35,9 +35,10 @@ elseif ischar(x) && isvector(x);
         disp ['No such file "' x '"'];
         output = {};
     end
-else;
+else
     err = MException('GetFiles:ArgumentTypeException', 'Argument to get_files was not a usable type');
     throw(err);
+end
 
 
 function output = get_files_multiple_listing(x);
