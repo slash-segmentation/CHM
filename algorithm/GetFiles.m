@@ -42,7 +42,7 @@ end
 
 
 function output = get_files_multiple_listing(x);
-    files = strsplit(str,',')
+    files = strsplit(x,',')
     if length(files) <= 1; output = 0; return; end;
     output = {};
     for i = 1:length(files);
