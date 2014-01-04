@@ -1,6 +1,8 @@
-function TrainScript(trainpath,labelpath,testpath,outputpath,savingpath);
-if nargin < 4 || nargin > 5; error('TrainScript must have 4 to 5 input arguments'); end
-if nargin == 4; savingpath = fullfile('.', 'temp'); end
+function TrainScript(trainpath,labelpath,testpath,outputpath,savingpath,Nstage,Nlevel);
+if nargin < 4 || nargin > 7; error('TrainScript must have 4 to 7 input arguments'); end
+if nargin < 5; savingpath = fullfile('.', 'temp'); end
+if nargin < 6; Nstage = 2; end
+if nargin < 7; Nlevel = 4; end
 
 opened_pool = 0;
 try; if ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
@@ -22,9 +24,6 @@ if exist(savingpath,'file')~=7; mkdir(savingpath); end
 addpath(genpath(fullfile(my_path, 'FilterStuff')));
 
 
-% parameters
-Nstage = 2;
-Nlevel = 4;
 % Only for preallocation purpose
 PixN = zeros(Nlevel+1,1);
 for i = 1:length(files_tr)

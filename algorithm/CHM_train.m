@@ -1,6 +1,8 @@
-function CHM_train(trainpath, labelpath, savingpath)
-if nargin < 2 || nargin > 3; error('CHM_train must have 2 to 3 input arguments'); end
-if nargin == 2; savingpath = fullfile('.', 'temp'); end
+function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel)
+if nargin < 2 || nargin > 5; error('CHM_train must have 2 to 5 input arguments'); end
+if nargin < 3; savingpath = fullfile('.', 'temp'); end
+if nargin < 4; Nstage = 2; end
+if nargin < 5; Nlevel = 4; end
 
 % Add path to functions required for feature extraction.
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));
@@ -9,10 +11,6 @@ addpath(genpath(fullfile(my_path, 'FilterStuff')));
 files_tr = GetFiles(trainpath);
 files_la = GetFiles(labelpath);
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
-
-% Parameters
-Nstage = 2;
-Nlevel = 4;
 
 % Only for preallocation purpose
 PixN = zeros(Nlevel+1,1);

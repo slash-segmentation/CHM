@@ -7,8 +7,8 @@ fi
 
 inputfile=$1;
 outputfile=$2;
-workfolder=./temp/;
-if [[ $# > 2 ]]; then workfolder=$3; fi
+opt=;
+if [[ $# > 2 ]]; then opt=${opt},''$3''; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
@@ -27,7 +27,7 @@ else
 fi
 
 # Run the main matlab script (no JVM and multi comp ) 
-matlab -nodisplay -nojvm -r "run_from_shell('CHM_test_single(''${inputfile}'',''${outputfile}'',''${workfolder}'');');";
+matlab -nodisplay -nojvm -r "run_from_shell('CHM_test_single(''${inputfile}'',''${outputfile}''${opt});');";
 matlab_err=$?;
 
 # Cleanup
