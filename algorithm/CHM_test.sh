@@ -8,7 +8,7 @@ fi
 inputfiles=$1;
 outputfolder=$2;
 opt=;
-if [[ $# > 2 ]]; then opt=${opt},''$3''; fi
+if [[ $# > 2 ]]; then opt="${opt},''$3''"; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink

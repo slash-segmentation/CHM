@@ -12,9 +12,9 @@ labelfolder=$2;
 testfolder=$3;
 testoutput=$4;
 opt=;
-if [[ $# > 4 ]]; then opt=${opt},''$5''; fi
-if [[ $# > 6 ]]; then opt=${opt},$6; fi
-if [[ $# > 7 ]]; then opt=${opt},$7; fi
+if [[ $# > 4 ]]; then opt="${opt},''$5''"; fi
+if [[ $# > 6 ]]; then opt="${opt},$6"; fi
+if [[ $# > 7 ]]; then opt="${opt},$7"; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink

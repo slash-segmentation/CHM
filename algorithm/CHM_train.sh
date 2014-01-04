@@ -8,9 +8,9 @@ fi
 trainfolder=$1;
 labelfolder=$2;
 opt=;
-if [[ $# > 2 ]]; then opt=${opt},''$3''; fi
-if [[ $# > 3 ]]; then opt=${opt},$4; fi
-if [[ $# > 4 ]]; then opt=${opt},$5; fi
+if [[ $# > 2 ]]; then opt="${opt},''$3''"; fi
+if [[ $# > 3 ]]; then opt="${opt},$4"; fi
+if [[ $# > 4 ]]; then opt="${opt},$5"; fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
