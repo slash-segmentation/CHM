@@ -28,8 +28,12 @@ else
     export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 fi
 
-# Run the main matlab script (has JVM and single comp thread because of parallel toolbox usage) 
-matlab -nodisplay -singleCompThread -r "run_from_shell('CHM_train(''${trainfolder}'',''${labelfolder}''${opt});');";
+# Set 'singleCompThread' for MATLAB if there are a lot of processors
+ARGS=
+if (( `nproc` > 24 )); then ARGS=-singleCompThread; fi;
+
+# Run the main matlab script (need JVM for parallel)
+matlab -nodisplay ${ARGS} -r "run_from_shell('CHM_train(''${trainfolder}'',''${labelfolder}''${opt});');";
 matlab_err=$?;
 
 # Cleanup

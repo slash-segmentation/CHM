@@ -26,8 +26,12 @@ else
     export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 fi
 
-# Run the main matlab script (no JVM and multi comp ) 
-matlab -nodisplay -nojvm -r "run_from_shell('CHM_test_single(''${inputfiles}'',''${outputfolder}''${opt});');";
+# Set 'singleCompThread' for MATLAB if there are a lot of processors
+ARGS=
+if (( `nproc` > 24 )); then ARGS=-singleCompThread; fi;
+
+# Run the main matlab script (need JVM for parallel)
+matlab -nodisplay ${ARGS} -r "run_from_shell('CHM_test_single(''${inputfiles}'',''${outputfolder}''${opt});');";
 matlab_err=$?;
 
 # Cleanup
