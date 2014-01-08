@@ -31,7 +31,7 @@ ARGS=
 if (( `nproc` > 24 )); then ARGS=-singleCompThread; fi;
 
 # Run the main matlab script (need JVM for parallel)
-matlab -nodisplay ${ARGS} -r "run_from_shell('CHM_test_single(''${inputfiles}'',''${outputfolder}''${opt});');";
+matlab -nodisplay ${ARGS} -r "run_from_shell('CHM_test(''${inputfiles}'',''${outputfolder}''${opt});');";
 matlab_err=$?;
 
 # Cleanup
