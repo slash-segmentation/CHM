@@ -13,4 +13,4 @@ img = imread(input_file);
 clabels = testCHM(img,savingpath,param); % uses Nfeatcontext, NLevel, and NStage from param
 %[folder,filename,~] = fileparts(output_file);
 %save(fullfile(folder,filename),'clabels','-v7.3');
-imwrite(clabels,output_file);
+imwrite(uint8(clabels*255),output_file);

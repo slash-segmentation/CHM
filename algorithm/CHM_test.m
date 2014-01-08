@@ -20,7 +20,7 @@ parfor i = 1:length(files_te)
     img = imread(files_te{i});
     clabels = testCHM(img,savingpath,param); % uses Nfeatcontext, NLevel, and NStage from param
     %parsave(fullfile(outputpath, filename), clabels);
-    imwrite(clabels, fullfile(outputpath, [filename ext]));
+    imwrite(uint8(clabels*255), fullfile(outputpath, [filename ext]));
 end
 
 if opened_pool; matlabpool close; end
