@@ -46,12 +46,12 @@ param.Nfeatcontext = Nfeatcontext;
 param.Nlevel = Nlevel;
 
 opened_pool = 0;
-try; if ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
+try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
 
 % Train the CHM
 for s = 1:Nstage
     for l = 0:Nlevel
-        model = trainCHM(files_tr,files_la,savingpath,s,l,PixN(l+1),param); % uses Nfeat, Nfeatcontext, and NLevel from param
+        model = trainCHM(files_tr,files_la,savingpath,s,l,PixN(l+1),param); % uses Nfeat, Nfeatcontext, and Nlevel from param
         if s==Nstage, break; end
     end
 end

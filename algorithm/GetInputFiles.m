@@ -1,4 +1,4 @@
-function output = GetFiles(x);
+function output = GetInputFiles(x);
 % Gets the files to use. Always returns a 1-by-n cell-array of currently valid, existing, file names.
 % The argument can be a cell str array already, in which case it is filtered for existing files and returned. 
 % Or the argument can be a char array like one of the following or a combination seperated by commas:
@@ -29,9 +29,9 @@ elseif ischar(x) && isvector(x);
         output = {x};
     else % if type == 0;
         % does not exist, maybe it is a multiple listing, numerical pattern, or wildcard pattern
-        output = get_files_multiple_listing(x); if iscellstr(output); return; end;
-        output = get_files_numerical(x);        if iscellstr(output); return; end;
-        output = get_files_wildcard(x);         if iscellstr(output); return; end;
+        output = get_files_multiple_listing(x); if iscellstr(output); output = unique(output); return; end;
+        output = get_files_numerical(x);        if iscellstr(output); output = unique(output); return; end;
+        output = get_files_wildcard(x);         if iscellstr(output); output = unique(output); return; end;
         disp(['No such file "' x '"']);
         output = cell(1,0);
     end
@@ -39,6 +39,7 @@ else
     err = MException('GetFiles:ArgumentTypeException', 'Argument to GetFiles was not a usable type');
     throw(err);
 end
+output = unique(output);
 
 
 function output = get_files_multiple_listing(x);
