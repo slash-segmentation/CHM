@@ -1,15 +1,20 @@
 2013
 
-You should start with TrainScript.m
-1 - There is a main script which is responsible for training and testing the CHM (TrainScript.m).
-It only passes some parameters and computes a bunch of variables for preallocation.
-2 - trainCHM is the main function that extracts features and trains the classifier, i.e., LDNN, 
-and finally computes the results for the training images.
-3 - testCHM is the main function that runs the trained model on new input images.
-4 - You should put your training images in the "trainImages" folder.
-5 - You should put your training labels in the "trainLabels" folder.
-6 - You should put your testing images in the "testImages" folder.
-7 - I have put one sample in the folders.
+There are two phases to the algorithm: Training (creating the model) and Testing (applying the model)
+ - CHM_train does the training and it the training images and labels and outputs the model files.
+ - CHM_test does the testing, it takes a images and the model files and generates the probability maps.
+ 
+In the model folder, there are also temporary files in folders which can be deleted. The only thing that
+one needs to keep is the many files like MODEL_level#_stage#.mat and param.mat.
+
+There are parameters that can be adjusted. When training, you can select a number of levels and stages
+of processing. The default is 2 stages and 4 levels. Increasing these values really time required to
+perform training, but may increase quuaility of the model. When testing, you can set a block size and
+overlap size. The block size should be the same size as the training images during training for
+efficiency. Using an overlap is important so that there are less edges seen by the algorithm, however
+it does increase the processing time. When using blocks, you should use TIFF images which can be nearly
+twice as fast as PNGs and require less memory. When the TIFF image is a multiple of blocksize-2*overlapsize
+in width and height it needs much less memory (not even enough to store the whole image).
 
 %================== Filters
 I integrated the following codes in this package:

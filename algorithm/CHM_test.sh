@@ -17,9 +17,10 @@ Optional Arguments:
                   This can reduce processing time and memory usage along with
                   increasing quality. The block size should be exactly the size
                   of the training images. TIFF images are particularly faster
-                  with this method, especially if their width and height are
-                  multiples of the block_size-2*overlap_size. When using this,
-                  parallelism is done on blocks instead of entire slices.
+                  and use less memory with this method. TIFF images that have a
+                  width and height that are multiples of
+                  block_size-2*overlap_size use a lot less memory. When using
+                  blocks, parallelism is done on blocks instead of images.
   -o overlap_size Only allowed with -b. Specifies how much the blocks should
                   overlap (default is none). The value used will depend on the
                   size of the structures being segmenting but 100-200 pixels
