@@ -23,14 +23,18 @@ for i = 1:length(files_te)
     [~,~,ext] = fileparts(files_te{i});
     if strcmpi(ext,'.tif') || strcmpi(ext,'.tiff')
         info = imfinfo(files_te{i});
-        if mod(info.Width, bs(2)) == 0 && mod(info.Height, bs(1)) == 0;
-                blockproc(       files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'Destination',files_out{i});
-        else
-        imwrite(blockproc(       files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false),              files_out{i});
+        w = info.Width;
+        h = info.Height;
+        if mod(w, bs(2)) == 0 && mod(h, bs(1)) == 0;
+             blockproc(files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'Destination',files_out{i});
+             continue;
         end
+        im = blockproc(files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false);
+        im = im(1:h,1:w); % when reading directly from file the image is always padded with zeros to a multiple of the block size size.
     else
-        imwrite(blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false),              files_out{i});
+        im = blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false);
     end
+    imwrite(im, files_out{i});
 end
 
 if opened_pool; matlabpool close; end
