@@ -8,8 +8,8 @@ if nargin < 5; Nlevel = 4; end
 [my_path, ~, ~] = fileparts(mfilename('fullpath'));
 addpath(genpath(fullfile(my_path, 'FilterStuff')));
 
-files_tr = GetFiles(trainpath);
-files_la = GetFiles(labelpath);
+files_tr = GetInputFiles(trainpath);
+files_la = GetInputFiles(labelpath);
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
 % Only for preallocation purpose
