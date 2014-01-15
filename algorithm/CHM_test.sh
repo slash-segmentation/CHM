@@ -120,7 +120,7 @@ fi
 
 # Run the main matlab script
 if [[ $BLOCK_SIZE_X != 0 ]]; then
-  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',[${BLOCK_SIZE_X} ${BLOCK_SIZE_Y}],[${OVERLAP_SIZE_X} ${OVERLAP_SIZE_Y}],''${MODEL_FOLDER}'');');";
+  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',[${BLOCK_SIZE_Y} ${BLOCK_SIZE_X}],[${OVERLAP_SIZE_Y} ${OVERLAP_SIZE_X}],''${MODEL_FOLDER}'');');";
 else
   matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',''${MODEL_FOLDER}'');');";
 fi
