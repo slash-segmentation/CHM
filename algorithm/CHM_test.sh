@@ -14,17 +14,20 @@ Optional Arguments:
   -m model_folder The folder that contains the model data
                   (contains param.mat and MODEL_level#_stage#.mat)
   -b block_size   Process images in blocks of this size instead of all at once.
-                  This can reduce processing time and memory usage along with
-                  increasing quality. The block size should be exactly the size
-                  of the training images. TIFF images are particularly faster
-                  and use less memory with this method. TIFF images that have a
-                  width and height that are multiples of
-                  block_size-2*overlap_size use a lot less memory. When using
-                  blocks, parallelism is done on blocks instead of images.
+                  Can be given as a single value (used for both height and
+                  width) or a WxH value. This can reduce processing time and
+                  memory usage along with increasing quality. The block size
+                  should be exactly the size of the training images. TIFF
+                  images are particularly faster and use less memory with this
+                  method. TIFF images that have a width and height that are
+                  multiples of block_size-2*overlap_size use a lot less memory
+                  but will create uncompressed outputs. When using blocks,
+                  parallelism is done on blocks instead of images.
   -o overlap_size Only allowed with -b. Specifies how much the blocks should
-                  overlap (default is none). The value used will depend on the
-                  size of the structures being segmenting but 100-200 pixels
-                  seem good in general.
+                  overlap (default is none). Like -b this supports a single
+                  value or a WxH value. The value used will depend on the size
+                  of the structures being segmenting but 100-200 pixels seem
+                  good in general.
   -s              Single-thread / non-parallel. Normally the images/blocks are
                   processed in parallel using all available physical cores. 
 
@@ -39,9 +42,9 @@ It needs to be one of the these or a comma-separated list of these:
      example: in/####.png;5-15 would do in/0005.png through in/0015.png
      note: the semicolon needs to be escaped or in double quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
-     pattern has * in it which means any number of any characters" 1>&2;
+     pattern has * in it which means any number of any characters
      example: in/*.tif does all TIFF images in that directory
-     ! note: at the moment this one does not work because of shell expansion  
+     note: the asterisk needs to be escaped or in double quotes in some shells" 1>&2;
   exit 1;
 }
 
@@ -52,8 +55,11 @@ OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 2>&1; echo; usage; fi;
 MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
-declare -i BLOCK_SIZE=0;
-declare -i OVERLAP_SIZE=0;
+declare -i COMMA=0;
+declare -i BLOCK_SIZE_X=0;
+declare -i BLOCK_SIZE_Y=0;
+declare -i OVERLAP_SIZE_X=0;
+declare -i OVERLAP_SIZE_Y=0;
 shift 2
 while getopts ":sm:b:o:" o; do
   case "${o}" in
@@ -65,12 +71,26 @@ while getopts ":sm:b:o:" o; do
       if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 2>&1; echo; usage; fi;
       ;;
     b)
-      BLOCK_SIZE=${OPTARG};
-      if (( $BLOCK_SIZE <= 0 )); then echo "Invalid block size." 2>&1; echo; usage; fi;
+      COMMA=`expr index "${OPTARG}" "x"`;
+      if [[ COMMA != 0 ]]; then
+        BLOCK_SIZE_X=${OPTARG:0:$COMMA-1};
+        BLOCK_SIZE_Y=${OPTARG:$COMMA};
+      else
+        BLOCK_SIZE_X=${OPTARG};
+        BLOCK_SIZE_Y=${OPTARG};
+      fi;
+      if (( $BLOCK_SIZE_X <= 0 || $BLOCK_SIZE_Y <= 0 )); then echo "Invalid block size." 2>&1; echo; usage; fi;
       ;;
     o)
-      OVERLAP_SIZE=${OPTARG};
-      if (( $OVERLAP_SIZE <= 0 )); then echo "Invalid overlap size." 2>&1; echo; usage; fi;
+      COMMA=`expr index "${OPTARG}" "x"`;
+      if [[ COMMA != 0 ]]; then
+        OVERLAP_SIZE_X=${OPTARG:0:$COMMA-1};
+        OVERLAP_SIZE_Y=${OPTARG:$COMMA};
+      else
+        OVERLAP_SIZE_X=${OPTARG};
+        OVERLAP_SIZE_Y=${OPTARG};
+      fi;
+      if (( $OVERLAP_SIZE_X < 0 || $OVERLAP_SIZE_Y < 0 )); then echo "Invalid overlap size." 2>&1; echo; usage; fi;
       ;;
     *)
       echo "Invalid argument." 2>&1; echo; 
@@ -78,7 +98,7 @@ while getopts ":sm:b:o:" o; do
       ;;
     esac
 done
-if [[ $OVERLAP_SIZE != 0 && $BLOCK_SIZE == 0 ]]; then echo "Overlap size can only be used with block size." 2>&1; echo; usage; fi;
+if [[ ($OVERLAP_SIZE_X != 0 || $OVERLAP_SIZE_Y != 0) && $BLOCK_SIZE_X == 0 ]]; then echo "Overlap size can only be used with block size." 2>&1; echo; usage; fi;
 
 
 # We need to add the path with the script in it to the MATLAB path
@@ -99,8 +119,8 @@ fi
 
 
 # Run the main matlab script
-if [[ $BLOCK_SIZE != 0 ]]; then
-  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',${BLOCK_SIZE},${OVERLAP_SIZE},''${MODEL_FOLDER}'');');";
+if [[ $BLOCK_SIZE_X != 0 ]]; then
+  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',[${BLOCK_SIZE_X} ${BLOCK_SIZE_Y}],[${OVERLAP_SIZE_X} ${OVERLAP_SIZE_Y}],''${MODEL_FOLDER}'');');";
 else
   matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',''${MODEL_FOLDER}'');');";
 fi

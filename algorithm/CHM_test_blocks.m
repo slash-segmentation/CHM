@@ -12,9 +12,10 @@ addpath(genpath(fullfile(my_path, 'FilterStuff')));
 files_te  = GetInputFiles(input_files);
 files_out = GetOutputFiles(outputpath, files_te);
 
-bs = [blocksize-2*bordersize blocksize-2*bordersize];
-brd = [bordersize bordersize];
-proc = @(bs) ProcessBlock(bs, savingpath, param);
+if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersize) == 2; brd = bordersize(:)'; else; error('bordersize argument to CHM_test_blocks must have 1 or 2 elements'); end
+if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test_blocks must have 1 or 2 elements'); end
+bs = bs-2*brd;
+proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
 
 opened_pool = 0;
 try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
