@@ -4,10 +4,11 @@
 % If this script is not used and an exception happens then MATLAB corrupts the shell completely.
 % Any time MATLAB is run from the shell *nix you should always run "stty sane" afterwards.
 function run_from_shell(str)
+    retval=1;
+    c=onCleanup(@()exit(retval)); % required for CTRL+C handling
     try
         eval(str);
+        retval=0;
     catch exc
         disp(getReport(exc));
-        exit(1);
     end
-    exit(0);
