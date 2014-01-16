@@ -121,13 +121,10 @@ makeDirectory $SCRATCH
 
 
 INPUT_IMAGE=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
-OUTPUT_IMAGE=$SCRATCH/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
-NSTAGE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 3 | tail -n 1`
-NLEVEL=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 4 | tail -n 1`
-BLOCKSIZE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 5 | tail -n 1`
+BLOCKSIZE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
 
-OUTPUT_IMAGE_NAME=`echo $OUTPUT_IMAGE | sed "s/^.*\///"`
-
+OUTPUT_IMAGE_NAME=`echo $INPUT_IMAGE | sed "s/^.*\///"`
+OUTPUT_IMAGE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}"
 
 LOG_FILE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}.log"
 
@@ -136,7 +133,7 @@ copyInputsToScratch $SCRATCH
 
 
 # run runjob.sh
-logStartTime "runjob.sh"
+logStartTime "CHM_test.sh"
 
 logMessage "Writing runjob.sh output to $LOG_FILE"
 
@@ -148,7 +145,11 @@ fi
 
 echo "Job.Task:  ${JOB_ID}.${SGE_TASK_ID}" > $LOG_FILE
 
-$SCRATCH/CHM/runjob.sh $MATLAB_DIR $OUTPUT_IMAGE $NSTAGE $NLEVEL $BLOCKSIZE >> $LOG_FILE 2>&1
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PANFISH_BASEDIR/$MATLAB_DIR/bin/glnxa64
+export MATLAB_BIN_DIR="$PANFISH_BASEDIR/$MATLAB_DIR/bin"
+export PATH=$PATH:$MATLAB_BIN_DIR
+
+$SCRATCH/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH/CHM/out -m $SCRATCH/CHM/out $BLOCKSIZE -s >> $LOG_FILE 2>&1
 
 EXIT_CODE=$?
 
@@ -158,7 +159,7 @@ if [ $? != 0 ] ; then
   jobFailed "Unable to run cd $BASEDIR"
 fi
 
-logEndTime "runjob.sh" $START_TIME $EXIT_CODE
+logEndTime "CHM_test.sh" $START_TIME $EXIT_CODE
 
 
 logStartTime "Copying back $OUTPUT_IMAGE_NAME"
