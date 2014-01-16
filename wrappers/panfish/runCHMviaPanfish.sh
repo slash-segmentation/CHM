@@ -1,9 +1,8 @@
 #!/bin/sh
 
 TESTRUN_MODE="-testrun"
-PRINTONLY_MODE="-printonly"
 FULLRUN_MODE="-fullrun"
-CREATE_MODE="-create"
+CREATE_NOTRAIN_MODE="-createnotrain"
 VERIFY_MODE="-verify"
 
 if [ $# -lt 2 ] ; then
@@ -14,14 +13,12 @@ if [ $# -lt 2 ] ; then
   echo ""
   echo "Supported modes:"
   echo ""
-  echo "$CREATE_MODE <path to training data> <input data directory> <output directory> <stage> <level> <block size>"
+  echo "$CREATE_NOTRAIN_MODE <path to training data> <input data directory> <output directory> <block size>"
   echo "     Creates job in <output directory> that is runnable via other commands below"
   echo "        <path to training data> -- Should be set to directory containing training data"
   echo "        <input data directory> -- Should be set to directory containing *.png files representing slices to process"
   echo "        <output directory> -- Directory where job will be created"
-  echo "        <stage> -- Stage to use, most people set this to 2"
-  echo "        <level> -- Level to use, most people set this to 2"
-  echo "        <block size> -- Size of tiles to break slices into, most people use 1000 which results in 1k x 1k tiles"
+  echo "        <block size> -- Size can be single # or HxW format ie 200 or 200x200"
   echo "                        NOTE:  Going above 1k block size may cause jobs to fail due to too much memory consumption"
   
   echo ""
@@ -31,21 +28,16 @@ if [ $# -lt 2 ] ; then
   echo "$FULLRUN_MODE <output directory>"
   echo "     Runs CHM via Panfish on all slices"
   echo ""
-  echo "$PRINTONLY_MODE <output directory>"
-  echo "     Prints the commands this script would run but does NOT run them"
-  echo ""
   echo "$VERIFY_MODE <output directory>"
   echo "     Checks jobs for successful completion"
   echo ""
   echo "Examples:"
   echo ""
-  echo "$0 $CREATE_MODE /foo/Nstage2_Nlevel2 /foo/inputslices /share/chmrun 2 2 2000"
+  echo "$0 $CREATE_NOTRAIN_MODE /foo/Nstage2_Nlevel2 /foo/inputslices /share/chmrun 2000"
   echo ""
   echo "$0 $TESTRUN_MODE /share/chmrun"
   echo ""
   echo "$0 $FULLRUN_MODE /share/chmrun"
-  echo ""
-  echo "$0 $PRINTONLY_MODE /share/chmrun"
   echo ""
   exit 1
 fi
@@ -68,47 +60,6 @@ on_usr2() {
 
 # trap usr2 signal cause its what gets sent by SGE when qdel is called
 trap 'on_usr2' USR2
-
-#
-# Invoked in the print only mode.  This function
-# outputs the panfish commands to run the
-# job in its entirety.
-#
-function runPrintOnlyMode {
-  echo ""
-  echo "Print mode invoked.  Run the following commands:"
-  echo ""
-
-  CHUMMEDLIST=`$CASTBINARY --listclusters`
-
-  # use Panfish chum to upload the OUTPUT_DIR
-  echo "  # Use Panfish chum to upload $OUTPUT_DIR"
-  echo "  panfishchum --path $OUTPUT_DIR --cluster $CHUMMEDLIST";
-  echo ""
-
-  getInputDataDirectory $OUTPUT_DIR
-
-  # use Panfish chum to upload input data
-  echo "  # Use Panfish chum to upload input data"
-  echo "  panfishchum --path $INPUT_DATA --cluster $CHUMMEDLIST"
-  echo ""
-
-  getNumberOfCHMJobsFromConfig $OUTPUT_DIR
-
-  # use Panfish cast to submit runCHM.sh array jobs 
-  echo "  # Use Panfish cast to submit runCHM.sh array jobs"
-  echo "  cd $OUTPUT_DIR ; panfishcast -t 1-${NUMBER_JOBS} -N chm_job -q $CHUMMEDLIST $OUTPUT_DIR/runCHM.sh"
-  echo ""
-
-  # wait for completion
-  echo "  # Wait for completion of jobs use qstat or add -sync y to panfishcast command above"
-  echo ""
-  # download results
-  echo "  # Download results"
-  echo "  panfishland --path $OUTPUT_DIR --cluster $CHUMMEDLIST"
-  echo ""
-}
-
 
 #    
 # Submit job(s) via Panfish
@@ -245,23 +196,6 @@ function verifyResults {
      fi
   done
 
-  logMessage "Examining logs from these clusters: $CHUMMEDLIST"
-
-  for Y in `echo $CHUMMEDLIST | sed "s/,/ /g"` ; do
-     if [ -d "$OUTPUT_DIR/$Y" ] ; then
-        for Z in `grep "Exit Code:" $OUTPUT_DIR/${Y}/*stdout | grep -v "Exit Code: 0" | sed "s/^.*(task //" | sed "s/).*//" | sort | uniq` ; do
-           ANYFAILED="YES"
-           let NUM_FAILED_JOBS++
-           if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
-              logWarning "ERROR: A sub job in task $Z had non zero exit code.  Adding $Z to failed.jobs file"
-              echo "$Z" | sed "s/^.*\.//" >> $OUTPUT_DIR/failed.jobs.tmp
-           else 
-              logWarning "ERROR: A sub job in task $Z had non zero exit code."
-           fi
-        done
-     fi
-  done
-
   VERIFY_EXIT=0
 
   # make sure we have a sorted unique list of failed jobs
@@ -286,31 +220,19 @@ function verifyResults {
 function checkSingleTask {
    THEJOB=$1
 
-   # Verify we got a resulting tif file and it has a size greater then 0.
-   OUTPUT_IMAGE_NAME=$SCRATCH/`egrep "^${THEJOB}:::" $OUTPUT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1 | sed "s/^.*\///"`
+   # Verify we got a resulting file and it has a size greater then 0.
+   OUTPUT_IMAGE_NAME=`egrep "^${THEJOB}:::" $OUTPUT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1 | sed "s/^.*\///"`
    if [ ! -s "$OUTPUT_DIR/out/${OUTPUT_IMAGE_NAME}" ] ; then
          logWarning "task # $THEJOB: $OUTPUT_DIR/out/${OUTPUT_IMAGE_NAME} is missing or zero size"
          return 1
    fi
 
-   # Examine log file from runjob.sh and verify size is greater then 0
    getSingleCHMTaskLogFile $OUTPUT_DIR $THEJOB
    if [ $? != 0 ] ; then
-        logWarning "task # $THEJOB: Log file missing"
-        return 1
+     return 1
    fi
 
-   # Examine log file from runjob.sh and verify there is no Caught Fatal Exception messages
-   getFatalExceptionFromSingleCHMTask $OUTPUT_DIR $THEJOB
-   CHECK_EXIT=$?
-   if [ $CHECK_EXIT != 0 ] ; then
-      logWarning "Error parsing log file for task # $THEJOB"
-   elif [ "$FATAL_MESSAGE" != "" ] ; then
-      logWarning "task # $THEJOB had fatal exception: $FATAL_MESSAGE"
-      CHECK_EXIT=1
-   fi
-
-   return $CHECK_EXIT
+   return 0
 }
 
 #
@@ -327,7 +249,7 @@ function runJobs {
   JOBS_TO_RUN=$JOBS
 
   if [ ! -e "$OUTPUT_DIR/$RUN_CHM_CONFIG" ] ; then
-     jobFailed "No $OUTPUT_DIR/$RUN_CHM_CONFIG found. Did you run $CREATE_MODE ?"
+     jobFailed "No $OUTPUT_DIR/$RUN_CHM_CONFIG found. Did you run $CREATE_NOTRAIN_MODE ?"
   fi
   FIRST_IMAGE=`egrep "1:::" $OUTPUT_DIR/$RUN_CHM_CONFIG | head -n 1 | sed "s/^.*::://"`
   INPUT_DATA=`dirname $FIRST_IMAGE`
@@ -413,7 +335,7 @@ function runJobs {
 }
 
 
-function runCreateMode {
+function runCreateNoTrainMode {
 
   # try to make the output directory
   makeDirectory $OUTPUT_DIR
@@ -455,13 +377,6 @@ function runCreateMode {
     jobFailed "Error running /bin/cp $SCRIPT_DIR/runCHM.sh $OUTPUT_DIR/."
   fi
 
-  # Copy the runjob.sh into the CHM directory
-  /bin/cp $SCRIPTS_SUBDIR/runjob.sh $OUTPUT_DIR/CHM/.
-
-  if [ $? != 0 ] ; then
-     jobFailed "Error running /bin/cp $SCRIPTS_SUBDIR/runjob.sh $OUTPUT_DIR/CHM/."
-  fi
-
   # Copy the helperfuncs.sh
   /bin/cp $SCRIPTS_SUBDIR/helperfuncs.sh $OUTPUT_DIR/.
 
@@ -501,15 +416,10 @@ function runCreateMode {
   # create out directory under $OUTPUT_DIR
   makeDirectory $OUTPUT_DIR/out/log
 
-
-
   logMessage "Generating $OUTPUT_DIR/runCHM.sh.config configuration file"
   # Examine INPUT_DATA and create a configuration file in 
   # OUTPUT_DIR with this format:
   # 1:::<full path to input png file>
-  # 1:::<relative path to output tif file>
-  # 1:::<nstage>
-  # 1:::<nlevel>
   # 1:::<block size>
   # where 1 will be the SGE_TASK_ID for the job
 
@@ -522,12 +432,6 @@ function runCreateMode {
   for Y in `find $INPUT_DATA -name "*.png" -type f | sort -n` ; do
     let CNTR++
     echo "$CNTR:::$Y" >> $CONFIG_FILE
-
-    INPUT_FILE_NAME=`echo $Y | sed "s/\.png//" | sed "s/^.*\///"`
-    echo "$CNTR:::CHM/out/combined_${INPUT_FILE_NAME}.tif" >> $CONFIG_FILE
-
-    echo "$CNTR:::$STAGE" >> $CONFIG_FILE
-    echo "$CNTR:::$LEVEL" >> $CONFIG_FILE
     echo "$CNTR:::$BLOCKSIZE" >> $CONFIG_FILE
   done
 }
@@ -566,10 +470,10 @@ logEcho ""
 # 
 # Create mode
 #
-if [ "$MODE" == "$CREATE_MODE" ] ; then
+if [ "$MODE" == "$CREATE_NOTRAIN_MODE" ] ; then
 
-  if [ $# -ne 7 ] ; then
-     jobFailed "$MODE requires 7 arguments invoke $0 with no arguments for more information"
+  if [ $# -lt 4 ] ; then
+     jobFailed "$MODE requires at least 4 arguments invoke $0 with no arguments for more information"
   fi
 
   getFullPath $2
@@ -580,12 +484,14 @@ if [ "$MODE" == "$CREATE_MODE" ] ; then
 
   getFullPath $4
   declare -r OUTPUT_DIR=$GETFULLPATHRET
+ 
+  BLOCKSIZE=""
+  
+  if [ $# -eq 5 ] ; then
+    BLOCKSIZE="-b $5"
+  fi
 
-  declare -r STAGE=$5
-  declare -r LEVEL=$6
-  declare -r BLOCKSIZE=$7
-
-  runCreateMode
+  runCreateNoTrainMode
   THE_EXIT=$?
 
   writeJobProperties $OUTPUT_DIR
@@ -651,24 +557,6 @@ if [ "$MODE" == "$FULLRUN_MODE" ] ; then
   logEcho ""
   logEndTime "$MODE mode" $MODE_START_TIME $THE_EXIT
 
-  exit $THE_EXIT
-fi
-
-#
-# Print only mode
-#
-if [ "$MODE" == "$PRINTONLY_MODE" ] ; then
-
-  if [ $# -ne 2 ] ; then
-     jobFailed "$MODE requires 2 arguments invoke $0 with no arguments for more information"
-  fi
-
-  getFullPath $2
-  declare -r OUTPUT_DIR=$GETFULLPATHRET
-  echo $OUTPUT_DIR
-  runPrintOnlyMode
-  THE_EXIT=$?
-  logEndTime "$MODE mode" $MODE_START_TIME $THE_EXIT
   exit $THE_EXIT
 fi
 
