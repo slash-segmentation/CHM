@@ -72,7 +72,7 @@ while getopts ":sm:b:o:" o; do
       ;;
     b)
       COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ COMMA != 0 ]]; then
+      if [[ $COMMA != 0 ]]; then
         BLOCK_SIZE_X=${OPTARG:0:$COMMA-1};
         BLOCK_SIZE_Y=${OPTARG:$COMMA};
       else
@@ -83,7 +83,7 @@ while getopts ":sm:b:o:" o; do
       ;;
     o)
       COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ COMMA != 0 ]]; then
+      if [[ $COMMA != 0 ]]; then
         OVERLAP_SIZE_X=${OPTARG:0:$COMMA-1};
         OVERLAP_SIZE_Y=${OPTARG:$COMMA};
       else
