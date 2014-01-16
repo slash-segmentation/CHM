@@ -6,9 +6,11 @@
 function run_from_shell(str)
     retval=1;
     c=onCleanup(@()exit(retval)); % required for CTRL+C handling
+    runFromShellStart = tic;
     try
         eval(str);
         retval=0;
     catch exc
         disp(getReport(exc));
     end
+    fprintf('Running << %s >> took %f seconds\n',str,toc(runFromShellStart));
