@@ -103,7 +103,7 @@ function getSingleCHMTaskLogFile {
     return 1
   fi
 
-  OUT_IMAGE_RAW=`egrep "^${TASKID}:::" $JOBDIR/$RUN_CHM_CONFIG | head -n 2 | tail -n 1 | sed "s/^.*::://"`
+  OUT_IMAGE_RAW=`egrep "^${TASKID}:::" $JOBDIR/$RUN_CHM_CONFIG | head -n 1 | sed "s/^.*::://"`
 
   LOG_FILE_NAME=`echo $OUT_IMAGE_RAW | sed "s/^.*\///"`
 
@@ -161,12 +161,12 @@ function getRunTimeOfSingleCHMTask {
     return 1
   fi
 
-  grep "Running TrainScript_testBlocks on" $LOG_FILE > /dev/null 2>&1
+  grep "Running <<" $LOG_FILE > /dev/null 2>&1
   if [ $? != 0 ] ; then
      logWarning "Unable to parse runtime from $LOG_FILE for task $TASKID"
      return 1
   fi 
-  RUNTIME_SECONDS=`cat $LOG_FILE | grep "Running TrainScript_testBlocks on" | sed "s/^.*took //" | sed "s/\..*//"`
+  RUNTIME_SECONDS=`cat $LOG_FILE | grep "Running <<" | sed "s/^.*took //" | sed "s/\..*//"`
   
   return 0
 }
