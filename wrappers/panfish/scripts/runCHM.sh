@@ -121,7 +121,7 @@ makeDirectory $SCRATCH
 
 
 INPUT_IMAGE=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
-BLOCKSIZE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
+CHMOPTS=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
 
 OUTPUT_IMAGE_NAME=`echo $INPUT_IMAGE | sed "s/^.*\///"`
 OUTPUT_IMAGE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}"
@@ -149,7 +149,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PANFISH_BASEDIR/$MATLAB_DIR/bin/glnxa64
 export MATLAB_BIN_DIR="$PANFISH_BASEDIR/$MATLAB_DIR/bin"
 export PATH=$PATH:$MATLAB_BIN_DIR
 
-$SCRATCH/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH/CHM/out -m $SCRATCH/CHM/out $BLOCKSIZE -s >> $LOG_FILE 2>&1
+$SCRATCH/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH/CHM/out -m $SCRATCH/CHM/out $CHMOPTS -s >> $LOG_FILE 2>&1
 
 EXIT_CODE=$?
 
