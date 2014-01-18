@@ -13,13 +13,15 @@ if [ $# -lt 2 ] ; then
   echo ""
   echo "Supported modes:"
   echo ""
-  echo "$CREATE_NOTRAIN_MODE <path to training data> <input data directory> <output directory> <block size>"
+  echo "$CREATE_NOTRAIN_MODE <path to training data> <input data directory> <output directory> <chm opts>"
   echo "     Creates job in <output directory> that is runnable via other commands below"
   echo "        <path to training data> -- Should be set to directory containing training data"
   echo "        <input data directory> -- Should be set to directory containing *.png files representing slices to process"
   echo "        <output directory> -- Directory where job will be created"
-  echo "        <block size> -- Size can be single # or HxW format ie 200 or 200x200"
-  echo "                        NOTE:  Going above 1k block size may cause jobs to fail due to too much memory consumption"
+  echo "        <chm opts> -- Parameters passed directly to CHM_test.sh"
+  echo "                      Should be set as a single argument in quotes if there are spaces"
+  echo "                      This is where blocksize (-b HxW) and overlap (-o HxW) can be set"
+  echo "                      NOTE:  Going above 1k block size may cause jobs to fail due to too much memory consumption"
   
   echo ""
   echo "$TESTRUN_MODE <output directory>"
@@ -84,7 +86,12 @@ function castJob {
   cd $OUTPUT_DIR
 
   CAST_START_TIME=$START_TIME
-  BATCH_AND_WALLTIME_ARGS="--batchfactor gordon_shadow.q::0.5,trestles_shadow.q::0.25,coleslaw_shadow.q::0.25 --walltime gordon_shadow.q::13:00:00,trestles_shadow.q::14:00:00"
+
+  if [ -s "$OUTPUT_DIR/cast.args" ] ; then
+    BATCH_AND_WALLTIME_ARGS=`cat $OUTPUT_DIR/cast.args`
+    logMessage "Found cast.args file passing these args to panfishcast: $BATCH_AND_WALLTIME_ARGS"
+  fi
+
   T_ARG=$2
 
   # Move the cast.out file out of the way
@@ -359,10 +366,10 @@ function runCreateNoTrainMode {
   
   logMessage "Copying over $INPUT_CHM_FOLDER to $OUTPUT_DIR"
   
-  /bin/cp -a $INPUT_CHM_FOLDER $OUTPUT_DIR/.
+  /bin/cp -dR $INPUT_CHM_FOLDER $OUTPUT_DIR/.
 
   if [ $? != 0 ] ; then
-    jobFailed "Error running /bin/cp -a $INPUT_CHM_FOLDER $OUTPUT_DIR/."
+    jobFailed "Error running /bin/cp -dR $INPUT_CHM_FOLDER $OUTPUT_DIR/."
   fi
 
 
@@ -432,8 +439,15 @@ function runCreateNoTrainMode {
   for Y in `find $INPUT_DATA -name "*.png" -type f | sort -n` ; do
     let CNTR++
     echo "$CNTR:::$Y" >> $CONFIG_FILE
-    echo "$CNTR:::$BLOCKSIZE" >> $CONFIG_FILE
+    echo "$CNTR:::$CHMOPTS" >> $CONFIG_FILE
   done
+
+  for Y in `find $INPUT_DATA -name "*.tiff" -type f | sort -n` ; do
+    let CNTR++
+    echo "$CNTR:::$Y" >> $CONFIG_FILE
+    echo "$CNTR:::$CHMOPTS" >> $CONFIG_FILE
+  done
+
 }
 
 ###########################################################
@@ -453,6 +467,11 @@ PANFISH_BIN_DIR=`egrep "^panfish.bin.dir" $SCRIPT_DIR/panfishCHM.config | sed "s
 
 MATLAB_DIR=`egrep "^matlab.dir" $SCRIPT_DIR/panfishCHM.config | sed "s/^.*= *//"`
 
+BATCH_AND_WALLTIME_ARGS=`egrep "^batch.and.walltime.args" $SCRIPT_DIR/panfishCHM.config | sed "s/^.*= *//"`
+
+CHUMMEDLIST=`egrep "^cluster.list" $SCRIPT_DIR/panfishCHM.config | sed "s/^.*= *//"`
+
+
 X=1
 MAX_RETRIES=5
 RETRY_SLEEP=100
@@ -460,7 +479,6 @@ CASTBINARY="${PANFISH_BIN_DIR}panfishcast"
 CHUMBINARY="${PANFISH_BIN_DIR}panfishchum"
 LANDBINARY="${PANFISH_BIN_DIR}panfishland"
 PANFISHSTATBINARY="${PANFISH_BIN_DIR}panfishstat"
-CHUMMEDLIST=""
 
 logEcho ""
 logStartTime "$MODE mode"
@@ -485,10 +503,10 @@ if [ "$MODE" == "$CREATE_NOTRAIN_MODE" ] ; then
   getFullPath $4
   declare -r OUTPUT_DIR=$GETFULLPATHRET
  
-  BLOCKSIZE=""
+  CHMOPTS=""
   
   if [ $# -eq 5 ] ; then
-    BLOCKSIZE="-b $5"
+    CHMOPTS="$5"
   fi
 
   runCreateNoTrainMode
