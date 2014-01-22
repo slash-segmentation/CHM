@@ -110,7 +110,6 @@ function getSingleCHMTaskLogFile {
   LOG_FILE="$JOBDIR/out/log/${LOG_FILE_NAME}.log"
 
   if [ ! -s "$LOG_FILE" ]  ; then
-     logWarning "No $LOG_FILE found for task: $TASKID"
      return 1
   fi
   return 0
@@ -444,6 +443,11 @@ function getInitialClusterList {
      if [ $? != 0 ] ; then
         logWarning "Unable to get Matlab directory"
         return 1
+     fi
+
+     if [ -n "$CHUMMEDLIST" ] ; then
+       logMessage "Cluster list set to $CHUMMEDLIST"
+       return 0
      fi
 
      logMessage "Running $CHUMBINARY --listexists --path $MATLAB_DIR"
