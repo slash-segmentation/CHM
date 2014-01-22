@@ -5,6 +5,8 @@ FULLRUN_MODE="-fullrun"
 CREATE_NOTRAIN_MODE="-createnotrain"
 VERIFY_MODE="-verify"
 
+NUM_TEST_JOBS=16
+
 if [ $# -lt 2 ] ; then
   echo "$0 <mode> <arguments>"
   echo ""
@@ -25,13 +27,16 @@ if [ $# -lt 2 ] ; then
   
   echo ""
   echo "$TESTRUN_MODE <output directory>"
-  echo "     Runs CHM via Panfish on the first slice/image/png file"
+  echo "     Runs CHM via Panfish on the first $NUM_TESTJOBS images"
   echo ""
   echo "$FULLRUN_MODE <output directory>"
-  echo "     Runs CHM via Panfish on all slices"
+  echo "     Runs CHM via Panfish on all slices unless failed.jobs file is found in which case"
+  echo "     jobs in failed.jobs file will be run"
   echo ""
   echo "$VERIFY_MODE <output directory>"
   echo "     Checks jobs for successful completion"
+  echo "     If failed jobs are found they will be written to failed.jobs file"
+  echo "     which will be parsed by $FULLRUN_MODE mode"
   echo ""
   echo "Examples:"
   echo ""
@@ -177,38 +182,58 @@ function verifyResults {
   if [ $# -eq 3 ] ; then
      WRITE_TO_FAIL_FILE=$3
   fi
+  
+  ANYFAILED="NO"
+
+  # if the $2 parameter is a file then this is the test
+  # run and we should only verify the jobs that are in the
+  # file passed in have successfully completed.  Otherwise
+  # assume $2 is of #-# format and we should check all jobs
+  # in that range.
+  if [ -e "$2" ] ; then
+    TASKS_IN_FAIL_FILE=`wc -l $2`
+    logMessage "Found $2 file.  Only examining $TASKS_IN_FAIL_FILE tasks"
+    for Y in `cat $2` ; do
+      checkSingleTask $Y
+      if [ $? != 0 ] ; then
+        ANYFAILED="YES"
+        let NUM_FAILED_JOBS++
+        if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
+          echo "$Y" >> $OUTPUT_DIR/failed.jobs.tmp
+        fi
+      fi
+    done
+  else 
+    SEQ_LINE=`echo $2 | sed "s/-/ /"`
+    LAST_ONE=`echo $2 | sed "s/^.*-//"`
+
+    logMessage "Examining $LAST_ONE tasks"
+
+    for Y in `seq $SEQ_LINE` ; do
+      checkSingleTask $Y
+      if [ $? != 0 ] ; then
+        ANYFAILED="YES"
+        let NUM_FAILED_JOBS++
+        if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
+          echo "$Y" >> $OUTPUT_DIR/failed.jobs.tmp
+        fi
+      fi
+    done
+  fi
+  
+  VERIFY_EXIT=0
 
   if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
     if [ -e $OUTPUT_DIR/failed.jobs ] ; then
        /bin/mv $OUTPUT_DIR/failed.jobs $OUTPUT_DIR/failed.$(( $1 - 1 )).jobs
     fi
   fi
-  
-  ANYFAILED="NO"
-
-  SEQ_LINE=`echo $2 | sed "s/-/ /"`
-
-  LAST_ONE=`echo $2 | sed "s/^.*-//"`
-
-  logMessage "Examining $LAST_ONE tasks"
-
-  for Y in `seq $SEQ_LINE` ; do
-     checkSingleTask $Y
-     if [ $? != 0 ] ; then
-         ANYFAILED="YES"
-         let NUM_FAILED_JOBS++
-         if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
-            echo "$Y" >> $OUTPUT_DIR/failed.jobs.tmp
-         fi
-     fi
-  done
-
-  VERIFY_EXIT=0
 
   # make sure we have a sorted unique list of failed jobs
   if [ "$ANYFAILED" == "YES" ] ; then
      VERIFY_EXIT=1
      if [ "$WRITE_TO_FAIL_FILE" == "yes" ] ; then
+       logMessage "Creating failed.jobs file which will be used by -fullrun"
        cat $OUTPUT_DIR/failed.jobs.tmp | sort -g | uniq > $OUTPUT_DIR/failed.jobs
        /bin/rm -f $OUTPUT_DIR/failed.jobs.tmp
      fi
@@ -230,7 +255,6 @@ function checkSingleTask {
    # Verify we got a resulting file and it has a size greater then 0.
    OUTPUT_IMAGE_NAME=`egrep "^${THEJOB}:::" $OUTPUT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1 | sed "s/^.*\///"`
    if [ ! -s "$OUTPUT_DIR/out/${OUTPUT_IMAGE_NAME}" ] ; then
-         logWarning "task # $THEJOB: $OUTPUT_DIR/out/${OUTPUT_IMAGE_NAME} is missing or zero size"
          return 1
    fi
 
@@ -296,7 +320,7 @@ function runJobs {
      checkForKillFile $OUTPUT_DIR
 
      # Upload job directory
-     chumData $X $CHUMMEDLIST $OUTPUT_DIR $OUTPUT_DIR/$CHUM_OUT_FILE "--exclude \"out/*.png\" --exclude \"*.out\""
+     chumData $X $CHUMMEDLIST $OUTPUT_DIR $OUTPUT_DIR/$CHUM_OUT_FILE "--exclude *.tif --exclude *.tiff --exclude *.png --exclude *.out --exclude *.log --exclude *.jobs --exclude *.list --exclude *.old"
      if [ $? != 0 ] ; then
         jobFailed "Unable to upload job directory"
      fi
@@ -310,7 +334,7 @@ function runJobs {
      waitForJobs $X
 
      # Download completed job results
-     landData $X $CHUMMEDLIST $OUTPUT_DIR " --exclude CHM.tar.gz --exclude runCHM.sh.config --exclude \"*.sh\" "
+     landData $X $CHUMMEDLIST $OUTPUT_DIR " --exclude CHM.tar.gz --exclude runCHM.sh.config --exclude *.sh --exclude *.out --exclude job.properties --exclude *.config"
      
      if [ $? != 0 ] ; then
         logMessage "Sleeping 60 seconds and retrying download..."
@@ -335,6 +359,10 @@ function runJobs {
      # Increment the counter
      X=$(( $X + 1 ))
   done
+
+  if [ $RUNJOBS_EXIT != 0 ] ; then
+    logWarning "Error running jobs...."    
+  fi
 
   logEndTime "RunJobs" $RUN_JOBS_START_TIME $RUNJOBS_EXIT
 
@@ -552,23 +580,20 @@ if [ "$MODE" == "$FULLRUN_MODE" ] ; then
     jobFailed "Unable to get path to matlab directory"
   fi
 
-  # Assume the first job has been run already, but we
-  # will check anyways
-  THE_START_JOB=2
+  verifyResults 1 "1-${NUMBER_JOBS}"
+  VERIFY_EXIT=$?
 
-  # Check that the first job was successful
-  # if not set set THE_START_JOB to 1
-  # Also check that is more then 1 job otherwise this does not
-  # need to run
-  checkSingleTask 1
-  if [ $? != 0 ] ; then
-     logMessage "Test job #1 appears to have failed.  Adding to run list"
-     THE_START_JOB=1
-  elif [ $NUMBER_JOBS -lt $THE_START_JOB ] ; then
-     logMessage "There are only $NUMBER_JOBS job to run and it appears to have run successfully"
-     logEndTime "$MODE mode" $MODE_START_TIME 0
-     exit 0 
+  logEcho ""
+
+  if [ $NUM_FAILED_JOBS -eq 0 ] ; then
+    logMessage "All $NUMBER_JOBS task(s) completed successfully"
+    logEcho ""
+    logEndTime "$MODE mode" $MODE_START_TIME $THE_EXIT
+    exit 0
   fi
+    
+  logMessage "$NUM_FAILED_JOBS out of $NUMBER_JOBS task(s) not completed."
+  logMessage "Running jobs..."
   
   runJobs "${THE_START_JOB}-${NUMBER_JOBS}"
   THE_EXIT=$?
@@ -590,23 +615,42 @@ if [ "$MODE" == "$TESTRUN_MODE" ] ; then
     jobFailed "Unable to get path to matlab directory"
   fi
 
-  runJobs "1-1"
+  getNumberOfCHMJobsFromConfig $OUTPUT_DIR
+
+  if [ $NUMBER_JOBS -le $NUM_TEST_JOBS ] ; then
+    logMessage "Number of tasks to run $NUMBER_JOBS is equal or less then the $NUM_TEST_JOBS.  Just run -fullrun.."
+    exit 1
+  fi
+
+  # randomly pick $NUM_TEST_JOBS images and write them to the failed.jobs
+  # file
+  TESTJOB=`echo "scale=0;$RANDOM % $NUMBER_JOBS" | bc -l`
+  echo $TESTJOB > "$OUTPUT_DIR/failed.jobs.tmp"
+
+  for Y in `seq 2 $NUM_TEST_JOBS` ; do
+    echo "scale=0;$RANDOM % $NUMBER_JOBS" | bc -l >> "$OUTPUT_DIR/failed.jobs.tmp"   
+  done
+
+  sort -g "$OUTPUT_DIR/failed.jobs.tmp" | uniq > "$OUTPUT_DIR/failed.jobs"
+
+  /bin/rm "$OUTPUT_DIR/failed.jobs.tmp"
+
+
+  runJobs "$OUTPUT_DIR/failed.jobs"
   THE_EXIT=$?
   
   if [ $THE_EXIT == 0 ] ; then
-
     
-    getRunTimeOfSingleCHMTask $OUTPUT_DIR 1
+    getRunTimeOfSingleCHMTask $OUTPUT_DIR $TESTJOB
 
     if [ $? == 0 ] ; then
        getNumberOfCHMJobsFromConfig $OUTPUT_DIR
        if [ $? == 0 ] ; then
           EST_HOURS=`echo "scale=0;($RUNTIME_SECONDS*$NUMBER_JOBS)/3600" | bc -l`
           logEcho ""
-          logMessage "The test job took roughly $RUNTIME_SECONDS seconds to run"
+          logMessage "One of the test tasks took roughly $RUNTIME_SECONDS seconds to run"
           logMessage "The full run has $NUMBER_JOBS task(s) which means this job will take: $EST_HOURS hours of compute time"
           logEcho ""
-  
        fi
     fi
 
