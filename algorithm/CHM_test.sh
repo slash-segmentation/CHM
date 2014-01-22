@@ -26,8 +26,8 @@ Optional Arguments:
   -o overlap_size Only allowed with -b. Specifies how much the blocks should
                   overlap (default is none). Like -b this supports a single
                   value or a WxH value. The value used will depend on the size
-                  of the structures being segmenting but 100-200 pixels seem
-                  good in general.
+                  of the structures being segmenting but at most 50 pixels
+                  seems necessary.
   -s              Single-thread / non-parallel. Normally the images/blocks are
                   processed in parallel using all available physical cores. 
 
