@@ -24,6 +24,36 @@ MATLAB_DIR=$1
 #
 ###########################################################
 
+
+#
+# Removes scratch directory if it exists
+#
+function removeScratch {
+  logStartTime "rm $SCRATCH"
+  if [ ! -d $SCRATCH ] ; then
+    logMessage "$SCRATCH is not a directory"
+    return 0
+  fi
+
+  /bin/rm -rf $SCRATCH
+  EXIT_CODE=$?
+  logEndTime "rm $SCRATCH" $START_TIME $EXIT_CODE
+  return $EXIT_CODE
+}
+
+#
+# function called when USR2 signal is caught
+#
+on_usr2() {
+  removeScratch
+  jobFailed "USR2 signal caught exiting.."
+}
+
+# trap usr2 signal cause its what gets sent by SGE when qdel is called
+trap 'on_usr2' USR2
+
+
+
 #
 # Copies gzip tarball of inputs to $SCRATCH/inputs 
 # decompressing the tarball
@@ -76,7 +106,8 @@ function copyInputsToScratch {
   /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/.
 
   if [ $? != 0 ] ; then
-     jobFailed "Unable to run: /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/."
+    removeScratch
+    jobFailed "Unable to run: /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/."
   fi
 
   logEndTime "Copying $INPUT_IMAGE to $SCRATCH/CHM/input/" $START_TIME 0
@@ -140,6 +171,7 @@ logMessage "Writing runjob.sh output to $LOG_FILE"
 cd $SCRATCH/CHM
 
 if [ $? != 0 ] ; then
+  removeScratch
   jobFailed "Unable to run cd $SCRATCH/CHM"
 fi
 
@@ -156,6 +188,7 @@ EXIT_CODE=$?
 cd $BASEDIR
 
 if [ $? != 0 ] ; then
+  removeScratch
   jobFailed "Unable to run cd $BASEDIR"
 fi
 
@@ -196,13 +229,9 @@ if [ -e "$LOG_FILE" ] ; then
 fi
 logEndTime "Copying back ${SGE_TASK_ID}.log file" $START_TIME $LOG_COPY_EXIT
 
+
 # delete tmp directory
-logStartTime "rm $SCRATCH"
-/bin/rm -rf $SCRATCH
-
-EXIT_CODE=$?
-
-logEndTime "rm $SCRATCH" $START_TIME $EXIT_CODE
+removeScratch
 
 logEndTime "runCHM.sh" $CHM_START_TIME $CHM_EXIT_CODE
 
