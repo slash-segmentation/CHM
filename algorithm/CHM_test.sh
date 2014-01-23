@@ -4,14 +4,14 @@ usage()
 {
     echo "CHM Image Testing Phase Script.
     
-CHM_test <input_files> <output_folder> <optional arguments>
+$0 <input_files> <output_folder> <optional arguments>
   input_files     The input files to use. See below for the specification.
   output_folder   The folder to save the generated images to
                   The images will have the same name and type as the input
                   files but be placed in this folder
 	
 Optional Arguments:
-  -m model_folder The folder that contains the model data
+  -m model_folder The folder that contains the model data. Default is ./temp/.
                   (contains param.mat and MODEL_level#_stage#.mat)
   -b block_size   Process images in blocks of this size instead of all at once.
                   Can be given as a single value (used for both height and
@@ -32,8 +32,8 @@ Optional Arguments:
                   processed in parallel using all available physical cores. 
 
 Input Files Specification
-For the many-files version the input files can be specified in multiple ways.
-It needs to be one of the these or a comma-separated list of these:
+For the input files can be specified in multiple ways. It needs to be one of
+the these or a comma-separated list of these:
  * path to a folder            - all PNGs in that folder
  * path to a file              - only that file 
  * path with numerical pattern - get all files matching the pattern
@@ -52,7 +52,7 @@ It needs to be one of the these or a comma-separated list of these:
 if [[ $# < 2 ]]; then usage; fi
 INPUT=$1;
 OUTPUT=$2;
-if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 2>&1; echo; usage; fi;
+if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i COMMA=0;
@@ -68,7 +68,7 @@ while getopts ":sm:b:o:" o; do
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
-      if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 2>&1; echo; usage; fi;
+      if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     b)
       COMMA=`expr index "${OPTARG}" "x"`;
@@ -79,7 +79,7 @@ while getopts ":sm:b:o:" o; do
         BLOCK_SIZE_X=${OPTARG};
         BLOCK_SIZE_Y=${OPTARG};
       fi;
-      if (( $BLOCK_SIZE_X <= 0 || $BLOCK_SIZE_Y <= 0 )); then echo "Invalid block size." 2>&1; echo; usage; fi;
+      if (( $BLOCK_SIZE_X <= 0 || $BLOCK_SIZE_Y <= 0 )); then echo "Invalid block size." 1>&2; echo; usage; fi;
       ;;
     o)
       COMMA=`expr index "${OPTARG}" "x"`;
@@ -90,15 +90,15 @@ while getopts ":sm:b:o:" o; do
         OVERLAP_SIZE_X=${OPTARG};
         OVERLAP_SIZE_Y=${OPTARG};
       fi;
-      if (( $OVERLAP_SIZE_X < 0 || $OVERLAP_SIZE_Y < 0 )); then echo "Invalid overlap size." 2>&1; echo; usage; fi;
+      if (( $OVERLAP_SIZE_X < 0 || $OVERLAP_SIZE_Y < 0 )); then echo "Invalid overlap size." 1>&2; echo; usage; fi;
       ;;
     *)
-      echo "Invalid argument." 2>&1; echo; 
+      echo "Invalid argument." 1>&2; echo; 
       usage;
       ;;
     esac
 done
-if [[ ($OVERLAP_SIZE_X != 0 || $OVERLAP_SIZE_Y != 0) && $BLOCK_SIZE_X == 0 ]]; then echo "Overlap size can only be used with block size." 2>&1; echo; usage; fi;
+if [[ ($OVERLAP_SIZE_X != 0 || $OVERLAP_SIZE_Y != 0) && $BLOCK_SIZE_X == 0 ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
 
 
 # We need to add the path with the script in it to the MATLAB path
@@ -128,7 +128,7 @@ matlab_err=$?;
 
 
 # Cleanup
-stty sane # restore terminal settings
+stty sane >/dev/null 2>&1 # restore terminal settings
 if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
 
 exit $matlab_err
