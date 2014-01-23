@@ -24,6 +24,36 @@ MATLAB_DIR=$1
 #
 ###########################################################
 
+
+#
+# Removes scratch directory if it exists
+#
+function removeScratch {
+  logStartTime "rm $SCRATCH"
+  if [ ! -d $SCRATCH ] ; then
+    logMessage "$SCRATCH is not a directory"
+    return 0
+  fi
+
+  /bin/rm -rf $SCRATCH
+  EXIT_CODE=$?
+  logEndTime "rm $SCRATCH" $START_TIME $EXIT_CODE
+  return $EXIT_CODE
+}
+
+#
+# function called when USR2 signal is caught
+#
+on_usr2() {
+  removeScratch
+  jobFailed "USR2 signal caught exiting.."
+}
+
+# trap usr2 signal cause its what gets sent by SGE when qdel is called
+trap 'on_usr2' USR2
+
+
+
 #
 # Copies gzip tarball of inputs to $SCRATCH/inputs 
 # decompressing the tarball
@@ -76,7 +106,8 @@ function copyInputsToScratch {
   /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/.
 
   if [ $? != 0 ] ; then
-     jobFailed "Unable to run: /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/."
+    removeScratch
+    jobFailed "Unable to run: /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/."
   fi
 
   logEndTime "Copying $INPUT_IMAGE to $SCRATCH/CHM/input/" $START_TIME 0
@@ -121,13 +152,10 @@ makeDirectory $SCRATCH
 
 
 INPUT_IMAGE=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
-OUTPUT_IMAGE=$SCRATCH/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
-NSTAGE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 3 | tail -n 1`
-NLEVEL=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 4 | tail -n 1`
-BLOCKSIZE=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 5 | tail -n 1`
+CHMOPTS=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
 
-OUTPUT_IMAGE_NAME=`echo $OUTPUT_IMAGE | sed "s/^.*\///"`
-
+OUTPUT_IMAGE_NAME=`echo $INPUT_IMAGE | sed "s/^.*\///"`
+OUTPUT_IMAGE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}"
 
 LOG_FILE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}.log"
 
@@ -136,29 +164,35 @@ copyInputsToScratch $SCRATCH
 
 
 # run runjob.sh
-logStartTime "runjob.sh"
+logStartTime "CHM_test.sh"
 
 logMessage "Writing runjob.sh output to $LOG_FILE"
 
 cd $SCRATCH/CHM
 
 if [ $? != 0 ] ; then
+  removeScratch
   jobFailed "Unable to run cd $SCRATCH/CHM"
 fi
 
 echo "Job.Task:  ${JOB_ID}.${SGE_TASK_ID}" > $LOG_FILE
 
-$SCRATCH/CHM/runjob.sh $MATLAB_DIR $OUTPUT_IMAGE $NSTAGE $NLEVEL $BLOCKSIZE >> $LOG_FILE 2>&1
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PANFISH_BASEDIR/$MATLAB_DIR/bin/glnxa64
+export MATLAB_BIN_DIR="$PANFISH_BASEDIR/$MATLAB_DIR/bin"
+export PATH=$PATH:$MATLAB_BIN_DIR
+
+$SCRATCH/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH/CHM/out -m $SCRATCH/CHM/out $CHMOPTS -s >> $LOG_FILE 2>&1
 
 EXIT_CODE=$?
 
 cd $BASEDIR
 
 if [ $? != 0 ] ; then
+  removeScratch
   jobFailed "Unable to run cd $BASEDIR"
 fi
 
-logEndTime "runjob.sh" $START_TIME $EXIT_CODE
+logEndTime "CHM_test.sh" $START_TIME $EXIT_CODE
 
 
 logStartTime "Copying back $OUTPUT_IMAGE_NAME"
@@ -195,13 +229,9 @@ if [ -e "$LOG_FILE" ] ; then
 fi
 logEndTime "Copying back ${SGE_TASK_ID}.log file" $START_TIME $LOG_COPY_EXIT
 
+
 # delete tmp directory
-logStartTime "rm $SCRATCH"
-/bin/rm -rf $SCRATCH
-
-EXIT_CODE=$?
-
-logEndTime "rm $SCRATCH" $START_TIME $EXIT_CODE
+removeScratch
 
 logEndTime "runCHM.sh" $CHM_START_TIME $CHM_EXIT_CODE
 
