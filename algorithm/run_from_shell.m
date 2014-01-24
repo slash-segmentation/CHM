@@ -11,6 +11,6 @@ function run_from_shell(str)
         eval(str);
         assignin('base','result',0);
     catch exc
-        disp(getReport(exc));
+        fprintf(2, getReport(exc));
     end
     fprintf('Running << %s >> took %f seconds\n',str,toc(runFromShellStart));
