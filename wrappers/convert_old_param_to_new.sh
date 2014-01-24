@@ -12,9 +12,10 @@ $0 [<model_folder> [<Nstage>]]
 }
 
 # Parse and minimally check arguments
-$ARGS=;
-if [[ $# > 1 ]]; then $ARGS=''$1'',$2;
-elif [[ $# > 0 ]]; then $ARGS=''$1'';fi
+ARGS=;
+if [[ $# < 1 || $# > 2 ]]; then usage;
+elif [[ $# > 1 ]]; then ARGS="''$1'',$2";
+elif [[ $# > 0 ]]; then ARGS="''$1''";fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
