@@ -19,7 +19,7 @@ declare -i B=$4;
 declare -i R=$5;
 IMAGE_OUT=$6;
 
-if [[ $T -le 0 || $L -le 0 || $B -le 0 || $R -le 0 ]]; then echo "Foreground rectangle not valid." 1>&2; echo; usage; fi; 
+if [[ $T -le 0 || $L -le 0 || $B -le $T || $R -le $L ]]; then echo "Foreground rectangle not valid." 1>&2; echo; usage; fi; 
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
