@@ -7,12 +7,11 @@ usage()
 $0 <inputs> <labels> <optional arguments>
   inputs          The raw image files to use.
   labels          The label / ground truth images (1=feature, 0=background)
-The file names names need not line up, but there must be equal amounts of
-inptus and labels. They are matched up in the order they are given. If using
-When using a folder or wildcard input the order may not be completely
-predictable, but most systems will put these in lexographic order.
-The files can be specified in multiple ways. It needs to be one of the these
-or a comma-separated list of these:
+The file names need not line up, but there must be equal amounts of inptus and
+labels. They are matched up in the order they are given. If using a folder or
+wildcard input the order may not be completely predictable, but most systems
+will put these in lexographic order. The files can be specified in multiple
+ways. It needs to be one of the these or a comma-separated list of these:
  * path to a folder            - all PNGs in that folder
  * path to a file              - only that file 
  * path with numerical pattern - get all files matching the pattern

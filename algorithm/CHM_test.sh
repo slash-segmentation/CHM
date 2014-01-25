@@ -32,8 +32,8 @@ Optional Arguments:
                   processed in parallel using all available physical cores. 
 
 Input Files Specification
-For the input files can be specified in multiple ways. It needs to be one of
-the these or a comma-separated list of these:
+The input files can be specified in multiple ways. It needs to be one of the
+these or a comma-separated list of these:
  * path to a folder            - all PNGs in that folder
  * path to a file              - only that file 
  * path with numerical pattern - get all files matching the pattern
