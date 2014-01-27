@@ -3,12 +3,13 @@ function counts=GetHistogram(im)
 % The image can be a string or a matrix.
 % If a cell-array of matrices or strings is given, the histogram is summed across all images.
 if iscell(im);
-    total_counts = zeros(256);
-    for i in numel(im)
-        [counts,x]=imhist(im{i});
-        total_counts = total_counts + counts;
+    if numel(im) < 1; counts = zeros(256,1); return
+    [counts,~] = imhist(im{1});
+    for i in 2:numel(im)
+        [c,~] = imhist(im{i});
+        counts = counts + c;
     end
 else
     if ischar(im); im = imread(im); end;
-    [counts,x]=imhist(im);
+    [counts,~] = imhist(im);
 end
