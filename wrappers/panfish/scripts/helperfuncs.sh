@@ -35,19 +35,19 @@ function jobFailed {
   getLabelForLogMessage
   logEcho ""
   logEcho ""
-  logEcho "ERROR:  $LOG_LABEL  $1" 1>&2
+  logEcho "ERROR:  $LOG_LABEL  $1"
   logEcho ""
   exit 1
 }
 
 #
-# This function outputs a warning message to standard error
+# This function outputs a warning message
 # logWarning($1 is identifier,$2 is message)
 #
 function logWarning {
   getLabelForLogMessage
   logEcho ""
-  logEcho "WARNING:  $LOG_LABEL  $1" 1>&2
+  logEcho "WARNING:  $LOG_LABEL  $1"
   logEcho ""
   
 }
@@ -107,7 +107,7 @@ function getSingleCHMTaskLogFile {
 
   LOG_FILE_NAME=`echo $OUT_IMAGE_RAW | sed "s/^.*\///"`
 
-  LOG_FILE="$JOBDIR/out/log/${LOG_FILE_NAME}.log"
+  LOG_FILE="$JOBDIR/out/log/chm/${LOG_FILE_NAME}.log"
 
   if [ ! -s "$LOG_FILE" ]  ; then
      return 1
