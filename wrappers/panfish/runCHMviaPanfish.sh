@@ -111,14 +111,14 @@ function castJob {
     TASK_ARG="-t $T_ARG"
   fi
 
-  logMessage "Running $CASTBINARY $TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE"
+  logMessage "Running $CASTBINARY $TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS --writeoutputlocal -o $OUTPUT_DIR/out/log/jobout/\$JOB_ID\.\$TASK_ID.stdout -e $OUTPUT_DIR/out/log/joberr/\$JOB_ID\.\$TASK_ID.stderr $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE"
 
-  $CASTBINARY $TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE
+  $CASTBINARY $TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS --writeoutputlocal -o $OUTPUT_DIR/out/log/jobout/\$JOB_ID\.\$TASK_ID.stdout -e $OUTPUT_DIR/out/log/joberr/\$JOB_ID\.\$TASK_ID.stderr $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE
 
   if [ $? != 0 ] ; then
       logEndTime "CastJob Iteration $1" $CAST_START_TIME 1
       cd $CURDIR
-      jobFailed "Error running $CASTBINARY$TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE"
+      jobFailed "Error running $CASTBINARY$TASK_ARG -q $CHUMMEDLIST -N chm_job $BATCH_AND_WALLTIME_ARGS --writeoutputlocal -o $OUTPUT_DIR/out/log/jobout/\$JOB_ID\.\$TASK_ID.stdout -e $OUTPUT_DIR/out/log/joberr/\$JOB_ID\.\$TASK_ID.stderr $OUTPUT_DIR/runCHM.sh $MATLAB_DIR > $OUTPUT_DIR/$CAST_OUT_FILE"
   fi
 
   # output in cast.out file will look like this
@@ -154,7 +154,7 @@ function waitForJobs {
       if [ -e "$OUTPUT_DIR/$DOWNLOAD_DATA_REQUEST" ] ; then
           /bin/rm -f $OUTPUT_DIR/$DOWNLOAD_DATA_REQUEST
           logMessage "$DOWNLOAD_DATA_REQUEST file found.  Performing download"
-          landData $1
+          landData $1 $CHUMMEDLIST $OUTPUT_DIR " --exclude CHM.tar.gz --exclude runCHM.sh.config --exclude *.sh --exclude *.out --exclude job.properties --exclude *.config" 
           /bin/rm -f $OUTPUT_DIR/$DOWNLOAD_DATA_REQUEST
           logMessage "Removing $DOWNLOAD_DATA_REQUEST file"
       fi
@@ -255,15 +255,13 @@ function checkSingleTask {
    # Verify we got a resulting file and it has a size greater then 0.
    OUTPUT_IMAGE_NAME=`egrep "^${THEJOB}:::" $OUTPUT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1 | sed "s/^.*\///"`
    if [ ! -s "$OUTPUT_DIR/out/${OUTPUT_IMAGE_NAME}" ] ; then
+         logWarning "No output image found for task $THEJOB"
          return 1
    fi
 
    getSingleCHMTaskLogFile $OUTPUT_DIR $THEJOB
-   if [ $? != 0 ] ; then
-     return 1
-   fi
 
-   return 0
+   return $?
 }
 
 #
@@ -320,7 +318,7 @@ function runJobs {
      checkForKillFile $OUTPUT_DIR
 
      # Upload job directory
-     chumData $X $CHUMMEDLIST $OUTPUT_DIR $OUTPUT_DIR/$CHUM_OUT_FILE "--exclude *.tif --exclude *.tiff --exclude *.png --exclude *.out --exclude *.log --exclude *.jobs --exclude *.list --exclude *.old"
+     chumData $X $CHUMMEDLIST $OUTPUT_DIR $OUTPUT_DIR/$CHUM_OUT_FILE "--deletebefore --exclude *.tif --exclude *.tiff --exclude *.png --exclude *.out --exclude *.log --exclude *.jobs --exclude *.list --exclude *.old --exclude *.stderr --exclude *.stdout"
      if [ $? != 0 ] ; then
         jobFailed "Unable to upload job directory"
      fi
@@ -339,7 +337,7 @@ function runJobs {
      if [ $? != 0 ] ; then
         logMessage "Sleeping 60 seconds and retrying download..."
         sleep 60
-        landData $X $CHUMMEDLIST $OUTPUT_DIR " "
+        landData $X $CHUMMEDLIST $OUTPUT_DIR " --exclude CHM.tar.gz --exclude runCHM.sh.config --exclude *.sh --exclude *.out --exclude job.properties --exclude *.config"
         if [ $? != 0 ] ; then
            logWarning "Download failed a second time"
         fi
@@ -449,7 +447,9 @@ function runCreateNoTrainMode {
   cd $CURDIR
 
   # create out directory under $OUTPUT_DIR
-  makeDirectory $OUTPUT_DIR/out/log
+  makeDirectory $OUTPUT_DIR/out/log/chm
+  makeDirectory $OUTPUT_DIR/out/log/joberr
+  makeDirectory $OUTPUT_DIR/out/log/jobout
 
   logMessage "Generating $OUTPUT_DIR/runCHM.sh.config configuration file"
   # Examine INPUT_DATA and create a configuration file in 
