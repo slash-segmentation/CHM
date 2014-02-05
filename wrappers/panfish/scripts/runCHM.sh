@@ -163,10 +163,10 @@ LOG_FILE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}.log"
 copyInputsToScratch $SCRATCH
 
 
-# run runjob.sh
+# run CHM_test.sh
 logStartTime "CHM_test.sh"
 
-logMessage "Writing runjob.sh output to $LOG_FILE"
+logMessage "Writing CHM_test.sh output to $LOG_FILE"
 
 cd $SCRATCH/CHM
 
@@ -221,10 +221,10 @@ LOG_COPY_EXIT=1
 if [ -e "$LOG_FILE" ] ; then
    getSizeOfPath $LOG_FILE
    logMessage "$LOG_FILE is $NUM_BYTES bytes"
-  /bin/cp $LOG_FILE $BASEDIR/out/log/.
+  /bin/cp $LOG_FILE $BASEDIR/out/log/chm/.
   LOG_COPY_EXIT=$?
   if [ $LOG_COPY_EXIT != 0 ] ; then
-     logWarning "Error running /bin/cp $LOG_FILE $BASEDIR/out/log/."
+     logWarning "Error running /bin/cp $LOG_FILE $BASEDIR/out/log/chm/."
   fi
 fi
 logEndTime "Copying back ${SGE_TASK_ID}.log file" $START_TIME $LOG_COPY_EXIT
