@@ -125,6 +125,11 @@ else
 fi
 
 
+# Setup caching
+export MCR_CACHE_ROOT=/tmp/mcr_cache_root_$USER
+mkdir -p $MCR_CACHE_ROOT
+
+
 # Find where the bash script actually is so we can find the wrapped program
 # This is a bit complicated since this script is actually a symlink
 # See stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
