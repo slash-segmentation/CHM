@@ -26,3 +26,10 @@ delete run_CHM_test_blocks.sh
 delete run_CHM_train.sh
 delete readme.txt
 delete mccExcludedFiles.log
+
+% Save MATLAB and compiler version which last compiled the code
+v = version;
+fid = fopen('matlab-version.txt','w');
+fprintf(fid,'MATLAB Version: %s\n',v);
+fclose(fid);
+system(sprintf('%s -v -m x 2>/dev/null | grep Compiler 1>>matlab-version.txt', fullfile(matlabroot,'bin','mcc')));
