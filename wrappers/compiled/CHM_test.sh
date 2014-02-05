@@ -28,8 +28,9 @@ Optional Arguments:
                   value or a WxH value. The value used will depend on the size
                   of the structures being segmenting but at most 50 pixels
                   seems necessary.
-  -s              Single-thread / non-parallel. Normally the images/blocks are
-                  processed in parallel using all available physical cores. 
+  -M matlab_dir   MATLAB 2011b directory. If not given will look for a MCR_DIR
+                  environmental variable. If that doesn't exist then an attempt
+                  will be made using 'which'.
 
 Input Files Specification
 The input files can be specified in multiple ways. It needs to be one of the
@@ -54,17 +55,17 @@ INPUT=$1;
 OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
-SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i COMMA=0;
 declare -i BLOCK_SIZE_X=0;
 declare -i BLOCK_SIZE_Y=0;
 declare -i OVERLAP_SIZE_X=0;
 declare -i OVERLAP_SIZE_Y=0;
+MATLAB_FOLDER=;
 shift 2
-while getopts ":sm:b:o:" o; do
+while getopts ":sm:b:o:M:" o; do
   case "${o}" in
     s)
-      SINGLE_THREAD=-nojvm;
+      echo "Warning: argument -s is ignored for compiled version, it is always single-threaded" 1>&2;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -92,6 +93,10 @@ while getopts ":sm:b:o:" o; do
       fi;
       if (( $OVERLAP_SIZE_X < 0 || $OVERLAP_SIZE_Y < 0 )); then echo "Invalid overlap size." 1>&2; echo; usage; fi;
       ;;
+    M)
+      MTLB_FLDR=${OPTARG};
+      if [ ! -d "$MTLB_FLDR" ]; then echo "MATLAB folder is not a directory." 1>&2; echo; usage; fi;
+      ;;
     *)
       echo "Invalid argument." 1>&2; echo; 
       usage;
@@ -101,7 +106,26 @@ done
 if [[ ($OVERLAP_SIZE_X != 0 || $OVERLAP_SIZE_Y != 0) && $BLOCK_SIZE_X == 0 ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
 
 
-# We need to add the path with the script in it to the MATLAB path
+# Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
+if [[ -z $MTLB_FLDR ]]; then
+    if [[ -z $MCR_DIR ]]; then
+        MTLB_FLDR=`which MATLAB 1>/dev/null 2>&1`
+        if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
+        MTLB_FLDR=$( dirname $MTLB_FLDR )
+    elseif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
+    else; MTLB_FLDR=$MCR_DIR; fi
+fi
+if [[ ! -d $MTLB_FLDR/bin/glnxa64 ]] || [[ ! -d $MTLB_FLDR/runtime/glnxa64 ]] || [[ ! -d $MTLB_FLDR/sys/os/glnxa64 ]]; then
+    echo "Unable to find MATLAB or MATLAB Compiler Runtime (thought we found $MTLB_FLDR but that wasn't it)." 1>&2; echo; usage; fi;
+fi
+if [ -z $LD_LIBRARY_PATH ]; then
+    export LD_LIBRARY_PATH=$MTLB_FLDR/bin/glnxa64:$MTLB_FLDR/runtime/glnxa64:$MTLB_FLDR/sys/os/glnxa64;
+else
+    export LD_LIBRARY_PATH=$MTLB_FLDR/bin/glnxa64:$MTLB_FLDR/runtime/glnxa64:$MTLB_FLDR/sys/os/glnxa64:$LD_LIBRARY_PATH;
+fi
+
+
+# Find where the bash script actually is so we can find the wrapped program
 # This is a bit complicated since this script is actually a symlink
 # See stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
 SOURCE="${BASH_SOURCE[0]}"
@@ -110,25 +134,15 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
   SOURCE="$(readlink "$SOURCE")"
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 done
-if [ -n "$MATLABPATH" ]; then
-  MATLABPATH_ORIGINAL=$MATLABPATH
-  export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )":$MATLABPATH
-else
-  export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
-fi
 
 
 # Run the main matlab script
 if [[ $BLOCK_SIZE_X != 0 ]]; then
-  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',[${BLOCK_SIZE_Y} ${BLOCK_SIZE_X}],[${OVERLAP_SIZE_Y} ${OVERLAP_SIZE_X}],''${MODEL_FOLDER}'');');";
+  $SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "[${BLOCK_SIZE_Y} ${BLOCK_SIZE_X}]" "[${OVERLAP_SIZE_Y} ${OVERLAP_SIZE_X}]" "${MODEL_FOLDER}";
 else
-  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',''${MODEL_FOLDER}'');');";
+  $SOURCE/CHM_test "${INPUT}" "${OUTPUT}" "${MODEL_FOLDER}";
 fi
-matlab_err=$?;
 
 
-# Cleanup
-stty sane >/dev/null 2>&1 # restore terminal settings
-if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
-
-exit $matlab_err
+# Done
+exit $?;

@@ -31,8 +31,9 @@ Optional Arguments:
                   Default is 2.
   -L Nlevel       The number of levels of training to perform. Must be >=1.
                   Default is 4.
-  -s              Single-thread / non-parallel. Normally one small step of this
-                  is done in parallel using all available physical cores." 1>&2;
+  -M matlab_dir   MATLAB 2011b directory. If not given will look for a MCR_DIR
+                  environmental variable. If that doesn't exist then an attempt
+                  will be made using 'which'.
   exit 1;
 }
 
@@ -41,14 +42,14 @@ if [[ $# -lt 2 ]]; then usage; fi
 INPUTS=$1;
 LABELS=$2;
 MODEL_FOLDER=./temp/;
-SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
+MATLAB_FOLDER=;
 shift 2
-while getopts ":sm:S:L:" o; do
+while getopts ":sm:S:L:M:" o; do
   case "${o}" in
     s)
-      SINGLE_THREAD=-nojvm;
+      echo "Warning: argument -s is ignored for compiled version, it is always single-threaded" 1>&2;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -62,6 +63,10 @@ while getopts ":sm:S:L:" o; do
       NLEVEL=${OPTARG};
       if [[ $NLEVEL < 1 ]]; then echo "Invalid number of training levels." 1>&2; echo; usage; fi;
       ;;
+    M)
+      MTLB_FLDR=${OPTARG};
+      if [ ! -d "$MTLB_FLDR" ]; then echo "MATLAB folder is not a directory." 1>&2; echo; usage; fi;
+      ;;
     *)
       echo "Invalid argument." 1>&2; echo; 
       usage;
@@ -70,7 +75,26 @@ while getopts ":sm:S:L:" o; do
 done
 
 
-# We need to add the path with the script in it to the MATLAB path
+# Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
+if [[ -z $MTLB_FLDR ]]; then
+    if [[ -z $MCR_DIR ]]; then
+        MTLB_FLDR=`which MATLAB 1>/dev/null 2>&1`
+        if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
+        MTLB_FLDR=$( dirname $MTLB_FLDR )
+    elseif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
+    else; MTLB_FLDR=$MCR_DIR; fi
+fi
+if [[ ! -d $MTLB_FLDR/bin/glnxa64 ]] || [[ ! -d $MTLB_FLDR/runtime/glnxa64 ]] || [[ ! -d $MTLB_FLDR/sys/os/glnxa64 ]]; then
+    echo "Unable to find MATLAB or MATLAB Compiler Runtime (thought we found $MTLB_FLDR but that wasn't it)." 1>&2; echo; usage; fi;
+fi
+if [ -z $LD_LIBRARY_PATH ]; then
+    export LD_LIBRARY_PATH=$MTLB_FLDR/bin/glnxa64:$MTLB_FLDR/runtime/glnxa64:$MTLB_FLDR/sys/os/glnxa64;
+else
+    export LD_LIBRARY_PATH=$MTLB_FLDR/bin/glnxa64:$MTLB_FLDR/runtime/glnxa64:$MTLB_FLDR/sys/os/glnxa64:$LD_LIBRARY_PATH;
+fi
+
+
+# Find where the bash script actually is so we can find the wrapped program
 # This is a bit complicated since this script is actually a symlink
 # See stackoverflow.com/questions/59895/can-a-bash-script-tell-what-directory-its-stored-in
 SOURCE="${BASH_SOURCE[0]}"
@@ -79,23 +103,11 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
   SOURCE="$(readlink "$SOURCE")"
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 done
-if [ -n "$MATLABPATH" ]; then
-    MATLABPATH_ORIGINAL=$MATLABPATH
-    export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )":$MATLABPATH
-else
-    export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
-fi
 
-# Set 'singleCompThread' for MATLAB if there are a lot of processors
-if [[ -n "${SINGLE_THREAD}" ]]; then SINGLE_THREAD="${SINGLE_THREAD} -singleCompThread";
-elif (( `nproc` > 24 )); then SINGLE_THREAD=-singleCompThread; fi;
 
-# Run the main matlab script (need JVM for parallel)
-matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL});');";
-matlab_err=$?;
+# Run the main matlab script
+$SOURCE/CHM_train "${INPUTS}" "${LABELS}" "${MODEL_FOLDER}" ${NSTAGE} ${NLEVEL};
 
-# Cleanup
-stty sane >/dev/null 2>&1 # restore terminal settings
-if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
 
-exit $matlab_err
+# Done
+exit $?;
