@@ -28,9 +28,10 @@ Optional Arguments:
                   value or a WxH value. The value used will depend on the size
                   of the structures being segmenting but at most 50 pixels
                   seems necessary.
-  -M matlab_dir   MATLAB 2011b directory. If not given will look for a MCR_DIR
+  -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
-                  will be made using 'which'.
+                  will be made using 'which'. It must be the same version used
+                  to compile the scripts.
 
 Input Files Specification
 The input files can be specified in multiple ways. It needs to be one of the
@@ -112,7 +113,7 @@ if [[ -z $MTLB_FLDR ]]; then
         MTLB_FLDR=`which MATLAB 1>/dev/null 2>&1`
         if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
         MTLB_FLDR=$( dirname $MTLB_FLDR )
-    elseif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
+    elif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
     else; MTLB_FLDR=$MCR_DIR; fi
 fi
 if [[ ! -d $MTLB_FLDR/bin/glnxa64 ]] || [[ ! -d $MTLB_FLDR/runtime/glnxa64 ]] || [[ ! -d $MTLB_FLDR/sys/os/glnxa64 ]]; then

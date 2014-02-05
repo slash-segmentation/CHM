@@ -31,9 +31,10 @@ Optional Arguments:
                   Default is 2.
   -L Nlevel       The number of levels of training to perform. Must be >=1.
                   Default is 4.
-  -M matlab_dir   MATLAB 2011b directory. If not given will look for a MCR_DIR
+  -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
-                  will be made using 'which'.
+                  will be made using 'which'. It must be the same version used
+                  to compile the scripts.
   exit 1;
 }
 
@@ -81,7 +82,7 @@ if [[ -z $MTLB_FLDR ]]; then
         MTLB_FLDR=`which MATLAB 1>/dev/null 2>&1`
         if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
         MTLB_FLDR=$( dirname $MTLB_FLDR )
-    elseif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
+    elif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
     else; MTLB_FLDR=$MCR_DIR; fi
 fi
 if [[ ! -d $MTLB_FLDR/bin/glnxa64 ]] || [[ ! -d $MTLB_FLDR/runtime/glnxa64 ]] || [[ ! -d $MTLB_FLDR/sys/os/glnxa64 ]]; then
