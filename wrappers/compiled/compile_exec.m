@@ -6,7 +6,7 @@ cd ../../algorithm
 
 % Compile the programs
 % -m creates a standalone C command line application
-% -C creates a seperate CTF archive from the executable (instead of packing them together)
+% -C creates a seperate CTF archive from the executable (instead of packing them together) and allows caching of programs
 % -R specifies matlab runtime arguments
 % -N removes all toolbox paths
 % -p readds a toolbox path
@@ -15,11 +15,11 @@ cd ../../algorithm
 % -d gives the output directory
 % Everything at the end are the functions to include/export
 fprintf('Compiling CHM_test...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_test
+mcc -m -C -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_test
 fprintf('\nCompiling CHM_test_blocks...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -I FilterStuff -d ../wrappers/compiled CHM_test_blocks
+mcc -m -C -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -I FilterStuff -d ../wrappers/compiled CHM_test_blocks
 fprintf('\nCompiling CHM_train...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_train
+mcc -m -C -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_train
 
 cd ../wrappers/compiled
 
