@@ -1,3 +1,0 @@
-Target Machine: GLNXA64
-MATLAB Version: 7.13.0.564 (R2011b)
-Compiler version: 4.16 (R2011b)
