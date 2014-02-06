@@ -31,8 +31,8 @@ delete readme.txt
 delete mccExcludedFiles.log
 
 % Save MATLAB and compiler version which last compiled the code
-v = version;
 fid = fopen('matlab-version.txt','w');
-fprintf(fid,'MATLAB Version: %s\n',v);
+fprintf(fid,'Target Machine: %s\n',computer);
+fprintf(fid,'MATLAB Version: %s\n',version);
 fclose(fid);
 system(sprintf('%s -v -m x 2>/dev/null | grep Compiler 1>>matlab-version.txt', fullfile(matlabroot,'bin','mcc')));
