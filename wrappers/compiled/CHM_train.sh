@@ -34,7 +34,7 @@ Optional Arguments:
   -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
                   will be made using 'which'. It must be the same version used
-                  to compile the scripts.
+                  to compile the scripts." 1>&2;
   exit 1;
 }
 
@@ -79,14 +79,19 @@ done
 # Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
 if [[ -z $MTLB_FLDR ]]; then
     if [[ -z $MCR_DIR ]]; then
-        MTLB_FLDR=`which MATLAB 1>/dev/null 2>&1`
+        MTLB_FLDR=`which matlab 2>/dev/null`
         if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
-        MTLB_FLDR=$( dirname $MTLB_FLDR )
+        while [ -h "$MTLB_FLDR" ]; do
+            DIR="$( cd -P "$( dirname "$MTLB_FLDR" )" && pwd -P )"
+            MTLB_FLDR="$(readlink "$MTLB_FLDR")"
+            [[ $MTLB_FLDR != /* ]] && MTLB_FLDR="$DIR/$MTLB_FLDR"
+        done
+        MTLB_FLDR=`dirname "$( cd -P "$( dirname "$MTLB_FLDR" )" && pwd -P )"`
     elif [ ! -d "$MCR_DIR" ]; then echo "MCR_DIR is not a directory." 1>&2; echo; usage;
-    else; MTLB_FLDR=$MCR_DIR; fi
+    else MTLB_FLDR=$MCR_DIR; fi
 fi
 if [[ ! -d $MTLB_FLDR/bin/glnxa64 ]] || [[ ! -d $MTLB_FLDR/runtime/glnxa64 ]] || [[ ! -d $MTLB_FLDR/sys/os/glnxa64 ]]; then
-    echo "Unable to find MATLAB or MATLAB Compiler Runtime (thought we found $MTLB_FLDR but that wasn't it)." 1>&2; echo; usage; fi;
+    echo "Unable to find MATLAB or MATLAB Compiler Runtime (thought we found $MTLB_FLDR but that wasn't it)." 1>&2; echo; usage;
 fi
 if [ -z $LD_LIBRARY_PATH ]; then
     export LD_LIBRARY_PATH=$MTLB_FLDR/bin/glnxa64:$MTLB_FLDR/runtime/glnxa64:$MTLB_FLDR/sys/os/glnxa64;
@@ -96,8 +101,10 @@ fi
 
 
 # Setup caching
-export MCR_CACHE_ROOT=/tmp/mcr_cache_root_$USER
-mkdir -p $MCR_CACHE_ROOT
+if [ -z $MCR_CACHE_ROOT ]; then
+    export MCR_CACHE_ROOT=/tmp/mcr_cache_root_$USER
+    mkdir -p $MCR_CACHE_ROOT
+fi
 
 
 # Find where the bash script actually is so we can find the wrapped program
@@ -109,6 +116,7 @@ while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symli
   SOURCE="$(readlink "$SOURCE")"
   [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
 done
+SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
