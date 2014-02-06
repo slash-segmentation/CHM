@@ -32,5 +32,5 @@ fid = fopen('matlab-version.txt','w');
 fprintf(fid,'Platform:         %s\n',computer);
 fprintf(fid,'MATLAB Version:   %s\n',version);
 [maj,min,rev] = mcrversion;
-fprintf(fid,'Compiler Version: %d\n',maj,min,rev); 
+fprintf(fid,'Compiler Version: %d.%d.%d\n',maj,min,rev); 
 fclose(fid);
