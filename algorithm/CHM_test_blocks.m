@@ -34,7 +34,7 @@ for i = 1:length(files_te)
         w = info.Width;
         h = info.Height;
         if mod(w, bs(2)) == 0 && mod(h, bs(1)) == 0;
-             blockproc(files_te{i}, bs,proc, args{:} 'Destination',files_out{i});
+             blockproc(files_te{i}, bs,proc, args{:}, 'Destination',files_out{i});
              continue;
         end
         im = blockproc(files_te{i}, bs,proc, args{:});
