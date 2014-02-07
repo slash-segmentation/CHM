@@ -2,11 +2,13 @@ function CHM_test(input_files,outputpath,savingpath);
 if nargin < 2 || nargin > 3; error('CHM_test must have 2 to 3 input arguments'); end
 if nargin == 2; savingpath = fullfile('.', 'temp'); end
 
-param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
+if ~ismcc && ~isdeployed
+    % Add path to functions required for feature extraction (already included in compiled version)
+    [my_path, ~, ~] = fileparts(mfilename('fullpath'));
+    addpath(genpath(fullfile(my_path, 'FilterStuff')));
+end
 
-% Add path to functions required for feature extraction.
-[my_path, ~, ~] = fileparts(mfilename('fullpath'));
-addpath(genpath(fullfile(my_path, 'FilterStuff')));
+param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 
 files_te  = GetInputFiles(input_files);
 files_out = GetOutputFiles(outputpath, files_te);

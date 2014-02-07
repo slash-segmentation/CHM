@@ -3,11 +3,17 @@ if nargin < 3 || nargin > 5; error('CHM_test_blocks must have 3 to 5 input argum
 if nargin < 4; bordersize = 0; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 
-param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
+if ~ismcc && ~isdeployed
+    % Add path to functions required for feature extraction (already included in compiled version)
+    [my_path, ~, ~] = fileparts(mfilename('fullpath'));
+    addpath(genpath(fullfile(my_path, 'FilterStuff')));
+else
+    % Parse non-string arguments
+    blocksize  = ParseArgument(blocksize);
+    bordersize = ParseArgument(bordersize);
+end
 
-% Add path to functions required for feature extraction.
-[my_path, ~, ~] = fileparts(mfilename('fullpath'));
-addpath(genpath(fullfile(my_path, 'FilterStuff')));
+param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 
 files_te  = GetInputFiles(input_files);
 files_out = GetOutputFiles(outputpath, files_te);

@@ -4,9 +4,15 @@ if nargin < 3; savingpath = fullfile('.', 'temp'); end
 if nargin < 4; Nstage = 2; end
 if nargin < 5; Nlevel = 4; end
 
-% Add path to functions required for feature extraction.
-[my_path, ~, ~] = fileparts(mfilename('fullpath'));
-addpath(genpath(fullfile(my_path, 'FilterStuff')));
+if ~ismcc && ~isdeployed
+    % Add path to functions required for feature extraction (already included in compiled version)
+    [my_path, ~, ~] = fileparts(mfilename('fullpath'));
+    addpath(genpath(fullfile(my_path, 'FilterStuff')));
+else
+    % Parse non-string arguments
+    Nstage = ParseArgument(Nstage);
+    Nlevel = ParseArgument(Nlevel);
+end
 
 files_tr = GetInputFiles(trainpath);
 files_la = GetInputFiles(labelpath);
