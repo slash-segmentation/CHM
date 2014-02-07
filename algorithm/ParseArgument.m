@@ -6,7 +6,7 @@ function x=ParseArgument(x)
 % is not parsable, it is returned as-is.
 if ischar(x)
   xx = ((x >= '0') & (x <= '9')) | ismember(x,'.+-');
-  if all(xx); x=str2double(x); end; % scalar, safest conversion
+  if all(xx); x=str2double(x); % scalar, safest conversion
   elseif x(1) == '[' && x(end) == ']'
     % vector or matrix, strip brackets and check for delimiters 
     xx = xx(2:end-1) | ismember(x(2:end-1),',; '); % no parentheses or letters!
