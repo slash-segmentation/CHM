@@ -22,6 +22,7 @@ if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersiz
 if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test_blocks must have 1 or 2 elements'); end
 bs = bs-2*brd;
 proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
+args = {'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true};
 
 opened_pool = 0;
 try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
@@ -33,10 +34,10 @@ for i = 1:length(files_te)
         w = info.Width;
         h = info.Height;
         if mod(w, bs(2)) == 0 && mod(h, bs(1)) == 0;
-             blockproc(files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'Destination',files_out{i});
+             blockproc(files_te{i}, bs,proc, args{:} 'Destination',files_out{i});
              continue;
         end
-        im = blockproc(files_te{i}, bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false);
+        im = blockproc(files_te{i}, bs,proc, args{:});
         im = im(1:h,1:w); % when reading directly from file the image is always padded with zeros to a multiple of the block size size.
     else
         im = blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false);
