@@ -6,10 +6,10 @@ function x=ParseArgument(x)
 % is not parsable, it is returned as-is.
 if ischar(x)
   xx = ((x >= '0') & (x <= '9')) | ismember(x,'.+-');
-  if all(xx); x=str2double(x); return end; % scalar, safest conversion
-  elseif xx(1) == '[' && xx(end) == ']'
+  if all(xx); x=str2double(x); end; % scalar, safest conversion
+  elseif x(1) == '[' && x(end) == ']'
     % vector or matrix, strip brackets and check for delimiters 
-    xx = xx(2:end-1) | ismember(x,',; '); % no parentheses or letters!
-    if all(xx); x=str2num(x(2:end-1))); return end; % we have made str2num safe with all our checks
+    xx = xx(2:end-1) | ismember(x(2:end-1),',; '); % no parentheses or letters!
+    if all(xx); x=str2num(x(2:end-1)); end; % we have made str2num safe with all our checks
   end
 end
