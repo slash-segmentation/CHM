@@ -14,7 +14,7 @@ cd ../../algorithm
 fprintf('Compiling CHM_test...\n');
 mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_test
 fprintf('\nCompiling CHM_test_blocks...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -I FilterStuff -d ../wrappers/compiled CHM_test_blocks
+mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -p images/imuitools -I FilterStuff -d ../wrappers/compiled CHM_test_blocks
 fprintf('\nCompiling CHM_train...\n');
 mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_train
 
