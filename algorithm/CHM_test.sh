@@ -55,7 +55,7 @@ OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
-declare -i COMMA=0;
+declare -i X=0;
 declare -i BLOCK_SIZE_X=0;
 declare -i BLOCK_SIZE_Y=0;
 declare -i OVERLAP_SIZE_X=0;
@@ -71,10 +71,10 @@ while getopts ":sm:b:o:" o; do
       if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     b)
-      COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ $COMMA != 0 ]]; then
-        BLOCK_SIZE_X=${OPTARG:0:$COMMA-1};
-        BLOCK_SIZE_Y=${OPTARG:$COMMA};
+      X=`expr index "${OPTARG}" "x"`;
+      if [[ $X -ne 0 ]]; then
+        BLOCK_SIZE_X=${OPTARG:0:$X-1};
+        BLOCK_SIZE_Y=${OPTARG:$X};
       else
         BLOCK_SIZE_X=${OPTARG};
         BLOCK_SIZE_Y=${OPTARG};
@@ -82,10 +82,10 @@ while getopts ":sm:b:o:" o; do
       if (( $BLOCK_SIZE_X <= 0 || $BLOCK_SIZE_Y <= 0 )); then echo "Invalid block size." 1>&2; echo; usage; fi;
       ;;
     o)
-      COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ $COMMA != 0 ]]; then
-        OVERLAP_SIZE_X=${OPTARG:0:$COMMA-1};
-        OVERLAP_SIZE_Y=${OPTARG:$COMMA};
+      X=`expr index "${OPTARG}" "x"`;
+      if [[ $X -ne 0 ]]; then
+        OVERLAP_SIZE_X=${OPTARG:0:$X-1};
+        OVERLAP_SIZE_Y=${OPTARG:$X};
       else
         OVERLAP_SIZE_X=${OPTARG};
         OVERLAP_SIZE_Y=${OPTARG};
