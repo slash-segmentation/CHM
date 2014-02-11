@@ -1,7 +1,8 @@
-function CHM_test_blocks(input_files,outputpath,blocksize,bordersize,savingpath)
-if nargin < 3 || nargin > 5; error('CHM_test_blocks must have 3 to 5 input arguments'); end
+function CHM_test_blocks(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
+if nargin < 3 || nargin > 6; error('CHM_test_blocks must have 3 to 6 input arguments'); end
 if nargin < 4; bordersize = 0; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
+if nargin < 6; tiles_to_proc = []; end
 
 if ~ismcc && ~isdeployed
     % Add path to functions required for feature extraction (already included in compiled version)
@@ -21,7 +22,14 @@ files_out = GetOutputFiles(outputpath, files_te);
 if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersize) == 2; brd = bordersize(:)'; else; error('bordersize argument to CHM_test_blocks must have 1 or 2 elements'); end
 if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test_blocks must have 1 or 2 elements'); end
 bs = bs-2*brd;
-proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
+if ndims(tiles_to_proc) == 2 && size(tiles_to_proc, 2) == 2 && size(tiles_to_proc, 1) ~= 0
+    locs_to_proc = repmat(bs, [size(tiles_to_proc, 1) 1]).*(tiles_to_proc-1)+1;
+    proc = @(block_struct) ProcessBlock_LocOnly(block_struct, savingpath, param, locs_to_proc);
+elseif all(size(tiles_to_proc) ~= 0)
+    error('tiles_to_proc argument to CHM_test_blocks must be an N by 2 matrix');
+else
+    proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
+end
 args = {'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true};
 
 opened_pool = 0;
@@ -64,8 +72,17 @@ function output=ProcessBlock(block_struct, savingpath, param)
     
     % Process block
     output = testCHM(block_struct.data, savingpath, param);
-    %output = block_struct.data/255.0;
     
     % Remove border and partial padding
     sz = brd + 1 + min([block_struct.imageSize-block_struct.location;size(output)-2*brd-1]);
     output = uint8(output(brd(1)+1:sz(1), brd(2)+1:sz(2))*255);
+
+
+function output=ProcessBlock_LocOnly(block_struct, savingpath, param, locs_to_proc)
+    % Only processes when location is in locs_to_proc, otherwise just returns 0s
+    loc = block_struct.location
+    if any(all(repmat(loc,size(locs_to_proc,1),1)==locs_to_proc,2)) % equivilent to but 10x faster then: any(ismember(locs_to_proc,loc,'rows'))
+      output = ProcessBlock(block_struct, savingpath, param);
+    else
+      output = zeros(min([block_struct.imageSize-loc;size(block_struct.data)-2*block_struct.border-1]),'uint8');
+    end

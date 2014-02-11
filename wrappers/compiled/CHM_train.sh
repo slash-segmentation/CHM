@@ -58,11 +58,11 @@ while getopts ":sm:S:L:M:" o; do
       ;;
     S)
       NSTAGE=${OPTARG};
-      if [[ $NSTAGE < 2 ]]; then echo "Invalid number of training stages." 1>&2; echo; usage; fi;
+      if [[ $NSTAGE -lt 2 ]]; then echo "Invalid number of training stages." 1>&2; echo; usage; fi;
       ;;
     o)
       NLEVEL=${OPTARG};
-      if [[ $NLEVEL < 1 ]]; then echo "Invalid number of training levels." 1>&2; echo; usage; fi;
+      if [[ $NLEVEL -lt 1 ]]; then echo "Invalid number of training levels." 1>&2; echo; usage; fi;
       ;;
     M)
       MTLB_FLDR=${OPTARG};
@@ -80,7 +80,7 @@ done
 if [[ -z $MTLB_FLDR ]]; then
     if [[ -z $MCR_DIR ]]; then
         MTLB_FLDR=`which matlab 2>/dev/null`
-        if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
+        if [[ $? -ne 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
         while [ -h "$MTLB_FLDR" ]; do
             DIR="$( cd -P "$( dirname "$MTLB_FLDR" )" && pwd -P )"
             MTLB_FLDR="$(readlink "$MTLB_FLDR")"
