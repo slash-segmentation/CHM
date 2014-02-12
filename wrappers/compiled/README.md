@@ -23,3 +23,6 @@ simply define MCR_CACHE_ROOT before running the script to a directory and make
 sure that directory exists. In that root directory will be placed a folder like
 .mcrCache7.16 (for MCR v7.16) which will contain the actual cache. If you want
 to disable caching, set MCR_CACHE_ROOT to a non-existent directory.
+
+To compile, in MATLAB run "run compile_exec" from this folder. Currently the
+shell scripts need to be manually updated if they have been changed.
