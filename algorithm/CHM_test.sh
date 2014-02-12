@@ -57,15 +57,15 @@ these or a comma-separated list of these:
 }
 
 # Functions for parsing arguments
-get_size() # takes string to parse, if 0s are allowed, and the width and height variable names (e.g. get_size ${OPTARG} 1 OVERLAP_W OVERLAP_H ) 
+get_size() # takes string to parse, if 0s are not allowed, and the width and height variable names (e.g. get_size ${OPTARG} 1 OVERLAP_W OVERLAP_H ) 
 {
     if ! [[ $1 =~ ^([0-9]+)(x([0-9]+))?$ ]]; then echo "Invalid size: $1. Expecting single number or WxH." 1>&2; echo; usage; fi;
     local -i W=${BASH_REMATCH[1]};
     local -i H=$W;
-    if [[ ${#BASH_REMATCH[*]} -eq 4 ]]; then
+    if [[ ! -z ${BASH_REMATCH[3]} ]]; then
         H=${BASH_REMATCH[3]};
     fi;
-    if [[ $2 && ( $W -eq 0 || $H -eq 0 ) ]]; then echo "Invalid size: $1. Neither dimension can be 0." 1>&2; echo; usage; fi;
+    if [[ $2 -ne 0 && ( $W -eq 0 || $H -eq 0 ) ]]; then echo "Invalid size: $1. Neither dimension can be 0." 1>&2; echo; usage; fi;
     eval $3=$W
     eval $4=$H
 }
