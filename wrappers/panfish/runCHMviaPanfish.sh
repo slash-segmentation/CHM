@@ -22,7 +22,7 @@ if [ $# -lt 2 ] ; then
   echo "        <output directory> -- Directory where job will be created"
   echo "        <chm opts> -- Parameters passed directly to CHM_test.sh"
   echo "                      Should be set as a single argument in quotes if there are spaces"
-  echo "                      This is where blocksize (-b HxW) and overlap (-o HxW) can be set"
+  echo "                      This is where blocksize (-b WxH) and overlap (-o WxH) can be set"
   echo "                      NOTE:  Going above 1k block size may cause jobs to fail due to too much memory consumption"
   
   echo ""
