@@ -56,11 +56,11 @@ while getopts ":sm:S:L:" o; do
       ;;
     S)
       NSTAGE=${OPTARG};
-      if [[ $NSTAGE < 2 ]]; then echo "Invalid number of training stages." 1>&2; echo; usage; fi;
+      if [[ $NSTAGE -lt 2 ]]; then echo "Invalid number of training stages." 1>&2; echo; usage; fi;
       ;;
     o)
       NLEVEL=${OPTARG};
-      if [[ $NLEVEL < 1 ]]; then echo "Invalid number of training levels." 1>&2; echo; usage; fi;
+      if [[ $NLEVEL -lt 1 ]]; then echo "Invalid number of training levels." 1>&2; echo; usage; fi;
       ;;
     *)
       echo "Invalid argument." 1>&2; echo; 

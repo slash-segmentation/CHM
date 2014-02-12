@@ -28,6 +28,14 @@ Optional Arguments:
                   value or a WxH value. The value used will depend on the size
                   of the structures being segmenting but at most 50 pixels
                   seems necessary.
+  -t tile_pos     Only allowed with -b. Specifies that only the given
+                  blocks/tiles be processed by CHM while all others simply
+                  output black. Each tile is given as C,R (e.g 2,1 would be the
+                  tile in the second column 2 and first row). Can process
+                  multiple tiles by using multiple -t arguments. The tiles are
+                  defined by multiples of block_size-2*overlap_size. A tile
+                  position out of range will be ignored. If not included then
+                  all tiles will be processed.
   -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
                   will be made using 'which'. It must be the same version used
@@ -50,20 +58,44 @@ these or a comma-separated list of these:
   exit 1;
 }
 
+# Functions for parsing arguments
+get_size() # takes string to parse, if 0s are allowed, and the width and height variable names (e.g. get_size ${OPTARG} 1 OVERLAP_W OVERLAP_H ) 
+{
+    if ! [[ $1 =~ ^([0-9]+)(x([0-9]+))?$ ]]; then echo "Invalid size: $1. Expecting single number or WxH." 1>&2; echo; usage; fi;
+    local -i W=${BASH_REMATCH[1]};
+    local -i H=$W;
+    if [[ ${#BASH_REMATCH[*]} -eq 4 ]]; then
+        H=${BASH_REMATCH[3]};
+    fi;
+    if [[ $2 && ( $W -eq 0 || $H -eq 0 ) ]]; then echo "Invalid size: $1. Neither dimension can be 0." 1>&2; echo; usage; fi;
+    eval $3=$W
+    eval $4=$H
+}
+get_pos() # takes string to parse and the X and Y variable names (e.g. get_pos ${OPTARG} TILE_COL TILE_ROW )
+{
+    if ! [[ $1 =~ ^(-?[0-9]+),(-?[0-9]+)$ ]]; then echo "Invalid position: $1. Expecting COL,ROW." 1>&2; echo; usage; fi;
+    local -i C=${BASH_REMATCH[1]};
+    local -i R=${BASH_REMATCH[2]};
+    eval $2=$C
+    eval $3=$R
+}
+
 # Parse and minimally check arguments
 if [[ $# -lt 2 ]]; then usage; fi
 INPUT=$1;
 OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
-declare -i COMMA=0;
-declare -i BLOCK_SIZE_X=0;
-declare -i BLOCK_SIZE_Y=0;
-declare -i OVERLAP_SIZE_X=0;
-declare -i OVERLAP_SIZE_Y=0;
+declare -i BLOCK_W=0;
+declare -i BLOCK_H=0;
+declare -i OVERLAP_W=0;
+declare -i OVERLAP_H=0;
+declare -i TILE_ROW=0; # temporary variables
+declare -i TILE_COL=0;
+TILES=; # the tiles to do as row1 col1;row2 col2;...
 MATLAB_FOLDER=;
 shift 2
-while getopts ":sm:b:o:M:" o; do
+while getopts ":sm:b:o:t:M:" o; do
   case "${o}" in
     s)
       echo "Warning: argument -s is ignored for compiled version, it is always single-threaded" 1>&2;
@@ -73,45 +105,38 @@ while getopts ":sm:b:o:M:" o; do
       if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     b)
-      COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ $COMMA != 0 ]]; then
-        BLOCK_SIZE_X=${OPTARG:0:$COMMA-1};
-        BLOCK_SIZE_Y=${OPTARG:$COMMA};
-      else
-        BLOCK_SIZE_X=${OPTARG};
-        BLOCK_SIZE_Y=${OPTARG};
-      fi;
-      if (( $BLOCK_SIZE_X <= 0 || $BLOCK_SIZE_Y <= 0 )); then echo "Invalid block size." 1>&2; echo; usage; fi;
+      get_size "${OPTARG}" 1 BLOCK_W BLOCK_H
       ;;
     o)
-      COMMA=`expr index "${OPTARG}" "x"`;
-      if [[ $COMMA != 0 ]]; then
-        OVERLAP_SIZE_X=${OPTARG:0:$COMMA-1};
-        OVERLAP_SIZE_Y=${OPTARG:$COMMA};
+      get_size "${OPTARG}" 0 OVERLAP_W OVERLAP_H
+      ;;
+    t)
+      get_pos "${OPTARG}" TILE_COL TILE_ROW
+      if [[ -z $TILES ]]; then
+        TILES="$TILE_ROW $TILE_COL"
       else
-        OVERLAP_SIZE_X=${OPTARG};
-        OVERLAP_SIZE_Y=${OPTARG};
-      fi;
-      if (( $OVERLAP_SIZE_X < 0 || $OVERLAP_SIZE_Y < 0 )); then echo "Invalid overlap size." 1>&2; echo; usage; fi;
+        TILES="$TILES;$TILE_ROW $TILE_COL"
+      fi
       ;;
     M)
       MTLB_FLDR=${OPTARG};
       if [ ! -d "$MTLB_FLDR" ]; then echo "MATLAB folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     *)
-      echo "Invalid argument." 1>&2; echo; 
+      echo "Invalid argument: ${o}." 1>&2; echo;
       usage;
       ;;
     esac
 done
-if [[ ($OVERLAP_SIZE_X != 0 || $OVERLAP_SIZE_Y != 0) && $BLOCK_SIZE_X == 0 ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
+if [[ ($OVERLAP_W -ne 0 || $OVERLAP_H -ne 0) && $BLOCK_W -eq 0 ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
+if [[ ! -z $TILES && $BLOCK_W -eq 0 ]]; then echo "Tile position can only be used with block size." 2>&1; echo; usage; fi;
 
 
 # Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
 if [[ -z $MTLB_FLDR ]]; then
     if [[ -z $MCR_DIR ]]; then
         MTLB_FLDR=`which matlab 2>/dev/null`
-        if [[ $? != 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
+        if [[ $? -ne 0 ]]; then echo "Unable to find MATLAB or MATLAB Compiler Runtime." 1>&2; echo; usage; fi;
         while [ -h "$MTLB_FLDR" ]; do
             DIR="$( cd -P "$( dirname "$MTLB_FLDR" )" && pwd -P )"
             MTLB_FLDR="$(readlink "$MTLB_FLDR")"
@@ -151,8 +176,8 @@ SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
-if [[ $BLOCK_SIZE_X != 0 ]]; then
-  $SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "[${BLOCK_SIZE_Y} ${BLOCK_SIZE_X}]" "[${OVERLAP_SIZE_Y} ${OVERLAP_SIZE_X}]" "${MODEL_FOLDER}";
+if [[ $BLOCK_W -ne 0 ]]; then
+  $SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "[${BLOCK_H} ${BLOCK_W}]" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]";
 else
   $SOURCE/CHM_test "${INPUT}" "${OUTPUT}" "${MODEL_FOLDER}";
 fi
