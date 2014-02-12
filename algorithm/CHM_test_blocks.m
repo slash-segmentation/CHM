@@ -12,6 +12,7 @@ else
     % Parse non-string arguments
     blocksize  = ParseArgument(blocksize);
     bordersize = ParseArgument(bordersize);
+    tiles_to_proc = ParseArgument(tiles_to_proc);
 end
 
 param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
