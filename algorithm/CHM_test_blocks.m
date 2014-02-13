@@ -49,7 +49,7 @@ for i = 1:length(files_te)
         im = blockproc(files_te{i}, bs,proc, args{:});
         im = im(1:h,1:w); % when reading directly from file the image is always padded with zeros to a multiple of the block size size.
     else
-        im = blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'UseParallel',true, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false);
+        im = blockproc(imread(files_te{i}),bs,proc, args{:});
     end
     imwrite(im, files_out{i});
 end
@@ -81,9 +81,9 @@ function output=ProcessBlock(block_struct, savingpath, param)
 
 function output=ProcessBlock_LocOnly(block_struct, savingpath, param, locs_to_proc)
     % Only processes when location is in locs_to_proc, otherwise just returns 0s
-    loc = block_struct.location
+    loc = block_struct.location;
     if any(all(repmat(loc,size(locs_to_proc,1),1)==locs_to_proc,2)) % equivilent to but 10x faster then: any(ismember(locs_to_proc,loc,'rows'))
       output = ProcessBlock(block_struct, savingpath, param);
     else
-      output = zeros(min([block_struct.imageSize-loc;size(block_struct.data)-2*block_struct.border-1]),'uint8');
+      output = zeros(min([block_struct.imageSize-loc;size(block_struct.data)-2*block_struct.border]),'uint8');
     end
