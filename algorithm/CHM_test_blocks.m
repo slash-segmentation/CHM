@@ -85,5 +85,5 @@ function output=ProcessBlock_LocOnly(block_struct, savingpath, param, locs_to_pr
     if any(all(repmat(loc,size(locs_to_proc,1),1)==locs_to_proc,2)) % equivilent to but 10x faster then: any(ismember(locs_to_proc,loc,'rows'))
       output = ProcessBlock(block_struct, savingpath, param);
     else
-      output = zeros(min([block_struct.imageSize-loc;size(block_struct.data)-2*block_struct.border]),'uint8');
+      output = zeros(min([block_struct.imageSize-loc+1;size(block_struct.data)-2*block_struct.border]),'uint8');
     end
