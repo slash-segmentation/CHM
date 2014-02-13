@@ -31,27 +31,30 @@ elseif all(size(tiles_to_proc) ~= 0)
 else
     proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
 end
-args = {'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true};
+%args = {'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true};
 
 opened_pool = 0;
 try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
 
 for i = 1:length(files_te)
-    [~,~,ext] = fileparts(files_te{i});
-    if strcmpi(ext,'.tif') || strcmpi(ext,'.tiff')
-        info = imfinfo(files_te{i});
-        w = info.Width;
-        h = info.Height;
-        if mod(w, bs(2)) == 0 && mod(h, bs(1)) == 0;
-             blockproc(files_te{i}, bs,proc, args{:}, 'Destination',files_out{i});
-             continue;
-        end
-        im = blockproc(files_te{i}, bs,proc, args{:});
-        im = im(1:h,1:w); % when reading directly from file the image is always padded with zeros to a multiple of the block size size.
-    else
-        im = blockproc(imread(files_te{i}),bs,proc, args{:});
-    end
-    imwrite(im, files_out{i});
+    % Disabling all TIFF-specific code for now. Maybe one day we will re-add it.
+    $ It has benefits of better memory usage and runs twice as fast when running in parallel ('UseParallel', true) but normally has a penalty of 2-5 seconds per tile (especially horrendous when running with selected tiles only - can add 30 min to a 10 min job).
+    %[~,~,ext] = fileparts(files_te{i});
+    %if strcmpi(ext,'.tif') || strcmpi(ext,'.tiff')
+    %    info = imfinfo(files_te{i});
+    %    w = info.Width;
+    %    h = info.Height;
+    %    if mod(w, bs(2)) == 0 && mod(h, bs(1)) == 0;
+    %         blockproc(files_te{i}, bs,proc, args{:}, 'Destination',files_out{i});
+    %         continue;
+    %    end
+    %    im = blockproc(files_te{i}, bs,proc, args{:});
+    %    im = im(1:h,1:w); % when reading directly from file the image is always padded with zeros to a multiple of the block size size.
+    %else
+    %    im = blockproc(imread(files_te{i}),bs,proc, args{:});
+    %end
+    %imwrite(im, files_out{i});
+    imwrite(blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true), files_out{i});
 end
 
 if opened_pool; matlabpool close; end
