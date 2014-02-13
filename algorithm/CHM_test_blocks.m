@@ -38,7 +38,7 @@ try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1;
 
 for i = 1:length(files_te)
     % Disabling all TIFF-specific code for now. Maybe one day we will re-add it.
-    $ It has benefits of better memory usage and runs twice as fast when running in parallel ('UseParallel', true) but normally has a penalty of 2-5 seconds per tile (especially horrendous when running with selected tiles only - can add 30 min to a 10 min job).
+    % It has benefits of better memory usage and runs twice as fast when running in parallel ('UseParallel', true) but normally has a penalty of 2-5 seconds per tile (especially horrendous when running with selected tiles only - can add 30 min to a 10 min job).
     %[~,~,ext] = fileparts(files_te{i});
     %if strcmpi(ext,'.tif') || strcmpi(ext,'.tiff')
     %    info = imfinfo(files_te{i});
