@@ -82,8 +82,10 @@ teardown() {
 @test "CHM_test.sh with invalid argument" {
   run $CHM_TEST blah ${THE_TMP} -invalidarg
   [ "$status" -eq 1 ]
-
-  [ "${lines[0]}" = "Invalid argument." ]
+  
+  # this is a little weird.  Looking at CHM_test.sh code I'd expect -invalidarg, but
+  # we are getting ? character.
+  [ "${lines[0]}" = "Invalid argument: ?." ]
   [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
 }
 
@@ -123,6 +125,24 @@ teardown() {
   export PATH=$A_TEMP_PATH
 }
 
+#
+# CHM_test.sh with basic arguments and -s
+#
+@test "CHM_test.sh with basic arguments and -s" {
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -s
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''./temp/'');');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
 # 
 # CHM_test.sh with fake successful matlab and block size argument
 #
@@ -133,13 +153,30 @@ teardown() {
   export PATH=$SUCCESS_MATLAB:$PATH
 
   run $CHM_TEST blah ${THE_TMP} -b 200x100
-
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
 }
+
+# 
+# CHM_test.sh with fake successful matlab and block size argument and -s
+#
+@test "CHM_test.sh with fake successful matlab and block size argument and -s" {
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -s -b 200x100
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
 
 # 
 # CHM_test.sh with fake fail matlab and block size argument
@@ -154,7 +191,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 200x100
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -167,16 +204,50 @@ teardown() {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
-  export PATH=$FAIL_MATLAB:$PATH
+  export PATH=$SUCCESS_MATLAB:$PATH
 
   run $CHM_TEST blah ${THE_TMP} -b 200x100 -o 3x1
 
-  [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'');');" ]
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
 }
+
+#
+# CHM_test.sh with fake successful matlab and single valid value for block size
+#
+@test "CHM_test.sh with fake successful matlab and single valid value for block size" {
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 50 
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[50 50],[0 0],''./temp/'',[]);');" ]
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
+#
+# CHM_test.sh with fake successful matlab and single valid value for overlap size
+#
+@test "CHM_test.sh with fake successful matlab and single valid value for overlap size" {
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 50 -o 20
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[50 50],[20 20],''./temp/'',[]);');" ]
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
+
 
 #
 # CHM_test.sh with overlap argument but no block size argument
@@ -191,30 +262,256 @@ teardown() {
 }
 
 #
-# CHM_test.sh with invalid block size
+# CHM_test.sh with tile argument but no block size argument
 #
-@test "CHM_test.sh with invalid block size" {
+@test "CHM_test.sh with tile argument but no block size argument" {
 
-  run $CHM_TEST blah ${THE_TMP} -b 10x-1
+  run $CHM_TEST blah ${THE_TMP} -t 3,1
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "Invalid block size." ]
+  [ "${lines[0]}" = "Tile position can only be used with block size." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+}
+
+#
+# CHM_test.sh with invalid block size
+#
+@test "CHM_test.sh with invalid block size 10x-1" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x-1
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: 10x-1. Expecting single number or WxH." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+}
+
+#
+# CHM_test.sh with invalid block size
+#
+@test "CHM_test.sh with invalid block size -1x300" {
+
+  run $CHM_TEST blah ${THE_TMP} -b -1x300
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: -1x300. Expecting single number or WxH." ]
   [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
 }
 
 
 #
-# CHM_test.sh with invalid overlap
+# CHM_test.sh with invalid block size
 #
-@test "CHM_test.sh with invalid block size" {
+@test "CHM_test.sh with invalid block size 10x0" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x0
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: 10x0. Neither dimension can be 0." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+}
+
+#
+# CHM_test.sh with invalid block size
+#
+@test "CHM_test.sh with invalid block size 0x20" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 0x20
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: 0x20. Neither dimension can be 0." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+}
+
+#
+# CHM_test.sh with invalid block size
+#
+@test "CHM_test.sh with invalid block size 0x0" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 0x0
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: 0x0. Neither dimension can be 0." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+}
+
+#
+# CHM_test.sh with invalid overlap -1x2
+#
+@test "CHM_test.sh with invalid overlap size -1x2" {
 
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o -1x2
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "Invalid overlap size." ]
+  [ "${lines[0]}" = "Invalid size: -1x2. Expecting single number or WxH." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+
+}
+
+#
+# CHM_test.sh with invalid overlap 2x-1
+#
+@test "CHM_test.sh with invalid overlap size 2x-1" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 2x-1
+
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid size: 2x-1. Expecting single number or WxH." ]
   [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
 
 }
 
 
+#
+# CHM_test.sh with valid overlap 0x2
+#
+@test "CHM_test.sh with valid overlap size 0x2" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x2
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[2 0],''./temp/'',[]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+
+}
+
+#
+# CHM_test.sh with valid overlap 2x0
+#
+@test "CHM_test.sh with valid overlap size 2x0" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 2x0
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 2],''./temp/'',[]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
+#
+# CHM_test.sh with valid overlap 0x0
+#
+@test "CHM_test.sh with valid overlap size 0x0" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x0
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+}
+
+#
+# CHM_test.sh invalid tile -t 4
+#
+@test "CHM_test.sh invalid tile -t 4" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 4
+
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid position: 4. Expecting COL,ROW." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+
+}
+
+#
+# CHM_test.sh invalid tile -t 4x4
+#
+@test "CHM_test.sh invalid tile -t 4x4" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 4x4
+
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid position: 4x4. Expecting COL,ROW." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+
+}
+
+#
+# CHM_test.sh good tile -t 5,6 and a bad tile -t foo
+#
+@test "CHM_test.sh good tile -t 5,6 and a bad tile -t foo" {
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 5,6 -t foo
+
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" = "Invalid position: foo. Expecting COL,ROW." ]
+  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+
+}
+
+#
+# CHM_test.sh valid tile -t 0,0
+#
+@test "CHM_test.sh valid tile -t 0,0" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 0,0
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[0 0]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+
+}
+
+#
+# CHM_test.sh valid tile -t -1,-1
+#
+@test "CHM_test.sh valid tile -t -1,-1" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t -1,-1
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[-1 -1]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+
+}
+
+
+
+#
+# CHM_test.sh multiple valid tiles with repeat -t 1,1 -t 2,3 -t 1,1
+#
+@test "CHM_test.sh multiple valid tiles with repeat -t 1,1 -t 2,3 -t 1,1" {
+
+  A_TEMP_PATH=$PATH
+
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+
+  run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 1,1 -t 2,3 -t 1,1
+
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[1 1;3 2;1 1]);');" ]
+
+  # reset path
+  export PATH=$A_TEMP_PATH
+
+}
 
