@@ -1,5 +1,5 @@
-*.png
+algorithm/*.mat
+algorithm/FilterStuff/*.mat
 *.pyc
-*.mat
 *.o
 *.log
