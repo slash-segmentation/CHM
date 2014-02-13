@@ -12,6 +12,6 @@ if nargin < 2
 end
 
 param = load(fullfile(model_folder, 'param'), 'param');
-Nlevel = param(1).Nlevel;
-Nfeatcontext = param(1).Nfeatcontext;
+Nlevel = param.param.Nlevel;
+Nfeatcontext = param.param.Nfeatcontext;
 save(fullfile(model_folder, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3');
