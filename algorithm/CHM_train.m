@@ -16,12 +16,18 @@ end
 
 files_tr = GetInputFiles(trainpath);
 files_la = GetInputFiles(labelpath);
+if numel(files_tr) < 1 || numel(files_tr) ~= numel(files_la); error('You must provide at least 1 image set and equal numbers of training and label images'); end;
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
 % Only for preallocation purpose
 PixN = zeros(Nlevel+1,1);
 for i = 1:length(files_tr)
     im = imread(files_tr{i});
+    if i == 1;
+        TrainingSize = size(im);
+        if numel(TrainingSize) ~= 2; error('You must use grayscale images'); end;
+    elseif TrainingSize ~= size(im); error('All training images must have the same dimensions'); end;
+    
     % Original: for l = 0:Nlevel; PixN(l+1) = PixN(l+1) + numel(MyDownSample(im,l)); end;
     
     % Faster (2.7x) but assumes MyDownSample(im,n) == MyDownSample(MyDownSample(im,1),n-1) and MyDownSample(im,0) == im
@@ -45,7 +51,7 @@ im = imread(files_tr{1});
 Nfeat = size(Filterbank(im),1);
 Nfeatcontext = size(ConstructNeighborhoodsS(im),1); % TODO: make shortcut function for getting size?
 
-save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', '-v7.3');
+save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', '-v7.3');
 
 param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;

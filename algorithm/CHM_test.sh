@@ -17,12 +17,10 @@ Optional Arguments:
                   Can be given as a single value (used for both height and
                   width) or a WxH value. This can reduce processing time and
                   memory usage along with increasing quality. The block size
-                  should be exactly the size of the training images. TIFF
-                  images are particularly faster and use less memory with this
-                  method. TIFF images that have a width and height that are
-                  multiples of block_size-2*overlap_size use a lot less memory
-                  but will create uncompressed outputs. When using blocks,
-                  parallelism is done on blocks instead of images.
+                  should be exactly the size of the training images. You can
+                  use the value 'auto' for block_size to have it use the
+                  training image sizes. When using blocks, parallelism is done
+                  on blocks instead of images.
   -o overlap_size Only allowed with -b. Specifies how much the blocks should
                   overlap (default is none). Like -b this supports a single
                   value or a WxH value. The value used will depend on the size
@@ -87,6 +85,7 @@ MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i BLOCK_W=0;
 declare -i BLOCK_H=0;
+BLOCKSIZE=; # nothing, [$BLOCK_H $BLOCK_W], or 'auto'
 declare -i OVERLAP_W=0;
 declare -i OVERLAP_H=0;
 declare -i TILE_ROW=0; # temporary variables
@@ -103,17 +102,22 @@ while getopts ":sm:b:o:t:" o; do
       if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     b)
-      get_size "${OPTARG}" 1 BLOCK_W BLOCK_H
+      if [[ "${OPTARG}" == "auto" ]]; then
+        BLOCKSIZE=auto;
+      else
+        get_size "${OPTARG}" 1 BLOCK_W BLOCK_H;
+        BLOCKSIZE="[${BLOCK_H} ${BLOCK_W}]";
+      fi
       ;;
     o)
-      get_size "${OPTARG}" 0 OVERLAP_W OVERLAP_H
+      get_size "${OPTARG}" 0 OVERLAP_W OVERLAP_H;
       ;;
     t)
-      get_pos "${OPTARG}" TILE_COL TILE_ROW
+      get_pos "${OPTARG}" TILE_COL TILE_ROW;
       if [[ -z $TILES ]]; then
-        TILES="$TILE_ROW $TILE_COL"
+        TILES="$TILE_ROW $TILE_COL";
       else
-        TILES="$TILES;$TILE_ROW $TILE_COL"
+        TILES="$TILES;$TILE_ROW $TILE_COL";
       fi
       ;;
     *)
@@ -122,8 +126,8 @@ while getopts ":sm:b:o:t:" o; do
       ;;
     esac
 done
-if [[ ($OVERLAP_W -ne 0 || $OVERLAP_H -ne 0) && $BLOCK_W -eq 0 ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
-if [[ ! -z $TILES && $BLOCK_W -eq 0 ]]; then echo "Tile position can only be used with block size." 2>&1; echo; usage; fi;
+if [[ ($OVERLAP_W -ne 0 || $OVERLAP_H -ne 0) && -z $BLOCKSIZE ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
+if [[ ! -z $TILES && -z $BLOCKSIZE ]]; then echo "Tile position can only be used with block size." 2>&1; echo; usage; fi;
 
 
 # We need to add the path with the script in it to the MATLAB path
@@ -144,8 +148,8 @@ fi
 
 
 # Run the main matlab script
-if [[ $BLOCK_W -ne 0 ]]; then
-  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',[${BLOCK_H} ${BLOCK_W}],[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}]);');";
+if [[ ! -z $BLOCKSIZE ]]; then
+  matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test_blocks(''${INPUT}'',''${OUTPUT}'',$BLOCKSIZE,[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}]);');";
 else
   matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',''${MODEL_FOLDER}'');');";
 fi
