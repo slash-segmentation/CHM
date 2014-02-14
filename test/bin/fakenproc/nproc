@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo $FAKE_NPROC_PROCS
+
+exit 0
