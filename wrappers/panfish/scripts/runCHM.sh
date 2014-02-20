@@ -1,19 +1,19 @@
 #!/bin/sh
 
 if [ $# -ne 1 ] ; then
-   echo "$0 <Matlab directory>"
-   echo "This script runs CHM on a slice/image of data"
-   echo "The parameters are set by examining the"
-   echo "environment variable SGE_TASK_ID and parsing"
-   echo "$RUN_CHM_CONFIG file for inputs corresponding"
-   echo "to SGE_TASK_ID."
-   echo ""
-   echo " <Matlab directory> is the directory where"
-   echo "Matlab is installed.  This script assumes"
-   echo "<Matlab directory>/bin/matlab is the path"
-   echo "to the matlab binary"
-   exit 1
+  echo "$0 <Directory containing matlab binary>
+This script runs CHM on a slice/image of data.
+The parameters are set by examining the
+environment variable SGE_TASK_ID and parsing
+$RUN_CHM_CONFIG file for inputs corresponding
+to SGE_TASK_ID.
 
+Matlab directory> is the directory where
+Matlab is installed.  This script assumes
+<Matlab directory>/bin/matlab is the path
+to the matlab binary"
+   
+  exit 1
 fi
 
 MATLAB_DIR=$1
@@ -52,74 +52,6 @@ on_usr2() {
 # trap usr2 signal cause its what gets sent by SGE when qdel is called
 trap 'on_usr2' USR2
 
-
-
-#
-# Copies gzip tarball of inputs to $SCRATCH/inputs 
-# decompressing the tarball
-#
-function copyInputsToScratch {
-  logStartTime "CopyInputsToScratch"
-
-  getSizeOfPath $BASEDIR/CHM.tar.gz
-
-  logMessage "Copying $NUM_BYTES bytes to scratch"
-
-  /bin/cp $BASEDIR/CHM.tar.gz $1
-
-  if [ $? != 0 ] ; then
-     jobFailed "Unable to run: /bin/cp $BASEDIR/CHM.tar.gz $1"
-  fi
-  
-  cd $1
-
-  if [ $? != 0 ] ; then
-    jobFailed "Unable to run: cd $1"
-  fi
-
-  logStartTime "Uncompressing CHM.tar.gz"
-
-  tar -zxf CHM.tar.gz
-
-  if [ $? != 0 ] ; then
-     jobFailed "Unable to run: tar -zxf CHM.tar.gz"
-  fi
-
-  /bin/rm -f CHM.tar.gz
-
-  if [ $? != 0 ] ; then
-     logWarning "Unable to run /bin/rm -f CHM.tar.gz"
-  fi
-  
-  logEndTime "Uncompressing CHM.tar.gz" $START_TIME 0
-
-  /bin/cp $BASEDIR/${RUN_CHM_CONFIG} $SCRATCH/.
-
-  if [ $? != 0 ] ; then
-     jobFailed "Unable to run: /bin/cp $BASEDIR/${RUN_CHM_CONFIG} $SCRATCH/."
-  fi
-
-  makeDirectory $SCRATCH/CHM/input
-
-  logStartTime "Copying $INPUT_IMAGE to $SCRATCH/CHM/input/"
-
-  /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/.
-
-  if [ $? != 0 ] ; then
-    removeScratch
-    jobFailed "Unable to run: /bin/cp $INPUT_IMAGE $SCRATCH/CHM/input/."
-  fi
-
-  logEndTime "Copying $INPUT_IMAGE to $SCRATCH/CHM/input/" $START_TIME 0
-
-  logEndTime "CopyInputsToScratch" $START_TIME 0
-}
-
-
-
-
-
-
 ###########################################################
 #
 # Start of script
@@ -154,26 +86,18 @@ makeDirectory $SCRATCH
 INPUT_IMAGE=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
 CHMOPTS=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
 
-OUTPUT_IMAGE_NAME=`echo $INPUT_IMAGE | sed "s/^.*\///"`
-OUTPUT_IMAGE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}"
+declare finalImage=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 3 | tail -n 1`
+declare finalImageName=`echo $finalImage | sed "s/^.*\///"`
 
-LOG_FILE="$SCRATCH/CHM/out/${OUTPUT_IMAGE_NAME}.log"
+declare tempResultImageName=`echo $INPUT_IMAGE | sed "s/^.*\///"`
+declare tempResultImage="$SCRATCH/${tempResultImageName}"
 
-# copy inputs
-copyInputsToScratch $SCRATCH
-
+LOG_FILE="$SCRATCH/${finalImageName}.log"
 
 # run CHM_test.sh
 logStartTime "CHM_test.sh"
 
 logMessage "Writing CHM_test.sh output to $LOG_FILE"
-
-cd $SCRATCH/CHM
-
-if [ $? != 0 ] ; then
-  removeScratch
-  jobFailed "Unable to run cd $SCRATCH/CHM"
-fi
 
 echo "Job.Task:  ${JOB_ID}.${SGE_TASK_ID}" > $LOG_FILE
 
@@ -181,40 +105,32 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PANFISH_BASEDIR/$MATLAB_DIR/bin/glnxa64
 export MATLAB_BIN_DIR="$PANFISH_BASEDIR/$MATLAB_DIR/bin"
 export PATH=$PATH:$MATLAB_BIN_DIR
 
-$SCRATCH/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH/CHM/out -m $SCRATCH/CHM/out $CHMOPTS -s >> $LOG_FILE 2>&1
+$BASEDIR/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH -m $BASEDIR/CHM/out $CHMOPTS -s >> $LOG_FILE 2>&1
 
 EXIT_CODE=$?
 
-cd $BASEDIR
-
-if [ $? != 0 ] ; then
-  removeScratch
-  jobFailed "Unable to run cd $BASEDIR"
-fi
-
 logEndTime "CHM_test.sh" $START_TIME $EXIT_CODE
 
-
-logStartTime "Copying back $OUTPUT_IMAGE_NAME"
+logStartTime "Copying back $finalImageName"
 
 CHM_EXIT_CODE=0
 
 # copy back results
-if [ ! -e "$OUTPUT_IMAGE" ] ; then
-  logWarning "No $OUTPUT_IMAGE_NAME Found to copy"
+if [ ! -e "$tempResultImage" ] ; then
+  logWarning "No $tempResultImage Found to copy"
   CHM_EXIT_CODE=1
 else
-  getSizeOfPath $OUTPUT_IMAGE
-  logMessage "$OUTPUT_IMAGE is $NUM_BYTES bytes"
+  getSizeOfPath $tempResultImage
+  logMessage "$tempResultImage is $NUM_BYTES bytes"
 
-  /bin/cp $OUTPUT_IMAGE $BASEDIR/out/.
+  /bin/cp $tempResultImage $BASEDIR/${finalImage}
   if [ $? != 0 ] ; then
-     logWarning "Error running /bin/cp $Y $BASEDIR/out/."
+     logWarning "Error running /bin/cp $Y $BASEDIR/${finalImage}"
      CHM_EXIT_CODE=1
   fi
 fi
 
-logEndTime "Copying back $OUTPUT_IMAGE_NAME" $START_TIME $CHM_EXIT_CODE
+logEndTime "Copying back $finalImageName" $START_TIME $CHM_EXIT_CODE
 
 logStartTime "Copying back ${SGE_TASK_ID}.log file"
 LOG_COPY_EXIT=1
