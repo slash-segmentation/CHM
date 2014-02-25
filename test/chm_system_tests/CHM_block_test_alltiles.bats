@@ -20,7 +20,6 @@ teardown() {
 # Test entire 10.png from 200x190train with -b 200x190 (10 min runtime)
 #
 @test "Test entire 10.png from 200x190train with -b 200x190 (10 min runtime)" {
-
   # Verify matlab is in the users path via which command
   run which matlab
   
@@ -36,10 +35,7 @@ teardown() {
   fi
 
   run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190
-  echo "$output" > /home/churas/x2 
-  echo "$CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190" >> /home/churas/x
   [ "$status" -eq 0 ] 
-  [ "${lines[11]}" = "Block Processing 20 blocks." ]
 
   # Verify result image matches closely to original result
   [ -s "$THE_TMP/10.png" ]
@@ -49,8 +45,42 @@ teardown() {
   # verify the comparison ran without error
   [ "$status" -eq 0 ] 
 
-  # verify that no more then 100 pixels have different intensities
-  [ "${lines[0]}" -lt 100 ]
-  echo "${output}"
+  # verify that 0 pixels have different intensities
+  [ "${lines[0]}" -eq 0 ]
+}
+
+#
+# Test entire 10.png from 200x190train with -b 200x190 -o 30x30 (15 min runtime)
+#
+@test "Test entire 10.png from 200x190train with -b 200x190 -o 30x30 (15 min runtime)" {
+
+  # Verify matlab is in the users path via which command
+  run which matlab
+
+  if [ "$status" -eq 1 ] ; then
+    skip "matlab not in path"
+  fi
+
+  # Check for Image Magick compare program
+  run which compare
+
+  if [ "$status" -eq 1 ] ; then
+    skip "compare (Image Magick program) not in path"
+  fi
+
+  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -o 30x30
+  echo "$output" 1>&2
+  [ "$status" -eq 0 ]
+
+  # Verify result image matches closely to original result
+  [ -s "$THE_TMP/10.png" ]
+  
+  run compare -metric ae "$THE_TMP/10.png" $TWOHONDO_DIR/10.alltiles.probmap.30x30overlap.png /dev/null
+
+  # verify the comparison ran without error
+  [ "$status" -eq 0 ]
+
+  # verify that 0 pixels have different intensities
+  [ "${lines[0]}" -eq 0 ]
 }
 

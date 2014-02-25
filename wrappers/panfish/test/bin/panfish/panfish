@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Reads a file matching this task of this format
+# exit code ::: std out ::: std err
+# The code then outputs the stdout and standard error
+# then removes the top line from task file 
+# and exits with exit code
+
+declare taskFile="${0}.tasks"
+
+if [ ! -s "$taskFile" ] ; then
+  echo "no task file found: $taskFile"
+  exit 1
+fi
+
+declare task=`head -n 1 $taskFile`
+declare theExit=`echo $task | cut -d "," -f 1`
+declare stdOut=`echo $task | cut -d "," -f 2`
+declare stdErr=`echo $task | cut -d "," -f 3`
+declare cmd=`echo $task | cut -d "," -f 4`
+if [ -n "$stdOut" ] ; then
+  echo $stdOut
+fi
+
+if [ -n "$stdErr" ] ; then
+  echo $stdErr 1>&2
+fi
+
+if [ -n "$cmd" ] ; then
+  eval "$cmd"
+fi
+
+# remove top line from task file
+tail -n +2 ${taskFile} > ${taskFile}.tmp
+
+/bin/mv ${taskFile}.tmp $taskFile
+
+exit $theExit
+

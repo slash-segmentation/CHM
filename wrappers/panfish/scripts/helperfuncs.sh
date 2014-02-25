@@ -1,15 +1,53 @@
-#!/bin/sh
+#!/bin/bash
 
 #
 # Variables used by scripts
 #
 #
-RUN_CHM_CONFIG="runCHM.sh.config"
+declare -r RUN_CHM_SH="runCHM.sh"
+declare -r RUN_CHM_JOB_VIA_PANFISH_SH="runCHMJobViaPanfish.sh"
+declare -r HELPER_FUNCS_SH="helperfuncs.sh"
+declare -r RUN_CHM_CONFIG="runCHM.sh.config"
+declare -r CAST_OUT_FILE="cast.out"
+declare -r CHUM_OUT_FILE="chum.out"
+declare -r PANFISH_CHM_PROPS="panfishCHM.properties"
+declare -r OUT_DIR_NAME="out"
+declare -r CONFIG_DELIM=":::"
 
-CAST_OUT_FILE="cast.out"
-CHUM_OUT_FILE="chum.out"
-CLUSTER_LIST_FILE="cluster.list"
-JOB_PROPERTIES_FILE="job.properties"
+function parseProperties {
+
+  local scriptDir="$1"
+  
+  local outputDir="$2"
+
+  local theConfig="$outputDir/$PANFISH_CHM_PROPS"
+
+  # Make sure we have a config file to use
+  if [ ! -s "$theConfig" ] ; then
+    theConfig="$scriptDir/$PANFISH_CHM_PROPS"
+  fi
+
+  if [ ! -s "$theConfig" ] ; then
+    logMessage "Config $theConfig not found"
+    return 1
+  fi
+
+  # if set must end with /
+  PANFISH_BIN_DIR=`egrep "^panfish.bin.dir" $theConfig | sed "s/^.*= *//"`
+
+  MATLAB_DIR=`egrep "^matlab.dir" $theConfig | sed "s/^.*= *//"`
+  BATCH_AND_WALLTIME_ARGS=`egrep "^batch.and.walltime.args" $theConfig | sed "s/^.*= *//"`
+
+  CHUMMEDLIST=`egrep "^cluster.list" $theConfig | sed "s/^.*= *//"`
+
+  MAX_RETRIES=5
+  RETRY_SLEEP=100
+  CASTBINARY="${PANFISH_BIN_DIR}panfishcast"
+  CHUMBINARY="${PANFISH_BIN_DIR}panfishchum"
+  LANDBINARY="${PANFISH_BIN_DIR}panfishland"
+  PANFISHSTATBINARY="${PANFISH_BIN_DIR}panfishstat"
+  return 0
+}
 
 function getLabelForLogMessage {
   LOG_LABEL=""
@@ -103,7 +141,7 @@ function getSingleCHMTaskLogFile {
     return 1
   fi
 
-  OUT_IMAGE_RAW=`egrep "^${TASKID}:::" $JOBDIR/$RUN_CHM_CONFIG | head -n 1 | sed "s/^.*::://"`
+  OUT_IMAGE_RAW=`egrep "^${TASKID}${CONFIG_DELIM}" $JOBDIR/$RUN_CHM_CONFIG | head -n 1 | sed "s/^.*${CONFIG_DELIM}//"`
 
   LOG_FILE_NAME=`echo $OUT_IMAGE_RAW | sed "s/^.*\///"`
 
@@ -236,25 +274,24 @@ function makeDirectory {
 #
 #
 function getFullPath {
-  CURDIR=`pwd`
+  local thePath=$1
+  local curdir=`pwd`
  
-  cd $1 2> /dev/null
+  cd $thePath 2> /dev/null
   if [ $? == 0 ] ; then
     GETFULLPATHRET=`pwd`
-    cd $CURDIR
+    cd $curdir
     return 0
   fi
 
-  cd $CURDIR
-
-  echo $1 | egrep "^/"
+  cd $curdir
  
   if [ $? == 0 ] ; then
-    GETFULLPATHRET=$1
+    GETFULLPATHRET=$thePath
     return 0
   fi
   
-  GETFULLPATHRET="$CURDIR/$1"
+  GETFULLPATHRET="$curdir/$thePath"
   
   return 0
 }
@@ -309,7 +346,7 @@ function getNumberOfCHMJobsFromConfig {
      logWarning "getNumberOfCHMJobsFromConfig - $1/$RUN_CHM_CONFIG not found"
      return 1
   fi
-  NUMBER_JOBS=`tail -n 1 $1/$RUN_CHM_CONFIG | sed "s/:::.*//"`
+  NUMBER_JOBS=`tail -n 1 $1/$RUN_CHM_CONFIG | sed "s/${CONFIG_DELIM}.*//"`
   return 0
 }
 
@@ -323,7 +360,7 @@ function getInputDataDirectory {
      return 1
   fi
 
-  FIRST_INPUT_IMAGE=`head -n 1 $1/$RUN_CHM_CONFIG | sed "s/^.*::://"`
+  FIRST_INPUT_IMAGE=`head -n 1 $1/$RUN_CHM_CONFIG | sed "s/^.*${CONFIG_DELIM}//"`
   INPUT_DATA=`dirname $FIRST_INPUT_IMAGE`
   return 0
 }
@@ -436,11 +473,8 @@ function getInitialClusterList {
    # If the file cluster.list exists obtain the suggested clusters from that
    # list otherwise just get the list by checking for clusters that have
    # matlab directory
-   if [ -e "$1/$CLUSTER_LIST_FILE" ] ; then
-     CHUMMEDLIST=`cat $1/$CLUSTER_LIST_FILE`
-   else
-     getMatlabDirectory $1
-     if [ $? != 0 ] ; then
+   if [ -z "$CHUMMEDLIST" ] ; then
+     if [ ! -d "$MATLAB_DIR" ] ; then
         logWarning "Unable to get Matlab directory"
         return 1
      fi
@@ -469,28 +503,181 @@ function getInitialClusterList {
 }
 
 #
-# Gets the matlab directory by parsing
-# job.properties file in $1 directory passed in
+# This function creates a configuration file to run CHM on each tile of each
+# image.  It is assumed the images all have the same size and need every tile
+# processed.  The code will create an entry for every tile in this format:
+# JOBID:::<full path to input image ie /home/foo/histeq_1.png>
+# JOBID:::<chmOpts ie overlap> -t R,C 
+# JOBID:::<output image path relative to job directory ie out/histeq_1.png/RxC.png>
 #
-function getMatlabDirectory {
-  # $1 jobDirectory
-  MATLAB_DIR="matlab"
+function createConfig {
+  local imageDir=$1
+  local configFile=$2
+  local tilesW=$3
+  local tilesH=$4
+  local tilesPerJob=$5
+  local chmOpts=$6
+  local imageSuffix=$7
+  local cntr=0
+  local outputFile=""
 
+  # Calculate the tile sets we will be using
+  local allTiles=() # simply a list of a tiles
 
-  if [ ! -s "$1/$JOB_PROPERTIES_FILE" ] ; then
-     logWarning "No $1/JOB_PROPERTIES_FILE file found"
+  for c in `seq 1 $tilesW`; do
+    for r in `seq 1 $tilesH`; do
+      allTiles[$cntr]="-t $c,$r"
+      let cntr++
+    done
+  done
+  
+  local tsCntr=0
+  # Batch tiles by $tilesPerJob into new array named $tileSets
+  let allTilesIndex=${#allTiles[@]}-1
+ 
+  local tileSets=()
+  while [ $allTilesIndex -ge 0 ] ; do
+    for (( i=0 ; i < ${tilesPerJob} ; i++ )) ; do
+      if [ $allTilesIndex -lt 0 ] ; then
+        break
+      fi
+      tileSets[$tsCntr]="${tileSets[$tsCntr]} ${allTiles[$allTilesIndex]}"
+      let allTilesIndex--
+    done
+    let tsCntr++
+   
+  done
+
+  # Using tileSets array generate jobs for each image
+  # Each job consists of 3 config lines
+  # <JOBID>:::<Input image full path>
+  # <JOBID>:::<CHM options and tile flags from tileSets>
+  # <JOBID>:::<relative output path for image of format out/[image name]/[JOBID].[image suffix]
+  let cntr=1
+  for z in `find $imageDir -name "*.${imageSuffix}" -type f | sort -n` ; do
+    imageName=`echo $z | sed "s/^.*\///"`
+    for (( y=0 ; y < ${#tileSets[@]} ; y++ )) ; do
+      echo "${cntr}${CONFIG_DELIM}${z}" >> "$configFile"
+      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]}" >> "$configFile"
+      outputFile="${OUT_DIR_NAME}/${imageName}/${cntr}.${imageSuffix}" >> "$configFile"
+      echo "${cntr}${CONFIG_DELIM}$outputFile" >> "$configFile"
+      let cntr++
+    done
+  done
+
+  return 0
+}
+
+# 
+# Parses WxH parameter
+# parseBlockParameter(String to parse, WIDTH_VARIABLE HEIGHT_VARIABLE)
+# Upon success (0 return) WIDTH_VARIABLE and HEIGHT_VARIABLE will be set with values parsed out
+# 
+function parseWidthHeightParameter {
+    local stringToParse=$1
+    PARSED_WIDTH=-1
+    PARSED_HEIGHT=-1
+    if ! [[ $stringToParse =~ ^([0-9]+)(x([0-9]+))?$ ]]; then 
+      logWarning "Unable to parse block parameter: :$stringToParse:"  
+      return 1
+    fi
+    local -i w=${BASH_REMATCH[1]};
+    local -i h=$w;
+
+    if [[ ${#BASH_REMATCH[*]} -eq 4 ]]; then
+      if [ -n "${BASH_REMATCH[3]}" ] ; then
+        h=${BASH_REMATCH[3]};
+      fi
+    fi
+
+    PARSED_WIDTH=$w
+    PARSED_HEIGHT=$h
+    return 0
+}
+
+#
+# uses Image Magick identify command to get dimensions of image file
+# getImageDimensions(path to image file)
+# return 0 upon success and sets PARSED_WIDTH and PARSED_HEIGHT to values
+function getImageDimensions {
+  local image=$1
+
+  if [ ! -f "${image}" ] ; then
+     logWarning "${image} is not a file"
      return 1
   fi
 
-  MATLAB_DIR=`egrep "^matlab.dir *= *" "$1/$JOB_PROPERTIES_FILE" | sed "s/^matlab.dir *= *//"`
-  return 0
+  local identifyOutput=`identify -format '%wx%h' "${image}" 2>&1`
+  # weird thing is in the unit tests identify never seems to kick back
+  # a non zero exit code
+  if [ $? -ne 0 ] ; then
+     logWarning "Unable to run identify on image ${image}"
+     return 1
+  fi
+
+  parseWidthHeightParameter "$identifyOutput"
+
+  return $?
 }
 
-function writeJobProperties {
-  # $1 jobDirectory
+#
+# Given a directory finds first image with matching suffix and
+# obtains its dimensions.  Code returns 0 upon success otherwise failure.
+# In addition, PARSED_WIDTH and PARSED_HEIGHT is set to dimensions of image
+#
+function getImageDimensionsFromDirOfImages {
+  local imageDir=$1
+  local imageSuffix=$2
 
-  echo "matlab.dir=$MATLAB_DIR" > "$1/$JOB_PROPERTIES_FILE"
-  return 0
+  if [ ! -d "$imageDir" ] ; then
+    logWarning "$imageDir is not a directory"
+    return 1
+  fi
+
+  local anImage=`find $imageDir -name "*.${imageSuffix}" -type f | head -n 1` 
+
+  if [ ! -f "$anImage" ] ; then
+    logWarning "No images found in $imageDir with suffix $imageSuffix"
+    return 1
+  fi
+
+  getImageDimensions "$anImage"
+  
+  return $?
 }
 
+#
+# Given dimensions of an image along with tile size this function returns
+# the number of tiles in horizontal (TILES_W) and vertical (TILES_H) 
+# that are needed to cover the image
+#
+function calculateTilesFromImageDimensions {
+  local width=$1
+  local height=$2
+  local blockWidth=$3
+  local blockHeight=$4
 
+  if [ $width -le 0 ] ; then
+    logWarning "Width must be larger then 0"
+    return 1
+  fi
+
+  if [ $height -le 0 ] ; then
+    logWarning "Height must be larger then 0"
+    return 1
+  fi
+
+  if [ $blockWidth -le 0 ] ; then
+    logWarning "BlockWidth must be larger then 0"
+    return 1
+  fi  
+
+  if [ $blockHeight -le 0 ] ; then
+    logWarning "BlockHeight must be larger then 0"
+    return 1
+  fi
+
+  TILES_W=`echo "scale=0;($width + $blockWidth - 1)/ $blockWidth" | bc -l`
+  TILES_H=`echo "scale=0;($height + $blockHeight - 1)/ $blockHeight" | bc -l`
+  return 0
+}
