@@ -15,12 +15,11 @@ else
     tiles_to_proc = ParseArgument(tiles_to_proc);
 end
 
-warn_orig_state = warning('off','MATLAB:load:variablePatternNotFound');
 param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
-warning(warn_orig_state);
 if ischar(blocksize) && blocksize == 'auto'
-    if ~isfield(param, 'TrainingSize'); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
-    blocksize = p.TrainingSize;
+    pts = load(fullfile(savingpath, 'param'), 'TrainingSize');
+    if ~isfield(pts, 'TrainingSize'); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
+    blocksize = pts.TrainingSize;
 end
 
 
