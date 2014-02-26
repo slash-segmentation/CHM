@@ -12,9 +12,7 @@ cd ../../algorithm
 % -d gives the output directory
 % Everything at the end are the functions to include/export
 fprintf('Compiling CHM_test...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_test
-fprintf('\nCompiling CHM_test_blocks...\n');
-mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -p images/imuitools -I FilterStuff -d ../wrappers/compiled CHM_test_blocks
+mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -p images/iptformats -p images/imuitools -I FilterStuff -d ../wrappers/compiled CHM_test
 fprintf('\nCompiling CHM_train...\n');
 mcc -m -R '-nojvm,-nodisplay,-singleCompThread' -N -p images/images -p images/iptutils -I FilterStuff -d ../wrappers/compiled CHM_train
 
@@ -22,7 +20,6 @@ cd ../wrappers/compiled
 
 % Remove extraneous files
 delete run_CHM_test.sh
-delete run_CHM_test_blocks.sh
 delete run_CHM_train.sh
 delete readme.txt
 delete mccExcludedFiles.log

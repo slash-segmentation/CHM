@@ -13,27 +13,22 @@ $0 <input_files> <output_folder> <optional arguments>
 Optional Arguments:
   -m model_folder The folder that contains the model data. Default is ./temp/.
                   (contains param.mat and MODEL_level#_stage#.mat)
-  -b block_size   Process images in blocks of this size instead of all at once.
-                  Can be given as a single value (used for both height and
-                  width) or a WxH value. This can reduce processing time and
-                  memory usage along with increasing quality. The block size
-                  should be exactly the size of the training images. You can
-                  use the value 'auto' for block_size to have it use the
-                  training image sizes. When using blocks, parallelism is done
-                  on blocks instead of images.
-  -o overlap_size Only allowed with -b. Specifies how much the blocks should
-                  overlap (default is none). Like -b this supports a single
-                  value or a WxH value. The value used will depend on the size
+  -b block_size   Set the block size to use as WxH. By default the block size
+                  is the the same as the size of the training images (which is
+                  believed to be optimal). Old models did not include the size
+                  of the training images so this argument must always be given
+                  in that case.
+  -o overlap_size Specifies how much the blocks should overlap given as WxH.
+                  Default is 0x0. The value used will depend on the size
                   of the structures being segmenting but at most 50 pixels
                   seems necessary.
-  -t tile_pos     Only allowed with -b. Specifies that only the given
-                  blocks/tiles be processed by CHM while all others simply
-                  output black. Each tile is given as C,R (e.g 2,1 would be the
-                  tile in the second column 2 and first row). Can process
-                  multiple tiles by using multiple -t arguments. The tiles are
-                  defined by multiples of block_size-2*overlap_size. A tile
-                  position out of range will be ignored. If not included then
-                  all tiles will be processed.
+  -t tile_pos     Specifies that only the given blocks/tiles be processed by
+                  CHM while all others simply output black. Each tile is given
+                  as C,R (e.g 2,1 would be the tile in the second column 2 and
+                  first row). Can process multiple tiles by using multiple -t
+                  arguments. The tiles are defined by multiples of
+                  block_size-2*overlap_size. A tile position out of range will
+                  be ignored. If not included then all tiles will be processed.
   -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
                   will be made using 'which'. It must be the same version used
@@ -84,9 +79,9 @@ INPUT=$1;
 OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
-declare -i BLOCK_W=0;
+declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
-BLOCKSIZE=; # nothing, [$BLOCK_H $BLOCK_W], or 'auto'
+BLOCKSIZE='auto'; # or [${BLOCK_H} ${BLOCK_W}]
 declare -i OVERLAP_W=0;
 declare -i OVERLAP_H=0;
 declare -i TILE_ROW=0; # temporary variables
@@ -104,12 +99,8 @@ while getopts ":sm:b:o:t:M:" o; do
       if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
       ;;
     b)
-      if [[ "${OPTARG}" == "auto" ]]; then
-        BLOCKSIZE=auto;
-      else
-        get_size "${OPTARG}" 1 BLOCK_W BLOCK_H;
-        BLOCKSIZE="[${BLOCK_H} ${BLOCK_W}]";
-      fi
+      get_size "${OPTARG}" 1 BLOCK_W BLOCK_H;
+      BLOCKSIZE="[${BLOCK_H} ${BLOCK_W}]";
       ;;
     o)
       get_size "${OPTARG}" 0 OVERLAP_W OVERLAP_H;
@@ -132,8 +123,6 @@ while getopts ":sm:b:o:t:M:" o; do
       ;;
     esac
 done
-if [[ ($OVERLAP_W -ne 0 || $OVERLAP_H -ne 0) && -z $BLOCKSIZE ]]; then echo "Overlap size can only be used with block size." 1>&2; echo; usage; fi;
-if [[ ! -z $TILES && -z $BLOCKSIZE ]]; then echo "Tile position can only be used with block size." 2>&1; echo; usage; fi;
 
 
 # Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
@@ -180,11 +169,7 @@ SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
-if [[ ! -z $BLOCKSIZE ]]; then
-  $SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]";
-else
-  $SOURCE/CHM_test "${INPUT}" "${OUTPUT}" "${MODEL_FOLDER}";
-fi
+$SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]";
 
 
 # Done
