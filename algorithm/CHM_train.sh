@@ -52,7 +52,7 @@ while getopts ":sm:S:L:" o; do
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
-      if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
+      if [ -f "$MODEL_FOLDER" ]; then echo "Model folder already exists as a regular file." 1>&2; echo; usage; fi;
       ;;
     S)
       NSTAGE=${OPTARG};
@@ -68,7 +68,10 @@ while getopts ":sm:S:L:" o; do
       ;;
     esac
 done
-
+if [ ! -d "$MODEL_FOLDER" ]; then
+  mkdir $MODEL_FOLDER
+  if [[ $? -ne 0 ]]; then echo "Model folder could not be created." 1>&2; echo; usage; fi;
+fi
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink

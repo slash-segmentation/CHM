@@ -54,7 +54,7 @@ while getopts ":sm:S:L:M:" o; do
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
-      if [ ! -d "$MODEL_FOLDER" ]; then echo "Model folder is not a directory." 1>&2; echo; usage; fi;
+      if [ -f "$MODEL_FOLDER" ]; then echo "Model folder already exists as a regular file." 1>&2; echo; usage; fi;
       ;;
     S)
       NSTAGE=${OPTARG};
@@ -74,6 +74,10 @@ while getopts ":sm:S:L:M:" o; do
       ;;
     esac
 done
+if [ ! -d "$MODEL_FOLDER" ]; then
+  mkdir $MODEL_FOLDER
+  if [[ $? -ne 0 ]]; then echo "Model folder could not be created." 1>&2; echo; usage; fi;
+fi
 
 
 # Find MATLAB or MATLAB Compiler Runtime and add some paths to the LD_LIBRARY_PATH
