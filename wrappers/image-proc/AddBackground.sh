@@ -3,31 +3,24 @@
 usage()
 {
     echo "Usage:
-$0 <image_in> <t> <l> [<h> <w> | <template_image>] <image_out>
+$0 <image_in> <t> <l> <b> <r> <image_out>
   image_in        The path to the grayscale image to read.
-  t,l             The top and left corners of the foreground.
-  h,w             The height and width of the final image.
-  template_image  Get the final image height and width from the template image.
+  t,l,b,r         The top, left, bottom, and right edge padding sizes to add.
   image_out       The path to the grayscale image to write." 1>&2;
   exit 1;
 }
 
 # Parse and minimally check arguments
-if [[ $# < 5 || $# > 6 ]]; then usage; fi;
+if [[ $# < 6 || $# > 6 ]]; then usage; fi;
 IMAGE_IN=$1;
 declare -i T=$2;
 declare -i L=$3;
-if [[ $T -le 0 || $L -le 0 ]]; then echo "Top-left corner not valid." 1>&2; echo; usage; fi; 
-if [[ $# > 5 ]]; then
-  declare -i H=$4;
-  declare -i W=$5;
-  IMAGE_OUT=$6;
-  if [[ $H -le $T || $W -le $L ]]; then echo "Height/width not valid." 1>&2; echo; usage; fi; 
-else
-  TEMPLATE_IMAGE=$4;
-  IMAGE_OUT=$5;
-  if [[ ! -f $TEMPLATE_IMAGE ]]; then echo "Template file does not exist." 1>&2; echo; usage; fi;
-fi
+declare -i B=$4;
+declare -i R=$5;
+IMAGE_OUT=$6;
+
+if [[ $T -lt 0 || $L -lt 0 || $B -lt 0 || $R -lt 0 ]]; then echo "Padding sizes not valid." 1>&2; echo; usage; fi; 
+
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink
@@ -47,11 +40,7 @@ fi
 
 
 # Run the main matlab script
-if [[ $# > 5 ]]; then
-  matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('imwrite(AddBackground(''${IMAGE_IN}'',${T},${L},${H},${W}),''${IMAGE_OUT}'');');";
-else
-  matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('i=imfinfo(''${TEMPLATE_IMAGE}'');imwrite(AddBackground(''${IMAGE_IN}'',${T},${L},i(1).Height,i(1).Width),''${IMAGE_OUT}'');');";
-fi
+matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('imwrite(AddBackground(''${IMAGE_IN}'',${T},${L},${B},${R}),''${IMAGE_OUT}'');');";
 matlab_err=$?;
 
 

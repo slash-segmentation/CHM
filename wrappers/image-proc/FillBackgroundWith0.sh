@@ -5,7 +5,7 @@ usage()
     echo "Usage:
 $0 <image_in> <t> <l> <b> <r> <image_out>
   image_in        The path to the grayscale image to read.
-  t,l,b,r         The top, left, bottom, and right corners of the foreground.
+  t,l,b,r         The top, left, bottom, and right edge padding sizes.
   image_out       The path to the grayscale image to write." 1>&2;
   exit 1;
 }
@@ -19,7 +19,8 @@ declare -i B=$4;
 declare -i R=$5;
 IMAGE_OUT=$6;
 
-if [[ $T -le 0 || $L -le 0 || $B -le $T || $R -le $L ]]; then echo "Foreground rectangle not valid." 1>&2; echo; usage; fi; 
+if [[ $T -lt 0 || $L -lt 0 || $B -lt 0 || $R -lt 0 ]]; then echo "Padding sizes not valid." 1>&2; echo; usage; fi; 
+
 
 # We need to add the path with the script in it to the MATLAB path
 # This is a bit complicated since this script is actually a symlink

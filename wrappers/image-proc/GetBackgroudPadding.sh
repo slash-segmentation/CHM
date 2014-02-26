@@ -9,9 +9,9 @@ $0 <image_path> [<bg_color>]
                   automatically determined by looking for strips of solid color
                   along the sides.
 
-On success, the program has the exit code 0 and outputs the line: "#,#,#,#"
-Where the numbers are the top-left and bottom-right corners of the foreground
-area. On failure the exit code is 1." 1>&2;
+On success, the program has the exit code 0 and outputs the line: "# # # #"
+Where the numbers are the sizes of the backgroud padding on the top, left,
+bottom, and right edges area. On failure the exit code is 1." 1>&2;
   exit 1;
 }
 
@@ -39,7 +39,7 @@ fi
 
 
 # Run the main matlab script
-matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('[t,l,b,r]=GetForegroundArea($ARGS);fprintf(''%d %d %d %d\n'',t,l,b,r);');" | grep -m 1 -x -E '[0-9]+ [0-9]+ [0-9]+ [0-9]+';
+matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('[t,l,b,r]=GetBackgroundPadding($ARGS);fprintf(''%d %d %d %d\n'',t,l,b,r);');" | grep -m 1 -x -E '[0-9]+ [0-9]+ [0-9]+ [0-9]+';
 matlab_err=$?;
 
 

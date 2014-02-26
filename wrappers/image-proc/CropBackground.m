@@ -1,6 +1,6 @@
 function im=CropBackground(im,t,l,b,r)
 % Removes the 'background' of the image.
-% The foreground is given by the top-left and bottom-right corners (such that im(t:b,l:r) is the foreground).
+% The background is given by the sizes of the top, left, bottom, and right padding already on the image.
 % The image can be a string or a matrix.
 if ischar(im); im = imread(im); end;
-im = im(t:b,l:r);
+im = im(t+1:end-b,l+1:end-r);
