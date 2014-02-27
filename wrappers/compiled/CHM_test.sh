@@ -75,6 +75,9 @@ get_pos() # takes string to parse and the X and Y variable names (e.g. get_pos $
 
 # Parse and minimally check arguments
 if [[ $# -lt 2 ]]; then usage; fi
+if [[ $# -gt 2 ]] && [ "${3:0:1}" != "-" ]; then
+  echo "You provided more than 2 required arguments. Did you accidently use a glob expression without escaping the asterisk?" 1>&2; echo; usage; 
+fi
 INPUT=$1;
 OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
