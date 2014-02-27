@@ -1,5 +1,5 @@
-function CHM_test_blocks(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
-if nargin < 3 || nargin > 6; error('CHM_test_blocks must have 3 to 6 input arguments'); end
+function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
+if nargin < 3 || nargin > 6; error('CHM_test must have 3 to 6 input arguments'); end
 if nargin < 4; bordersize = 0; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 if nargin < 6; tiles_to_proc = []; end
@@ -26,14 +26,14 @@ end
 files_te  = GetInputFiles(input_files);
 files_out = GetOutputFiles(outputpath, files_te);
 
-if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersize) == 2; brd = bordersize(:)'; else; error('bordersize argument to CHM_test_blocks must have 1 or 2 elements'); end
-if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test_blocks must have 1 or 2 elements'); end
+if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersize) == 2; brd = bordersize(:)'; else; error('bordersize argument to CHM_test must have 1 or 2 elements'); end
+if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test must have 1 or 2 elements'); end
 bs = bs-2*brd;
 if ndims(tiles_to_proc) == 2 && size(tiles_to_proc, 2) == 2 && size(tiles_to_proc, 1) ~= 0
     locs_to_proc = repmat(bs, [size(tiles_to_proc, 1) 1]).*(tiles_to_proc-1)+1;
     proc = @(block_struct) ProcessBlock_LocOnly(block_struct, savingpath, param, locs_to_proc);
 elseif all(size(tiles_to_proc) ~= 0)
-    error('tiles_to_proc argument to CHM_test_blocks must be an N by 2 matrix');
+    error('tiles_to_proc argument to CHM_test must be an N by 2 matrix');
 else
     proc = @(block_struct) ProcessBlock(block_struct, savingpath, param);
 end
