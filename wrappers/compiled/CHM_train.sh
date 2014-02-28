@@ -34,7 +34,11 @@ Optional Arguments:
   -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
                   will be made using 'which'. It must be the same version used
-                  to compile the scripts." 1>&2;
+                  to compile the scripts.
+  -r              Restart a failed training attempt. This will restart just
+                  after the last copmleted stage/level. You must give the same
+                  parameters (data, labels, ...) as before for the model to
+                  make sense." 1>&2;
   exit 1;
 }
 
@@ -46,14 +50,18 @@ fi
 INPUTS=$1;
 LABELS=$2;
 MODEL_FOLDER=./temp/;
+declare -i RESTART=0; % 0=FALSE, 1=TRUE
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
 MATLAB_FOLDER=;
 shift 2
-while getopts ":sm:S:L:M:" o; do
+while getopts ":srm:S:L:M:" o; do
   case "${o}" in
     s)
       echo "Warning: argument -s is ignored for compiled version, it is always single-threaded" 1>&2;
+      ;;
+    r)
+      RESTART=1;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -127,7 +135,7 @@ SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
-$SOURCE/CHM_train "${INPUTS}" "${LABELS}" "${MODEL_FOLDER}" ${NSTAGE} ${NLEVEL};
+$SOURCE/CHM_train "${INPUTS}" "${LABELS}" "${MODEL_FOLDER}" ${NSTAGE} ${NLEVEL} ${RESTART};
 
 
 # Done

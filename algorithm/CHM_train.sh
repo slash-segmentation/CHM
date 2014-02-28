@@ -31,6 +31,10 @@ Optional Arguments:
                   Default is 2.
   -L Nlevel       The number of levels of training to perform. Must be >=1.
                   Default is 4.
+  -r              Restart a failed training attempt. This will restart just
+                  after the last copmleted stage/level. You must give the same
+                  parameters (data, labels, ...) as before for the model to
+                  make sense.
   -s              Single-thread / non-parallel. Normally one small step of this
                   is done in parallel using all available physical cores." 1>&2;
   exit 1;
@@ -44,14 +48,18 @@ fi
 INPUTS=$1;
 LABELS=$2;
 MODEL_FOLDER=./temp/;
+declare -i RESTART=0; % 0=FALSE, 1=TRUE
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
 shift 2
-while getopts ":sm:S:L:" o; do
+while getopts ":srm:S:L:" o; do
   case "${o}" in
     s)
       SINGLE_THREAD=-nojvm;
+      ;;
+    r)
+      RESTART=1;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -97,7 +105,7 @@ if [[ -n "${SINGLE_THREAD}" ]]; then SINGLE_THREAD="${SINGLE_THREAD} -singleComp
 elif (( `nproc` > 24 )); then SINGLE_THREAD=-singleCompThread; fi;
 
 # Run the main matlab script (need JVM for parallel)
-matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL});');";
+matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL},${RESTART});');";
 matlab_err=$?;
 
 # Cleanup
