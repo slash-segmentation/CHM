@@ -1,5 +1,5 @@
 function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart)
-if nargin < 2 || nargin > 5; error('CHM_train must have 2 to 6 input arguments'); end
+if nargin < 2 || nargin > 6; error('CHM_train must have 2 to 6 input arguments'); end
 if nargin < 3; savingpath = fullfile('.', 'temp'); end
 if nargin < 4; Nstage = 2; end
 if nargin < 5; Nlevel = 4; end
