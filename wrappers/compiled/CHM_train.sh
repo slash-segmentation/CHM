@@ -50,7 +50,7 @@ fi
 INPUTS=$1;
 LABELS=$2;
 MODEL_FOLDER=./temp/;
-declare -i RESTART=0; % 0=FALSE, 1=TRUE
+declare -i RESTART=0; # 0=FALSE, 1=TRUE
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
 MATLAB_FOLDER=;
