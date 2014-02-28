@@ -7,15 +7,6 @@ There are two phases to the algorithm: Training (creating the model) and Testing
 In the model folder, there are also temporary files in folders which can be deleted. The only thing that
 one needs to keep is the many files like MODEL_level#_stage#.mat and param.mat.
 
-There are parameters that can be adjusted. When training, you can select a number of levels and stages
-of processing. The default is 2 stages and 4 levels. Increasing these values really time required to
-perform training, but may increase quuaility of the model. When testing, you can set a block size and
-overlap size. The block size should be the same size as the training images during training for
-efficiency. Using an overlap is important so that there are less edges seen by the algorithm, however
-it does increase the processing time. When using blocks, you should use TIFF images which can be nearly
-twice as fast as PNGs and require less memory. When the TIFF image is a multiple of blocksize-2*overlapsize
-in width and height it needs much less memory (not even enough to store the whole image).
-
 %================== Filters
 I integrated the following codes in this package:
 1 - HoG features -->http://www.mathworks.com/matlabcentral/fileexchange/33863-histograms-of-oriented-gradients
