@@ -84,7 +84,7 @@ if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2
 MODEL_FOLDER=./temp/;
 declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
-BLOCKSIZE=\'auto\'; # or [${BLOCK_H} ${BLOCK_W}]
+BLOCKSIZE=\'\'auto\'\'; # or [${BLOCK_H} ${BLOCK_W}]
 declare -i OVERLAP_W=0;
 declare -i OVERLAP_H=0;
 declare -i TILE_ROW=0; # temporary variables
