@@ -1,5 +1,6 @@
 function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
-if nargin < 3 || nargin > 6; error('CHM_test must have 3 to 6 input arguments'); end
+if nargin < 2 || nargin > 6; error('CHM_test must have 2 to 6 input arguments'); end
+if nargin < 3; blocksize = 'auto'; end
 if nargin < 4; bordersize = 0; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 if nargin < 6; tiles_to_proc = []; end
@@ -16,7 +17,7 @@ else
 end
 
 param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
-if ischar(blocksize) && blocksize == 'auto'
+if ischar(blocksize) && strcmpi(blocksize, 'auto')
     pts = load(fullfile(savingpath, 'param'), 'TrainingSize');
     if ~isfield(pts, 'TrainingSize'); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
     blocksize = pts.TrainingSize;
