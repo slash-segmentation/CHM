@@ -24,7 +24,7 @@ if exist(savingpath,'file')~=7; mkdir(savingpath); end
 if restart
     % Note: Support chaning the Nlevel and Nstage values, either truncating or expanding a previous model
     param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
-    if GetImageSize(files_tr{i}) ~= param.TrainingSize; error('Cannot restart since training data is a different size'); end;
+    if GetImageSize(files_tr{1}) ~= param.TrainingSize; error('Cannot restart since training data is a different size'); end;
     % Remove all stages/levels that would be invalid if Nlevel/Nstage change
     files_m = dir(fullfile(savingpath,'MODEL_level*_stage*.mat'));
     for i = 1:length(files_m)
