@@ -28,9 +28,9 @@ if restart
     % Remove all stages/levels that would be invalid if Nlevel/Nstage change
     files_m = dir(fullfile(savingpath,'MODEL_level*_stage*.mat'));
     for i = 1:length(files_m)
-        [l,s] = sscanf(files_m.name, 'MODEL_level%d_stage%d.mat');
+        [l,s] = sscanf(files_m{1}.name, 'MODEL_level%d_stage%d.mat');
         if s > Nstage || l > Nlevel || (Nlevel ~= param.Nlevel && s > 1)
-            delete(fullfile(savingpath,files_m.name));
+            delete(fullfile(savingpath,files_m{1}.name));
             [~,~,~] = rmdir(fullfile(savingpath,['output_level' num2str(l) '_stage' num2str(s)]),'s');
         end
     end
