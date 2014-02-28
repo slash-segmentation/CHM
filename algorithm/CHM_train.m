@@ -92,7 +92,7 @@ for s = Nstage_start:Nstage
         model = trainCHM(files_tr,files_la,savingpath,s,l,PixN(l+1),param); % uses Nfeat, Nfeatcontext, and Nlevel from param
         if s==Nstage, break; end
     end
-    Nlevel_start = 0
+    Nlevel_start = 0;
 end
 
 if opened_pool; matlabpool close; end
