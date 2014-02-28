@@ -48,7 +48,7 @@ fi
 INPUTS=$1;
 LABELS=$2;
 MODEL_FOLDER=./temp/;
-declare -i RESTART=0; % 0=FALSE, 1=TRUE
+declare -i RESTART=0; # 0=FALSE, 1=TRUE
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
