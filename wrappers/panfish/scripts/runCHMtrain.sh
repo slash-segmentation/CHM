@@ -84,7 +84,7 @@ function copyInputsToScratch {
 
 SCRIPT_DIR=`dirname $0`
 
-. $SCRIPT_DIR/helperfuncs.sh
+. $SCRIPT_DIR/.helperfuncs.sh
 
 logStartTime "runCHMtrain.sh" 
 CHM_START_TIME=$START_TIME
