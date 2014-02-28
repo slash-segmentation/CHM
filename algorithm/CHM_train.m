@@ -59,7 +59,7 @@ end
 im = imread(files_tr{1});
 TrainingSize = size(im);
 if numel(TrainingSize) ~= 2; error('You must use grayscale images'); end;
-for i = 2:length(files_tr); TrainingSize ~= GetImageSize(files_tr{i}); error('All training images must have the same dimensions'); end; end;
+for i = 2:length(files_tr); if TrainingSize ~= GetImageSize(files_tr{i}); error('All training images must have the same dimensions'); end; end;
 
 im = imread(files_tr{1});
 Nfeat = size(Filterbank(im),1);
