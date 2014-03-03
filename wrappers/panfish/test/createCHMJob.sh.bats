@@ -12,6 +12,9 @@ setup() {
   export TESTIMAGE="${TESTIMAGE_DIR}/600by400.png"
   export CREATECHM="$THE_TMP/createCHMJob.sh"
   chmod a+x $CREATECHM
+  unset SGE_TASK_ID
+  # should match OUT_DIR_NAME variable in .helperfuncs
+  export BATS_TEST_OUT_DIR_NAME="runchmout"
 }
 
 teardown(){
@@ -84,7 +87,7 @@ teardown(){
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" == *createpretrained* ]]
-  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/out/stderr" ]
+  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/stderr" ]
 
   # Verify runCHMviaPanfish.sh was copied over
   [ -x "$THE_TMP/run/runCHMViaPanfish.sh" ]
@@ -93,7 +96,7 @@ teardown(){
   [ -s "$THE_TMP/run/panfishCHM.properties" ]
 
   # Verify out directory was created
-  [ -d "$THE_TMP/run/out/600by400.png" ]
+  [ -d "$THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles" ]
 
   # Verify runCHM.sh was copied over and is executable
   [ -s "$THE_TMP/run/runCHM.sh" ]
@@ -120,7 +123,7 @@ teardown(){
   [ "$aLine" == "1:::   -b 200x100  -t 3,4" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::out/600by400.png/1.png" ]
+  [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::$TESTIMAGE" ]
@@ -132,7 +135,7 @@ teardown(){
   [ "$aLine" == "2:::   -b 200x100  -t 3,3" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::out/600by400.png/2.png" ]
+  [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]
 
   aLine=`head -n 45 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "12:::$TESTIMAGE" ]
@@ -144,7 +147,7 @@ teardown(){
   [ "$aLine" == "12:::   -b 200x100  -t 1,1" ]
 
   aLine=`head -n 48 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "12:::out/600by400.png/12.png" ]
+  [ "$aLine" == "12:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/12.png" ]
 }
 
 #
@@ -166,7 +169,7 @@ teardown(){
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" == *createpretrained* ]]
-  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/out/stderr" ]
+  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/stderr" ]
 
   # Verify runCHMviaPanfish.sh was copied over
   [ -x "$THE_TMP/run/runCHMViaPanfish.sh" ]
@@ -175,7 +178,7 @@ teardown(){
   [ -s "$THE_TMP/run/panfishCHM.properties" ]
 
   # Verify out directory was created
-  [ -d "$THE_TMP/run/out/600by400.png" ]
+  [ -d "$THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles" ]
 
   # Verify runCHM.sh was copied over and is executable
   [ -s "$THE_TMP/run/runCHM.sh" ]
@@ -201,7 +204,7 @@ teardown(){
   [ "$aLine" == "1:::   -b 200x100  -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,4 -t 1,3 -t 1,2 -t 1,1" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::out/600by400.png/1.png" ]
+  [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
 
 }
 
@@ -222,7 +225,7 @@ teardown(){
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" == *createpretrained* ]]
-  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/out/stderr" ]
+  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/stderr" ]
 
   # Verify runCHMviaPanfish.sh was copied over
   [ -x "$THE_TMP/run/runCHMViaPanfish.sh" ]
@@ -231,7 +234,7 @@ teardown(){
   [ -s "$THE_TMP/run/panfishCHM.properties" ]
 
   # Verify out directory was created
-  [ -d "$THE_TMP/run/out/600by400.png" ]
+  [ -d "$THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles" ]
 
   # Verify runCHM.sh was copied over and is executable
   [ -s "$THE_TMP/run/runCHM.sh" ]
@@ -256,7 +259,7 @@ teardown(){
   [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::out/600by400.png/1.png" ]
+  [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::$TESTIMAGE" ]
@@ -268,7 +271,7 @@ teardown(){
   [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::out/600by400.png/2.png" ]
+  [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]
 
 }
 
@@ -291,7 +294,7 @@ teardown(){
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" == *createpretrained* ]]
-  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/out/stderr" ]
+  [ "${lines[1]}" == "  Creating directory $THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/stderr" ]
 
   cd $curdir
 
@@ -302,7 +305,7 @@ teardown(){
   [ -s "$THE_TMP/run/panfishCHM.properties" ]
 
   # Verify out directory was created
-  [ -d "$THE_TMP/run/out/600by400.png" ]
+  [ -d "$THE_TMP/run/${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles" ]
 
   # Verify runCHM.sh was copied over and is executable
   [ -s "$THE_TMP/run/runCHM.sh" ]
@@ -327,7 +330,7 @@ teardown(){
   [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::out/600by400.png/1.png" ]
+  [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::$TESTIMAGE" ]
@@ -339,6 +342,6 @@ teardown(){
   [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::out/600by400.png/2.png" ]
+  [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]
 
 }
