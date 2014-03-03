@@ -9,7 +9,7 @@ setup() {
   export TESTIMAGE_DIR="${BATS_TEST_DIRNAME}/createchmjob"
   export HELPERFUNCS="$THE_TMP/.helperfuncs.sh"
   export PANFISH_TEST_BIN="${BATS_TEST_DIRNAME}/bin/panfish"
-
+  unset SGE_TASK_ID
 }
 
 teardown(){
@@ -30,7 +30,7 @@ teardown(){
   run parseProperties "$THE_TMP" "$THE_TMP/s"
 
   [ "$status" -eq 1 ]
-  echo "${lines[0]}" 1>&2
+  echo "$output" 1>&2
   [ "${lines[0]}" == "  Config $THE_TMP/panfishCHM.properties not found" ]
 
 
@@ -86,14 +86,14 @@ teardown(){
   # Test where log file does not exist
   getSingleCHMTestTaskStdOutFile "$THE_TMP" "1"
   [ "$?" -eq 0 ] 
-  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/out/stdout/1.stdout" ]
+  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout" ]
 
   # Test with valid log file
-  mkdir -p "$THE_TMP/out/stdout"
-  echo "blah" > "$THE_TMP/out/stdout/4.stdout"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stdout"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/4.stdout"
   getSingleCHMTestTaskStdOutFile "$THE_TMP" "4"
   [ "$?" == 0 ] 
-  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/out/stdout/4.stdout" ]
+  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/${OUT_DIR_NAME}/stdout/4.stdout" ]
 
 }
 
@@ -114,14 +114,14 @@ teardown(){
   # Test where log file does not exist
   getSingleCHMTestTaskStdErrFile "$THE_TMP" "1"
   [ $? -eq 0 ]
-  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/out/stderr/1.stderr" ]
+  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/${OUT_DIR_NAME}/stderr/1.stderr" ]
 
   # Test with valid log file
-  mkdir -p "$THE_TMP/out/stderr"
-  echo "blah" > "$THE_TMP/out/stderr/24.stderr"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stderr"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stderr/24.stderr"
   getSingleCHMTestTaskStdErrFile "$THE_TMP" "24"
   [ "$?" == 0 ]     
-  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/out/stderr/24.stderr" ]
+  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/${OUT_DIR_NAME}/stderr/24.stderr" ]
 
 }
 
@@ -133,28 +133,28 @@ teardown(){
   # source helperfuncs.sh to we can call the function
   . $HELPERFUNCS
 
-  mkdir -p "$THE_TMP/out/stdout"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stdout"
   # Test where stdout file does not exist
   run checkSingleCHMTestTask "$THE_TMP" "1"
   [ "$status" -eq 2 ]
 
   # Test where stdout file is zero size
-  touch "$THE_TMP/out/stdout/1.stdout"
+  touch "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
   run checkSingleCHMTestTask "$THE_TMP" "1"
   [ "$status" -eq 2 ]
 
-  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
-  echo "1:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::out/uh.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}${OUT_DIR_NAME}/uh.png" >> "$THE_TMP/runCHM.sh.config"
 
-  echo "blah" > "$THE_TMP/out/stdout/1.stdout"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
   # Test where no output image is found
   run checkSingleCHMTestTask "$THE_TMP" "1"
   echo "$output" 1>&2
   [ "$status" -eq 3 ]
 
-  echo "hi" > "$THE_TMP/out/uh.png"  
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/uh.png"  
   # Test where we are all good
   run checkSingleCHMTestTask "$THE_TMP" "1"
   [ "$status" -eq 0 ]
@@ -361,16 +361,16 @@ teardown(){
 
   # Check each line
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/1.png" ]
   
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::   -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}   -t 1,1" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
 }
 
@@ -395,16 +395,16 @@ teardown(){
 
   # Check each line
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::-o 1x1  -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 1,1" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
 }
 
@@ -430,76 +430,76 @@ teardown(){
   [ `wc -l "$THE_TMP/foo" | sed "s/ .*//"` == "24" ]
   # Check the lines
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
  
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::-o 1x1  -t 3,2" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 3,2" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::$THE_TMP/1.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 6 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::modeldir" ]
+  [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::-o 1x1  -t 3,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 3,1" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::out/1.png/2.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
 
   aLine=`head -n 9 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "3:::$THE_TMP/1.png" ]
+  [ "$aLine" == "3${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 10 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "3:::modeldir" ]
+  [ "$aLine" == "3${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 11 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "3:::-o 1x1  -t 2,2" ]
+  [ "$aLine" == "3${CONFIG_DELIM}-o 1x1  -t 2,2" ]
 
   aLine=`head -n 12 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "3:::out/1.png/3.png" ]
+  [ "$aLine" == "3${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/3.png" ]
 
   aLine=`head -n 13 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "4:::$THE_TMP/1.png" ]
+  [ "$aLine" == "4${CONFIG_DELIM}$THE_TMP/1.png" ]
   
   aLine=`head -n 14 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "4:::modeldir" ]
+  [ "$aLine" == "4${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 15 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "4:::-o 1x1  -t 2,1" ]
+  [ "$aLine" == "4${CONFIG_DELIM}-o 1x1  -t 2,1" ]
 
   aLine=`head -n 16 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "4:::out/1.png/4.png" ]
+  [ "$aLine" == "4${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/4.png" ]
 
   aLine=`head -n 17 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "5:::$THE_TMP/1.png" ]
+  [ "$aLine" == "5${CONFIG_DELIM}$THE_TMP/1.png" ]
   
   aLine=`head -n 18 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "5:::modeldir" ]
+  [ "$aLine" == "5${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 19 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "5:::-o 1x1  -t 1,2" ]
+  [ "$aLine" == "5${CONFIG_DELIM}-o 1x1  -t 1,2" ]
 
   aLine=`head -n 20 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "5:::out/1.png/5.png" ]
+  [ "$aLine" == "5${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/5.png" ]
 
   aLine=`head -n 21 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "6:::$THE_TMP/1.png" ]
+  [ "$aLine" == "6${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 22 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "6:::modeldir" ]
+  [ "$aLine" == "6${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 23 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "6:::-o 1x1  -t 1,1" ]
+  [ "$aLine" == "6${CONFIG_DELIM}-o 1x1  -t 1,1" ]
 
   aLine=`head -n 24 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "6:::out/1.png/6.png" ]
+  [ "$aLine" == "6${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/6.png" ]
 
 }
 
@@ -524,16 +524,16 @@ teardown(){
   cat $THE_TMP/foo 1>&2
   # Check each line
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
 }
 
@@ -558,28 +558,28 @@ teardown(){
   cat $THE_TMP/foo 1>&2
   # Check each line
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::$THE_TMP/1.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}$THE_TMP/1.png" ]
 
   aLine=`head -n 6 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::modeldir" ]
+  [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::-o 1x1  -t 1,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 1,1" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::out/1.png/2.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
 
 }
 
@@ -605,28 +605,28 @@ teardown(){
   cat $THE_TMP/foo 1>&2
   # Check each line
   local aLine=`head -n 1 "$THE_TMP/foo"`
-  [ "$aLine" == "1:::$THE_TMP/hist1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}$THE_TMP/hist1.png" ]
 
   aLine=`head -n 2 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::modeldir" ]
+  [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1:::out/hist1.png/1.png" ]
+  [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/hist1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
 
   aLine=`head -n 5 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::$THE_TMP/hist2.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}$THE_TMP/hist2.png" ]
 
   aLine=`head -n 6 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::modeldir" ]
+  [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2:::out/hist2.png/2.png" ]
+  [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/hist2.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
 }
 
 #
@@ -657,7 +657,7 @@ teardown(){
 
   run createImageOutputDirectories "$THE_TMP/out" "$THE_TMP" "png"
   [ "$status" -eq 0 ]
-  [ -d "$THE_TMP/out/foo.png" ]
+  [ -d "$THE_TMP/out/foo.png.${IMAGE_TILE_DIR_SUFFIX}" ]
 
 
   # Test where we have 2 images in directory
@@ -666,8 +666,8 @@ teardown(){
   mkdir -p "$THE_TMP/out2" 1>&2
   run createImageOutputDirectories "$THE_TMP/out2" "$THE_TMP" "png"
   [ "$status" -eq 0 ]
-  [ -d "$THE_TMP/out2/foo.png" ]
-  [ -d "$THE_TMP/out2/foo2.png" ]
+  [ -d "$THE_TMP/out2/foo.png.${IMAGE_TILE_DIR_SUFFIX}" ]
+  [ -d "$THE_TMP/out2/foo2.png.${IMAGE_TILE_DIR_SUFFIX}" ]
 }
 
 
@@ -680,16 +680,16 @@ teardown(){
   . $HELPERFUNCS
 
   # Test with 1 job successful no file
-  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
-  echo "1:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::out/blah/1.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}${OUT_DIR_NAME}/blah/1.png" >> "$THE_TMP/runCHM.sh.config"
 
 
-  mkdir -p "$THE_TMP/out/stdout"
-  mkdir -p "$THE_TMP/out/blah"
-  echo "blah" > "$THE_TMP/out/stdout/1.stdout"
-  echo "hi" > "$THE_TMP/out/blah/1.png"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stdout"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/blah"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/blah/1.png"
    # Test with 1 job successful no file
   verifyCHMTestResults "1" "$THE_TMP" "1" "1" "no"
   [ $? -eq 0 ]
@@ -703,11 +703,11 @@ teardown(){
 
 
   # Test with 1 job failure no file
-  /bin/rm -f "$THE_TMP/out/blah/1.png"
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/blah/1.png"
   run verifyCHMTestResults "1" "$THE_TMP" "1" "1" "no"
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" == "WARNING:    No output image found for task 1 $THE_TMP/out/blah/1.png" ]
+  [ "${lines[0]}" == "WARNING:    No output image found for task 1 $THE_TMP/${OUT_DIR_NAME}/blah/1.png" ]
   [ ! -e "$THE_TMP/failed.jobs" ]
 
   echo "hello" > "$THE_TMP/failed.jobs"
@@ -715,7 +715,7 @@ teardown(){
   run verifyCHMTestResults "1" "$THE_TMP" "1" "1" "yes"
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" == "WARNING:    No output image found for task 1 $THE_TMP/out/blah/1.png" ]
+  [ "${lines[0]}" == "WARNING:    No output image found for task 1 $THE_TMP/${OUT_DIR_NAME}/blah/1.png" ]
   [ -s "$THE_TMP/failed.jobs" ]
   [ -s "$THE_TMP/failed.0.jobs" ]
 
@@ -725,22 +725,22 @@ teardown(){
 
   /bin/rm -f "$THE_TMP/failed.jobs"
   /bin/rm -f "$THE_TMP/failed.0.jobs"
-  echo "2:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "2:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "2:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "2:::out/blah/2.png" >> "$THE_TMP/runCHM.sh.config"
-  echo "3:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "3:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "3:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "3:::out/blah/3.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}${OUT_DIR_NAME}/blah/2.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "3${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "3${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "3${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "3${CONFIG_DELIM}${OUT_DIR_NAME}/blah/3.png" >> "$THE_TMP/runCHM.sh.config"
 
-    echo "blah" > "$THE_TMP/out/stdout/1.stdout"
-  echo "hi" > "$THE_TMP/out/blah/1.png"
+    echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/blah/1.png"
 
-  echo "blah" > "$THE_TMP/out/stdout/2.stdout"
-  echo "hi" > "$THE_TMP/out/blah/2.png"
-  echo "blah" > "$THE_TMP/out/stdout/3.stdout"
-  echo "hi" > "$THE_TMP/out/blah/3.png"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/2.stdout"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/blah/2.png"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/3.stdout"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/blah/3.png"
   # Test with 3 jobs all successful no file
   verifyCHMTestResults "1" "$THE_TMP" "1" "3" "no"
   [ $? -eq 0 ]
@@ -755,19 +755,19 @@ teardown(){
   [ ! -e "$THE_TMP/failed.jobs" ]
 
   # Test with 5 jobs 2 failed and 3 successful no file
-  /bin/rm -f "$THE_TMP/out/blah/1.png"
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/blah/1.png"
 
-  echo "4:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "4:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "4:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "4:::out/blah/4.png" >> "$THE_TMP/runCHM.sh.config"
-  echo "5:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "5:::yy" >> "$THE_TMP/runCHM.sh.config"
-  echo "5:::zz" >> "$THE_TMP/runCHM.sh.config"
-  echo "5:::out/blah/5.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "4${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "4${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "4${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "4${CONFIG_DELIM}${OUT_DIR_NAME}/blah/4.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "5${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "5${CONFIG_DELIM}yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "5${CONFIG_DELIM}zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "5${CONFIG_DELIM}${OUT_DIR_NAME}/blah/5.png" >> "$THE_TMP/runCHM.sh.config"
 
-  echo "blah" > "$THE_TMP/out/stdout/4.stdout"
-  echo "hi" > "$THE_TMP/out/blah/4.png"
+  echo "blah" > "$THE_TMP/${OUT_DIR_NAME}/stdout/4.stdout"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/blah/4.png"
   run verifyCHMTestResults "1" "$THE_TMP" "1" "5" "no"
   [ "$status" -eq 1 ]
   [ ! -e "$THE_TMP/failed.jobs" ]
@@ -1222,7 +1222,7 @@ teardown(){
   thecurdir=`pwd`
   run castCHMTestJob "1" "$THE_TMP" "1" "2" "foo"
   [ "$status" -eq 2 ]
-  [ "${lines[0]}" == "WARNING:    Error calling /bin/false -t 1-2 -q hi.q -N foo  --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh > $THE_TMP/chm.test.cast.out" ]
+  [ "${lines[0]}" == "WARNING:    Error calling /bin/false -t 1-2 -q hi.q -N foo  --writeoutputlocal -o $THE_TMP/${OUT_DIR_NAME}/stdout/\$TASK_ID.stdout -e $THE_TMP/${OUT_DIR_NAME}/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh > $THE_TMP/chm.test.cast.out" ]
   newcurdir=`pwd`
   [ "$thecurdir" == "$newcurdir" ]
 
@@ -1237,7 +1237,7 @@ teardown(){
   [ "$status" -eq 0 ]
   aLine=`head -n 1 "$THE_TMP/chm.test.cast.out"`
   echo "$aLine" 1>&2
-  [ "$aLine" == "--taskfile $THE_TMP/tasky -q hi.q -N foo --walltime 2:00:00 --batchfactor hi.q::0.5 --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
+  [ "$aLine" == "--taskfile $THE_TMP/tasky -q hi.q -N foo --walltime 2:00:00 --batchfactor hi.q::0.5 --writeoutputlocal -o $THE_TMP/${OUT_DIR_NAME}/stdout/\$TASK_ID.stdout -e $THE_TMP/${OUT_DIR_NAME}/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
   newcurdir=`pwd`
   [ "$thecurdir" == "$newcurdir" ]
 }
@@ -1331,17 +1331,17 @@ teardown(){
   echo "hi" > "$THE_TMP/cast.out"
   echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
   echo "0,error,," > "$THE_TMP/panfish/panfishland.tasks"
-  mkdir -p "$THE_TMP/out/stdout" 1>&2
-  mkdir -p "$THE_TMP/out/stderr" 1>&2
-  mkdir -p "$THE_TMP/out/1.png" 1>&2
-  echo "yo" > "$THE_TMP/out/1.png/1.png"
-  echo "hi" > "$THE_TMP/out/stdout/1.stdout"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stdout" 1>&2
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stderr" 1>&2
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/1.png" 1>&2
+  echo "yo" > "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
 
      # make runchm.sh.config file
-  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
 
   run waitForDownloadAndVerifyCHMTestJobs "1" "$THE_TMP" "1" "cast.out"
 
@@ -1368,17 +1368,17 @@ teardown(){
 
   # Test jobs already completed successfully
   echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
-  mkdir -p "$THE_TMP/out/stdout" 1>&2
-  mkdir -p "$THE_TMP/out/stderr" 1>&2
-  mkdir -p "$THE_TMP/out/1.png" 1>&2
-  echo "yo" > "$THE_TMP/out/1.png/1.png"
-  echo "hi" > "$THE_TMP/out/stdout/1.stdout"
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stdout" 1>&2
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/stderr" 1>&2
+  mkdir -p "$THE_TMP/${OUT_DIR_NAME}/1.png" 1>&2
+  echo "yo" > "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png"
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout"
 
      # make runchm.sh.config file
-  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
  
   run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
   [ "$status" -eq 0 ]
@@ -1393,7 +1393,7 @@ teardown(){
 
  
   # Test failure to chum data
-  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png" 1>&2
   echo "0,download,," > "$THE_TMP/panfish/panfishland.tasks"
   echo "1,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
   run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
@@ -1424,14 +1424,14 @@ teardown(){
   echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
   echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
   echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
-  echo "0,landcall,,echo hi > $THE_TMP/out/stdout/1.stdout" >> "$THE_TMP/panfish/panfishland.tasks"
-  /bin/rm -f "$THE_TMP/out/stdout/1.stdout" 1>&2 
-  echo "hi" > "$THE_TMP/out/1.png/1.png"
+  echo "0,landcall,,echo hi > $THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout" >> "$THE_TMP/panfish/panfishland.tasks"
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/stdout/1.stdout" 1>&2 
+  echo "hi" > "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png"
      # make runchm.sh.config file
-  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
-  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
 
   run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
   [ "$status" -eq 0 ]
@@ -1439,7 +1439,7 @@ teardown(){
   [[ "${lines[11]}" == " RunCHMTestJobs End Time: "* ]]
   [ -s "$THE_TMP/chm.test.cast.out" ]
   aLine=`head -n 1 "$THE_TMP/chm.test.cast.out"`
-  [ "$aLine" == "--taskfile $THE_TMP/failed.jobs -q foo.q -N jobname --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
+  [ "$aLine" == "--taskfile $THE_TMP/failed.jobs -q foo.q -N jobname --writeoutputlocal -o $THE_TMP/${OUT_DIR_NAME}/stdout/\$TASK_ID.stdout -e $THE_TMP/${OUT_DIR_NAME}/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
 
   # Test 1st iteration fail then success
   echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
@@ -1453,9 +1453,9 @@ teardown(){
   echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
   echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
   echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
-  echo "0,landcall,,echo hi > $THE_TMP/out/1.png/1.png" >> "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,,echo hi > $THE_TMP/${OUT_DIR_NAME}/1.png/1.png" >> "$THE_TMP/panfish/panfishland.tasks"
 
-  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png" 1>&2
 
   run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
   [ "$status" -eq 0 ]
@@ -1480,13 +1480,146 @@ teardown(){
   echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
   echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
 
-  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+  /bin/rm -f "$THE_TMP/${OUT_DIR_NAME}/1.png/1.png" 1>&2
 
   run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
   [ "$status" -eq 1 ]
   [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
   [ "${lines[21]}" == "WARNING:    Error running jobs...." ]
   [[ "${lines[22]}" == " RunCHMTestJobs End Time: "* ]]
+}
 
+#
+# getParameterForTaskFromConfig() tests
+#
+@test "getParameterForTaskFromConfig() tests" {
+  
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+  
+  # Test where initial egrep fails
+  run getParameterForTaskFromConfig "1" "1" "$THE_TMP/doesnotexist"
+  [ "$status" -eq 1 ] 
+
+  # Test where line to parse is larger then lines found
+  echo "1${CONFIG_DELIM}a" > "$THE_TMP/config"
+  echo "1${CONFIG_DELIM}b" >> "$THE_TMP/config"
+  echo "1${CONFIG_DELIM}c" >> "$THE_TMP/config"
+  echo "2${CONFIG_DELIM}d" >> "$THE_TMP/config"
+  run getParameterForTaskFromConfig "1" "4" "$THE_TMP/config"
+  echo "$output" 1>&2
+  [ "$status" -eq 2 ]
+
+
+
+  # Test valid extraction from 1st line
+  getParameterForTaskFromConfig "1" "1" "$THE_TMP/config"
+  [ "$?" -eq 0 ] 
+  [ "$TASK_CONFIG_PARAM" == "a" ]
+  
+
+  # Test valid extraction from 2nd line
+  getParameterForTaskFromConfig "1" "2" "$THE_TMP/config"
+  [ "$?" -eq 0 ]
+  [ "$TASK_CONFIG_PARAM" == "b" ]
+
+  # Test valid extraction from 3rd line
+  getParameterForTaskFromConfig "1" "1" "$THE_TMP/config"
+  [ "$?" -eq 0 ]
+  [ "$TASK_CONFIG_PARAM" == "a" ]
+
+
+  # Test valid extraction from 4th line
+  echo "2${CONFIG_DELIM}e" >> "$THE_TMP/config"
+  echo "2${CONFIG_DELIM}f" >> "$THE_TMP/config"
+  echo "2${CONFIG_DELIM} g -g ?" >> "$THE_TMP/config"
+  getParameterForTaskFromConfig "2" "4" "$THE_TMP/config"
+  [ "$?" -eq 0 ]
+  [ "$TASK_CONFIG_PARAM" == " g -g ?" ]
+}
+
+#
+# getCHMTestJobParametersForTaskFromConfig() tests
+#
+@test "getCHMTestJobParametersForTaskFromConfig() tests" {
+  
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where we can't get first parameter
+  run getCHMTestJobParametersForTaskFromConfig "1" "$THE_TMP"
+  [ "$status" -eq 1 ]
+  
+  # Test where we can't get 2nd parameter
+  echo "1${CONFIG_DELIM}a" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}b" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}c" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}d" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}e" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "2" "$THE_TMP"
+  [ "$status" -eq 2 ]
+
+  # Test where we cant get 3rd parameter
+  echo "2${CONFIG_DELIM}f" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "2" "$THE_TMP"
+  [ "$status" -eq 3 ]
+
+
+  # Test where we cant get 4th parameter
+  echo "2${CONFIG_DELIM}g" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "2" "$THE_TMP"
+  [ "$status" -eq 4 ]
+
+  # Test success
+  echo "2${CONFIG_DELIM}h" >> "$THE_TMP/runCHM.sh.config"
+  getCHMTestJobParametersForTaskFromConfig "2" "$THE_TMP"
+  [ "$?" -eq 0 ]
+
+  [ "$INPUT_IMAGE" == "e" ]
+  [ "$MODEL_DIR" == "f" ]
+  [ "$CHM_OPTS" == "g" ]
+  [ "$OUTPUT_IMAGE" == "h" ]
+}
+
+#
+# getNumberOfCHMTestJobsFromConfig() tests
+#
+@test "getNumberOfCHMTestJobsFromConfig() tests" {
+ 
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where there isnt a config
+  run getNumberOfCHMTestJobsFromConfig "$THE_TMP"
+  [ "$status" -eq 1 ]
+
+  # Test on empty file
+  touch "$THE_TMP/runCHM.sh.config"
+  run getNumberOfCHMTestJobsFromConfig "$THE_TMP"
+  [ "$status" -eq 2 ]
+
+  # Test on file without proper job #${CONFIG_DELIM} prefix on last line
+  echo "yikes" > "$THE_TMP/runCHM.sh.config"
+  getNumberOfCHMTestJobsFromConfig "$THE_TMP"
+  [ "$?" -eq 0 ]
+  [ "$NUMBER_JOBS" == "yikes" ]
+
+  # Test on file with 1 job
+  echo "1${CONFIG_DELIM}a" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}b" >> "$THE_TMP/runCHM.sh.config"
+  getNumberOfCHMTestJobsFromConfig "$THE_TMP"
+  [ "$?" -eq 0 ]
+  [ "$NUMBER_JOBS" -eq 1 ]
+
+
+  # Test on file with 4 jobs
+  echo "4${CONFIG_DELIM}asdf" >> "$THE_TMP/runCHM.sh.config"
+  getNumberOfCHMTestJobsFromConfig "$THE_TMP"
+  [ "$?" -eq 0 ]
+  [ "$NUMBER_JOBS" -eq 4 ]
+
+
+ 
 
 }
+
