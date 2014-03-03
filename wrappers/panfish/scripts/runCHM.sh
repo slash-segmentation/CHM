@@ -1,22 +1,19 @@
-#!/bin/sh
+#!/bin/bash
 
-if [ $# -ne 1 ] ; then
-  echo "$0 <Directory containing matlab binary>
-This script runs CHM on a slice/image of data.
-The parameters are set by examining the
-environment variable SGE_TASK_ID and parsing
-$RUN_CHM_CONFIG file for inputs corresponding
-to SGE_TASK_ID.
 
-Matlab directory> is the directory where
-Matlab is installed.  This script assumes
-<Matlab directory>/bin/matlab is the path
-to the matlab binary"
-   
+# Look for the helper functions file and bail if not found
+SCRIPT_DIR=`dirname $0`
+if [ ! -s "$SCRIPT_DIR/.helperfuncs.sh" ] ; then
+  echo "$SCRIPT_DIR/.helperfuncs.sh not found" 1>&2
   exit 1
 fi
 
-MATLAB_DIR=$1
+# Source the helper functions file
+. $SCRIPT_DIR/.helperfuncs.sh
+
+# Parse the properties file
+parseProperties "$SCRIPT_DIR" "$SCRIPT_DIR"
+
 
 ###########################################################
 #
@@ -25,32 +22,22 @@ MATLAB_DIR=$1
 ###########################################################
 
 
-#
-# Removes scratch directory if it exists
-#
-function removeScratch {
-  logStartTime "rm $SCRATCH"
-  if [ ! -d $SCRATCH ] ; then
-    logMessage "$SCRATCH is not a directory"
-    return 0
-  fi
+function usage {
+  echo "This script runs CHM on a slice/image of data.
 
-  /bin/rm -rf $SCRATCH
-  EXIT_CODE=$?
-  logEndTime "rm $SCRATCH" $START_TIME $EXIT_CODE
-  return $EXIT_CODE
+What is run is defined by the environment variable SGE_TASK_ID.
+The script uses SGE_TASK_ID and extracts the job from $RUN_CHM_CONFIG
+file residing in the same directory as this script.
+
+The script also examines $PANFISH_CHM_PROPS for configuration that is
+needed such as path to matlab.  This script will return 0 exit
+code upon success otherwise failure. 
+ 
+"
+   
+  exit 1
 }
 
-#
-# function called when USR2 signal is caught
-#
-on_usr2() {
-  removeScratch
-  jobFailed "USR2 signal caught exiting.."
-}
-
-# trap usr2 signal cause its what gets sent by SGE when qdel is called
-trap 'on_usr2' USR2
 
 ###########################################################
 #
@@ -58,97 +45,75 @@ trap 'on_usr2' USR2
 #
 ###########################################################
 
-SCRIPT_DIR=`dirname $0`
-
-. $SCRIPT_DIR/helperfuncs.sh
-
 # Dont allow job to run if SGE_TASK_ID is NOT set
 if [ -z "$SGE_TASK_ID" ] ; then
-  jobFailed "Variable SGE_TASK_ID must be set to a numeric value"
+  usage
 fi
 
-logStartTime "runCHM.sh" 
-CHM_START_TIME=$START_TIME
+# Bail if no config is found
+if [ ! -s "$SCRIPT_DIR/$RUN_CHM_CONFIG" ] ; then
+  jobFailed "No $SCRIPT_DIR/$RUN_CHM_CONFIG found"
+fi
 
-BASEDIR=`pwd`
 
-# set SCRATCH variable to /tmp/blast.# or to whatever $PANFISH_SCRATCH/blast.#
+logStartTime "$RUN_CHM_SH" 
+
+declare -r runChmStartTime=$START_TIME
+
+
+# set SCRATCH variable to /tmp/chm.# or to whatever $PANFISH_SCRATCH/chm.#
 # if PANFISH_SCRATCH variable is not empty
-UUID=`uuidgen`
-SCRATCH="/tmp/chm.${UUID}"
+declare uuidVal=`uuidgen`
+declare scratchDir="/tmp/chm.${uuidVal}"
 if [ -n "$PANFISH_SCRATCH" ] ; then
-  SCRATCH="$PANFISH_SCRATCH/chm.${UUID}"
+  scratchDir="$PANFISH_SCRATCH/chm.${uuidVal}"
 fi
 
-makeDirectory $SCRATCH
 
+getCHMTestJobParametersForTaskFromConfig "${SGE_TASK_ID}" "$SCRIPT_DIR"
+if [ $? != 0 ] ; then
+  logEndTime "$RUN_CHM_SH" $runChmStartTime 1
+  exit 1
+fi
 
-INPUT_IMAGE=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
-CHMOPTS=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
+makeDirectory "$scratchDir"
 
-declare finalImage=`egrep "^${SGE_TASK_ID}:::" $RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 3 | tail -n 1`
-declare finalImageName=`echo $finalImage | sed "s/^.*\///"`
+# Parse the config for job parameters
+declare -r inputImage="$PANFISH_BASEDIR/$INPUT_IMAGE"
+declare -r inputImageName=`echo $inputImage | sed "s/^.*\///"`
+declare -r modelDir="$PANFISH_BASEDIR/$MODEL_DIR"
+declare -r chmOpts="$CHM_OPTS"
+declare -r finalImage="$SCRIPT_DIR/$OUTPUT_IMAGE"
 
-declare tempResultImageName=`echo $INPUT_IMAGE | sed "s/^.*\///"`
-declare tempResultImage="$SCRATCH/${tempResultImageName}"
-
-LOG_FILE="$SCRATCH/${finalImageName}.log"
-
-# run CHM_test.sh
-logStartTime "CHM_test.sh"
-
-logMessage "Writing CHM_test.sh output to $LOG_FILE"
-
-echo "Job.Task:  ${JOB_ID}.${SGE_TASK_ID}" > $LOG_FILE
-
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PANFISH_BASEDIR/$MATLAB_DIR/bin/glnxa64
-export MATLAB_BIN_DIR="$PANFISH_BASEDIR/$MATLAB_DIR/bin"
+# Set environment variables
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PANFISH_BASEDIR}/${MATLAB_DIR}/bin/glnxa64
+export MATLAB_BIN_DIR="${PANFISH_BASEDIR}/${MATLAB_DIR}/bin"
 export PATH=$PATH:$MATLAB_BIN_DIR
 
-$BASEDIR/CHM/CHM_test.sh $INPUT_IMAGE $SCRATCH -m $BASEDIR/CHM/out $CHMOPTS -s >> $LOG_FILE 2>&1
+# Todo: Need to make this task run in the background and then check on job completion
+#       this will allow the script to catch KILL requests etc.. and to track memory
+#       usage etc.
+/usr/bin/time -v $PANFISH_BASEDIR/$CHM_BIN_DIR/$CHM_TEST_SH "$inputImage" "$scratchDir" -m "$modelDir" $chmOpts -s
 
-EXIT_CODE=$?
+declare chmExitCode=$?
 
-logEndTime "CHM_test.sh" $START_TIME $EXIT_CODE
-
-logStartTime "Copying back $finalImageName"
-
-CHM_EXIT_CODE=0
-
-# copy back results
-if [ ! -e "$tempResultImage" ] ; then
-  logWarning "No $tempResultImage Found to copy"
-  CHM_EXIT_CODE=1
-else
-  getSizeOfPath $tempResultImage
-  logMessage "$tempResultImage is $NUM_BYTES bytes"
-
-  /bin/cp $tempResultImage $BASEDIR/${finalImage}
+# copy back image to final directory
+if [ ! -s "$scratchDir/$inputImageName" ] ; then
+  logWarning "No $scratchDir/$inputImageName found to copy"
+  chmExitCode=2
+else 
+  /bin/cp -f "$scratchDir/$inputImageName" "$finalImage"
   if [ $? != 0 ] ; then
-     logWarning "Error running /bin/cp $Y $BASEDIR/${finalImage}"
-     CHM_EXIT_CODE=1
+    logWarning "Error running /bin/cp -f \"$scratchDir/$inputImageName\" \"$finalImage\""
+    chmExitCode=3
   fi
 fi
 
-logEndTime "Copying back $finalImageName" $START_TIME $CHM_EXIT_CODE
-
-logStartTime "Copying back ${SGE_TASK_ID}.log file"
-LOG_COPY_EXIT=1
-if [ -e "$LOG_FILE" ] ; then
-   getSizeOfPath $LOG_FILE
-   logMessage "$LOG_FILE is $NUM_BYTES bytes"
-  /bin/cp $LOG_FILE $BASEDIR/out/log/chm/.
-  LOG_COPY_EXIT=$?
-  if [ $LOG_COPY_EXIT != 0 ] ; then
-     logWarning "Error running /bin/cp $LOG_FILE $BASEDIR/out/log/chm/."
-  fi
+# remove Scratch Directory
+if [ -d "$scratchDir" ] ; then
+  /bin/rm -rf "$scratchDir"
 fi
-logEndTime "Copying back ${SGE_TASK_ID}.log file" $START_TIME $LOG_COPY_EXIT
 
+logEndTime "$RUN_CHM_SH" $runChmStartTime $chmExitCode
 
-# delete tmp directory
-removeScratch
-
-logEndTime "runCHM.sh" $CHM_START_TIME $CHM_EXIT_CODE
-
-exit 0
+exit $chmExitCode

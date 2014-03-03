@@ -22,7 +22,7 @@ Arguments:
                    memory usage along with increasing quality. The block size
                    should be exactly the size of the training images.
   -i image_folder  Folder containing input images.  Images should be either in
-                   tiff (.tiff) or png (.png) format and should be 8/16 bit 
+                   tiff (.tiff|.tif) or png (.png) format and should be 8/16 bit 
                    grayscale
 
 Optional Arguments:
@@ -44,30 +44,20 @@ Optional Arguments:
 function runCreatePreTrainedMode {
 
   local outputDir=$1
-  local modelDir=$2
-  local imageDir=$3
-  local chmOpts=$4
+  local imageDir=$2
+  local chmOpts=$3
+  local modelDir=$4
   local blocksW=$5
   local blocksH=$6
-  local tilesPerJob=$7
+  local overlapW=$7
+  local overlapH=$8
+  local tilesPerJob=$9
 
-  # try to make the output directory
-  makeDirectory $outputDir
+  # try to make the output directory and
+  # stderr and stdout directories
+  makeDirectory "$outputDir/$OUT_DIR_NAME/$STD_ERR_DIR_NAME"
+  makeDirectory "$outputDir/$OUT_DIR_NAME/$STD_OUT_DIR_NAME"
  
-  # Copy over CHM folder
-  local inputChmFolder="$SCRIPT_DIR/CHM"
-  
-  logMessage "Copying over $inputChmFolder to $outputDir"
-  
-  /bin/cp -dR "$inputChmFolder" "$outputDir/."
-
-  if [ $? != 0 ] ; then
-    jobFailed "Error running /bin/cp -dR \"$inputChmFolder\" \"$outputDir/.\""
-  fi
-
-  # Create out directory under $OUTPUT_DIR/CHM folder
-  makeDirectory "$outputDir/CHM/out"
-
   logMessage "Copying scripts to $outputDir"
   # Copy over runCHM.sh script
   /bin/cp "$SCRIPTS_SUBDIR/$RUN_CHM_SH" "$outputDir/."
@@ -84,9 +74,9 @@ function runCreatePreTrainedMode {
   fi
 
   # Copy run script over
-  /bin/cp "$SCRIPTS_SUBDIR/$RUN_CHM_JOB_VIA_PANFISH_SH" "$outputDir/."
+  /bin/cp "$SCRIPTS_SUBDIR/$RUN_CHM_VIA_PANFISH_SH" "$outputDir/."
   if [ $? != 0 ] ; then
-    jobFailed "Error running /bin/cp \"$SCRIPTS_SUBDIR/$RUN_CHM_JOB_VIA_PANFISH_SH\" \"$outputDir/.\""
+    jobFailed "Error running /bin/cp \"$SCRIPTS_SUBDIR/$RUN_CHM_VIA_PANFISH_SH\" \"$outputDir/.\""
   fi
 
   # Copy the properties
@@ -95,22 +85,6 @@ function runCreatePreTrainedMode {
   if [ $? != 0 ] ; then
     jobFailed "Error running /bin/cp \"$SCRIPT_DIR/$PANFISH_CHM_PROPS\" \"$outputDir/.\""
   fi
-
-  getSizeOfPath $modelDir
-  logMessage "Copying Model/Training Data $modelDir which is $NUM_BYTES bytes in size to $outputDir/CHM/out/"
-  # Copy training data into output folder under CHM folder
-  /bin/cp -r "$modelDir/"* "$outputDir/CHM/out/."
-
-  if [ $? != 0 ] ; then
-    jobFailed "Error running /bin/cp -r \"$modelDir/\"* \"$outputDir/CHM/out/.\""
-  fi
-
-  getSizeOfPath "$outputDir/CHM"
-  
-  # create out directory under $OUTPUT_DIR
-  makeDirectory "$outputDir/out/log/chm"
-  makeDirectory "$outputDir/out/log/joberr"
-  makeDirectory "$outputDir/out/log/jobout"
 
   local configFile="$outputDir/$RUN_CHM_CONFIG"
 
@@ -125,11 +99,18 @@ function runCreatePreTrainedMode {
     # try looking at the tiff
     getImageDimensionsFromDirOfImages "$imageDir" "tiff"
     if [ $? != 0 ] ; then
-      jobFailed "Unable to get dimensions of an image in $imageDir"
+      getImageDimensionsFromDirOfImages "$imageDir" "tif"
+      if [ $? != 0 ] ; then
+        jobFailed "Unable to get dimensions of an image in $imageDir"
+      fi
     fi
   fi
   local imageWidth=$PARSED_WIDTH
   local imageHeight=$PARSED_HEIGHT
+
+  let blocksW=`echo "scale=0;$blocksW-(2*$overlapW)" | bc -l`
+  let blocksH=`echo "scale=0;$blocksH-(2*$overlapH)" | bc -l`
+
 
   logMessage "Images are ${imageWidth}x${imageHeight} in size"
 
@@ -146,8 +127,13 @@ function runCreatePreTrainedMode {
   
   logMessage "Generating $configFile configuration file"
 
-  createConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "png"
-  createConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "tiff"
+  createCHMTestConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "$modelDir" "png"
+  createCHMTestConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "$modelDir" "tiff"
+  createCHMTestConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "$modelDir" "tif"
+
+  for Y in `echo png tif tiff` ; do
+    createImageOutputDirectories  "$outputDir/${OUT_DIR_NAME}" "$imageDir" "$Y"
+  done  
 
   return $?
 }
@@ -171,13 +157,13 @@ if [ $# -lt 2 ] ; then
   usage;
 fi
 
-declare -l MODE=$1
+declare  MODE=$1
 
 # load the helper functions
-if [ -s "$SCRIPT_DIR/helperfuncs.sh" ] ; then
-  . $SCRIPT_DIR/helperfuncs.sh
+if [ -s "$SCRIPT_DIR/.helperfuncs.sh" ] ; then
+  . $SCRIPT_DIR/.helperfuncs.sh
 else
-  . $SCRIPTS_SUBDIR/helperfuncs.sh
+  . $SCRIPTS_SUBDIR/.helperfuncs.sh
 fi
 
 
@@ -188,6 +174,8 @@ declare -i BLOCK_W=0
 declare -i BLOCK_H=0
 declare BLOCK=""
 declare OVERLAP=""
+declare -i OVERLAP_W=0
+declare -i OVERLAP_H=0
 declare MODEL_FOLDER=""
 declare IMAGE_FOLDER=""
 declare -i TILES_PER_JOB=1
@@ -196,8 +184,10 @@ shift 2
 while getopts ":m:b:o:i:T:" o; do
   case "${o}" in
     m)
-      MODEL_FOLDER=${OPTARG}
-      if [ ! -d "$MODEL_FOLDER" ]; then 
+      getFullPath "${OPTARG}"
+      MODEL_FOLDER="$GETFULLPATHRET"
+
+      if [ ! -d "${MODEL_FOLDER}" ]; then 
         jobFailed "Model folder is not a directory."
       fi
       ;;
@@ -211,7 +201,13 @@ while getopts ":m:b:o:i:T:" o; do
       BLOCK=" -b ${BLOCK_W}x${BLOCK_H}"
       ;;
     o)
-      OVERLAP="-o ${OPTARG}"
+      parseWidthHeightParameter "${OPTARG}"
+      if [ $? -ne 0 ] ; then
+        jobFailed "Invalid block parameter"
+      fi
+      OVERLAP_W=$PARSED_WIDTH
+      OVERLAP_H=$PARSED_HEIGHT
+      OVERLAP=" -o ${OVERLAP_W}x${OVERLAP_H}"
       ;;
     i)
       if [ ! -d "${OPTARG}" ]; then 
@@ -254,18 +250,18 @@ if [ "$MODE" == "$CREATE_PRETRAIN_MODE" ] ; then
     jobFailed "Image Folder must be specified via -i flag"
   fi
 
-  if [ ! -d "$SCRIPT_DIR/CHM" ] ; then
-    jobFailed "No CHM folder found.  Is this script in a job folder?"
+  if [ ! -e "$CHM_BIN_DIR" ] ; then
+    jobFailed "CHM bin dir $CHM_BIN_DIR does not exist"
   fi
 
-  runCreatePreTrainedMode "$OUTPUT_DIR" "$MODEL_FOLDER" "$IMAGE_FOLDER" "$OVERLAP $BLOCK" $BLOCK_W $BLOCK_H $TILES_PER_JOB
+  runCreatePreTrainedMode "$OUTPUT_DIR" "$IMAGE_FOLDER" "$OVERLAP $BLOCK" "$MODEL_FOLDER" $BLOCK_W $BLOCK_H $OVERLAP_W $OVERLAP_H $TILES_PER_JOB
   declare createPreTrainExit=$?
 
   if [ $createPreTrainExit -eq 0 ] ; then
     logEcho ""
     logMessage "Next step is to do a test run by running the following command:"
     logEcho ""
-    logMessage "cd \"$OUTPUT_DIR\";./$RUN_CHM_JOB_VIA_PANFISH_SH $TESTRUN_MODE $OUTPUT_DIR"
+    logMessage "cd \"$OUTPUT_DIR\";./$RUN_CHM_VIA_PANFISH_SH $OUTPUT_DIR"
     logEcho ""
   fi
 

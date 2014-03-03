@@ -27,20 +27,21 @@ if [ $? != 0 ] ; then
   exit 1
 fi
 
-/bin/cp -a ../../algorithm $TMPINSTALLDIR/CHM
-
+#copy over createCHMJob.sh
+/bin/cp createCHMJob.sh $TMPINSTALLDIR/.
 if [ $? != 0 ] ; then
-  echo "Error unable to run /bin/cp -a ../../algorithm $TMPINSTALLDIR/."
+  echo "Error unable to run /bin/cp createCHMJob.sh $TMPINSTALLDIR/."
   exit 1
 fi
 
-/bin/cp runCHMviaPanfish.sh $TMPINSTALLDIR/.
-
+chmod a+x $TMPINSTALLDIR/createCHMJob.sh
 if [ $? != 0 ] ; then
-  echo "Error unable to run /bin/cp runCHMviaPanfish.sh $TMPINSTALLDIR/."
+  echo "Error unable to run chmod a+x $TMPINSTALLDIR/createCHMJob.sh"
   exit 1
 fi
 
+
+# copy over scripts folder
 /bin/cp -a scripts $TMPINSTALLDIR/.
 
 if [ $? != 0 ] ; then
@@ -58,10 +59,10 @@ if [ ! -s "$PROPERTIES_FILE" ] ; then
 fi
 
 
-/bin/cp $PROPERTIES_FILE $TMPINSTALLDIR/panfishCHM.config
+/bin/cp $PROPERTIES_FILE $TMPINSTALLDIR/panfishCHM.properties
 
 if [ $? != 0 ] ; then
-  echo "Unable to run /bin/cp $PROPERTIES_FILE $TMPINSTALLDIR/panfishCHM.config"
+  echo "Unable to run /bin/cp $PROPERTIES_FILE $TMPINSTALLDIR/panfishCHM.properties"
   exit 1
 fi
 
