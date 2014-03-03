@@ -15,7 +15,7 @@ declare -r CHUM_IMAGE_OUT_FILE="chum.image.out"
 declare -r CHUM_MODEL_OUT_FILE="chum.model.out"
 declare -r KILLED_CHUM_OUT_FILE="killed.chum.out"
 declare -r PANFISH_CHM_PROPS="panfishCHM.properties"
-declare -r OUT_DIR_NAME="out"
+declare -r OUT_DIR_NAME="runchmout"
 declare -r CONFIG_DELIM=":::"
 declare -r JOB_ERR_DIR_NAME="joberr"
 declare -r JOB_OUT_DIR_NAME="jobout"
@@ -30,8 +30,9 @@ declare -r FAILED_JOBS_TMP_FILE="${FAILED}.${JOBS_SUFFIX}.tmp"
 declare -r FAILED_JOBS_FILE="${FAILED}.${JOBS_SUFFIX}"
 declare -r OLD_SUFFIX="old"
 declare -r OUT_SUFFIX="out"
+declare -r IMAGE_TILE_DIR_SUFFIX="tiles"
 declare -r KILL_JOB_REQUEST="KILL.JOB.REQUEST"
-
+declare -r CHM_TEST_ITERATION_FILE="chm.test.iteration"
 # Command defines
 declare MV_CMD="/bin/mv"
 declare RM_CMD="/bin/rm"
@@ -481,14 +482,20 @@ function moveOldClusterFolders {
 #
 # gets number of jobs in config by looking at #::: of the last line
 # of config file
-# getNumberOfCHMJobsFromConfig $jobDirectory
+# getNumberOfCHMTestJobsFromConfig $jobDirectory
 #
-function getNumberOfCHMJobsFromConfig {
-  if [ ! -e "$1/$RUN_CHM_CONFIG" ] ; then
-     logWarning "getNumberOfCHMJobsFromConfig - $1/$RUN_CHM_CONFIG not found"
+function getNumberOfCHMTestJobsFromConfig {
+  local jobDir=$1
+  if [ ! -e "$jobDir/$RUN_CHM_CONFIG" ] ; then
      return 1
   fi
-  NUMBER_JOBS=`tail -n 1 $1/$RUN_CHM_CONFIG | sed "s/${CONFIG_DELIM}.*//"`
+  local lastLine=`tail -n 1 $jobDir/$RUN_CHM_CONFIG`
+  
+  if [ -z "$lastLine" ] ; then
+    return 2
+  fi
+
+  NUMBER_JOBS=`echo "$lastLine" | sed "s/${CONFIG_DELIM}.*//"`
   return 0
 }
 
@@ -652,7 +659,7 @@ function createCHMTestConfig {
       echo "${cntr}${CONFIG_DELIM}${z}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}${modelDir}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]}" >> "$configFile"
-      outputFile="${OUT_DIR_NAME}/${imageName}/${cntr}.${imageSuffix}" >> "$configFile"
+      outputFile="${OUT_DIR_NAME}/${imageName}.${IMAGE_TILE_DIR_SUFFIX}/${cntr}.${imageSuffix}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}$outputFile" >> "$configFile"
       let cntr++
     done
@@ -795,7 +802,7 @@ function createImageOutputDirectories {
 
   for z in `find $imageDir -name "*.${imageSuffix}" -type f` ; do
     imageName=`echo $z | sed "s/^.*\///"`
-    makeDirectory "$outDir/$imageName"
+    makeDirectory "$outDir/${imageName}.${IMAGE_TILE_DIR_SUFFIX}"
   done
 
   return 0
@@ -831,7 +838,7 @@ function waitForJobs {
   logStartTime "WaitForJobs in $castOutFile Iteration $iteration"
   local waitForJobsStartTime=$START_TIME
   local jobStatus="NA"
-
+  local firstTime="yes"
   DOWNLOAD_DATA_REQUEST="DOWNLOAD.DATA.REQUEST"
 
   while [ "$jobStatus" != "done" ]
@@ -839,8 +846,12 @@ function waitForJobs {
 
       checkForKillFile "$jobDir"
 
-      logMessage "Iteration $iteration job status is $jobStatus.  Sleeping $WAIT_SLEEP_TIME seconds"
-      sleep $WAIT_SLEEP_TIME
+      if [ "$firstTime" == "yes" ] ; then
+        logMessage "Iteration $iteration job status is $jobStatus.  Sleeping $WAIT_SLEEP_TIME seconds"
+        sleep $WAIT_SLEEP_TIME
+      else
+        firstTime="no"
+      fi
 
       if [ -e "$jobDir/$DOWNLOAD_DATA_REQUEST" ] ; then
           $RM_CMD -f "$jobDir/$DOWNLOAD_DATA_REQUEST"
@@ -864,7 +875,6 @@ function waitForJobs {
       if [ $statusRetVal -eq 0 ] ; then
         jobStatus="$JOBSTATUS"
       fi
-
   done
   logEndTime "WaitForJobs in $castOutFile Iteration $iteration" $waitForJobsStartTime 0
   return 0
@@ -1052,8 +1062,15 @@ function runCHMTestJobs {
 
   local altJobStart="$jobDir/${FAILED_JOBS_FILE}"
 
-  while [ $iteration -le $MAX_RETRIES ]
+  # take whatever iteration we are starting with and add max # of retries
+  local maxRetries=$MAX_RETRIES
+  let maxRetries=$maxRetries+$iteration
+
+  while [ $iteration -le $maxRetries ]
   do
+    # dump the current iteration to a file
+    echo "$iteration" > "$jobDir/$CHM_TEST_ITERATION_FILE"
+
 
     if [ $iteration -gt 1 ] ; then
       # Move old panfish job folders out of way
@@ -1099,3 +1116,73 @@ function runCHMTestJobs {
   return $runJobsExit
 }
 
+#
+# Given a task id and an offset this function
+# parses a config file and returns the value from
+# that line.  If there was an error a non zero return code
+# is returned
+# TASK_CONFIG_PARAM is the value that is set
+function getParameterForTaskFromConfig {
+  local taskId=$1
+  local lineToParse=$2
+  local configFile=$3
+
+  local linesOfInterest=`egrep "^$taskId${CONFIG_DELIM}" $configFile`
+  if [ $? != 0 ] ; then
+    return 1
+  fi
+  
+  if [ -z "$linesOfInterest" ] ; then
+    return 1
+  fi
+
+ 
+  local numLines=`echo "$linesOfInterest" | wc -l`
+  if [ $lineToParse -gt $numLines ] ; then
+    return 2
+  fi
+
+  TASK_CONFIG_PARAM=`echo "$linesOfInterest" | head -n $lineToParse | tail -n 1 | sed "s/^.*${CONFIG_DELIM}//"`
+
+  return 0
+}
+
+#
+# Given a task id this function gets job parameters set as
+# the following variables
+# INPUT_IMAGE
+# MODEL_DIR
+# CHM_OPTS
+# OUTPUT_IMAGE
+# If the config file does not exist or there was a problem parsing
+# function returns with non zero exit code
+#
+function getCHMTestJobParametersForTaskFromConfig {
+  local taskId=$1
+  local jobDir=$2
+
+  getParameterForTaskFromConfig "$taskId" "1" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 1
+  fi 
+  INPUT_IMAGE=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "2" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 2
+  fi 
+  MODEL_DIR=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "3" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 3
+  fi
+  CHM_OPTS=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "4" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 4
+  fi
+  OUTPUT_IMAGE=$TASK_CONFIG_PARAM
+  return 0
+}
