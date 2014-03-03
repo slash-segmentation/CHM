@@ -131,9 +131,9 @@ function runCreatePreTrainedMode {
   createCHMTestConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "$modelDir" "tiff"
   createCHMTestConfig "$imageDir" "$configFile" "$tilesW" "$tilesH" "$tilesPerJob" " $chmOpts" "$modelDir" "tif"
 
-  createImageOutputDirectories  "$outputDir/$OUT_DIR_NAME" "$imageDir" "png"
-  createImageOutputDirectories  "$outputDir/$OUT_DIR_NAME" "$imageDir" "tiff"
-  createImageOutputDirectories  "$outputDir/$OUT_DIR_NAME" "$imageDir" "tif"
+  for Y in `echo png tif tiff` ; do
+    createImageOutputDirectories  "$outputDir/${OUT_DIR_NAME}" "$imageDir" "$Y"
+  done  
 
   return $?
 }
