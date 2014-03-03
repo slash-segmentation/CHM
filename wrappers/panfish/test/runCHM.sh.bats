@@ -15,6 +15,7 @@ setup() {
 
   chmod a+x $SUCCESS_CHM_TEST
   chmod a+x $FAIL_CHM_TEST
+  unset SGE_TASK_ID
 }
 
 teardown(){
@@ -96,7 +97,7 @@ teardown(){
   export SGE_TASK_ID=1
   export PANFISH_BASEDIR="$THE_TMP"
   export PANFISH_SCRATCH="/tmp/pan"
-
+  unset SKIP_COPY
   mkdir -p "$THE_TMP/cc/" 1>&2
   /bin/cp -a ${SUCCESS_CHM_TEST}/* "$THE_TMP/cc/." 1>&2
 
@@ -112,7 +113,7 @@ teardown(){
   echo "1:::out/hist1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
 
   # make output directory
-  mkdir -p "$THE_TMP/out/hist1.png/chm" 1>&2
+  mkdir -p "$THE_TMP/out/hist1.png/" 1>&2
 
   export SGE_TASK_ID=1
 
@@ -125,6 +126,8 @@ teardown(){
   [[ "${lines[2]}" == *" -m $THE_TMP//foo/modeldir chmopts -s" ]]
   [[ "${lines[26]}" == "(task 1) runCHM.sh End Time: "* ]]
   [[ "${lines[26]}" == *" Exit Code: 0" ]]
+
+  [ -s "$THE_TMP/out/hist1.png/1.png" ]
 }
 
 # Simple valid run with failing fake CHM_test.sh call

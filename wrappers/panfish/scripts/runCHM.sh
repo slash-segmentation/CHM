@@ -69,15 +69,21 @@ if [ -n "$PANFISH_SCRATCH" ] ; then
   scratchDir="$PANFISH_SCRATCH/chm.${uuidVal}"
 fi
 
+
+getCHMTestJobParametersForTaskFromConfig "${SGE_TASK_ID}" "$SCRIPT_DIR"
+if [ $? != 0 ] ; then
+  logEndTime "$RUN_CHM_SH" $runChmStartTime 1
+  exit 1
+fi
+
 makeDirectory "$scratchDir"
 
 # Parse the config for job parameters
-declare -r inputImage=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $SCRIPT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 1`
+declare -r inputImage="$PANFISH_BASEDIR/$INPUT_IMAGE"
 declare -r inputImageName=`echo $inputImage | sed "s/^.*\///"`
-declare -r modelDir=$PANFISH_BASEDIR/`egrep "^${SGE_TASK_ID}:::" $SCRIPT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 2 | tail -n 1`
-declare -r chmOpts=`egrep "^${SGE_TASK_ID}:::" $SCRIPT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 3 | tail -n 1`
-
-declare -r finalImage=${SCRIPT_DIR}/`egrep "^${SGE_TASK_ID}:::" $SCRIPT_DIR/$RUN_CHM_CONFIG | sed "s/^.*::://" | head -n 4 | tail -n 1`
+declare -r modelDir="$PANFISH_BASEDIR/$MODEL_DIR"
+declare -r chmOpts="$CHM_OPTS"
+declare -r finalImage="$SCRIPT_DIR/$OUTPUT_IMAGE"
 
 # Set environment variables
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PANFISH_BASEDIR}/${MATLAB_DIR}/bin/glnxa64
