@@ -41,9 +41,8 @@ trap 'on_usr2' USR2
 declare CHM_JOB_NAME="chm_job"
 # get the directory where the script resides
 declare SCRIPT_DIR=`dirname $0`
-declare SCRIPTS_SUBDIR="$SCRIPT_DIR/scripts"
 
-while getopts ":h:n" o; do
+while getopts ":hn:" o; do
   case "${o}" in
     h)
       usage
@@ -52,27 +51,28 @@ while getopts ":h:n" o; do
       CHM_JOB_NAME="${OPTARG}"
       ;;
     *)
-      jobFailed "Invalid argument: ${o}."
+      echo "Invalid argument"
+      usage
       ;;
     esac
 done
 
-# load the helper functions
-if [ -s "$SCRIPT_DIR/.helperfuncs.sh" ] ; then
-  . $SCRIPT_DIR/.helperfuncs.sh
-else 
-  . $SCRIPTS_SUBDIR/.helperfuncs.sh
+if [ ! -s "$SCRIPT_DIR/.helperfuncs.sh" ] ; then
+  echo "No $SCRIPT_DIR/.helperfuncs.sh found"
+  exit 2
 fi
+
+# load the helper functions
+. $SCRIPT_DIR/.helperfuncs.sh
 
 getFullPath "$SCRIPT_DIR"
 declare OUTPUT_DIR="$GETFULLPATHRET"
-
 
 # Parse the configuration file
 parseProperties "$SCRIPT_DIR" "$OUTPUT_DIR"
 
 if [ $? != 0 ] ; then
-  jobFailed "There was a problem parsing the properties"
+  jobFailed "There was a problem parsing the $PANFISH_CHM_PROPS file"
 fi
 
 logEcho ""
@@ -80,10 +80,10 @@ logStartTime "Full run"
 declare -i modeStartTime=$START_TIME
 logEcho ""
 
-
-getNumberOfCHMJobsFromConfig $OUTPUT_DIR
+# Get the number of jobs we will be running
+getNumberOfCHMTestJobsFromConfig $OUTPUT_DIR
 if [ $? != 0 ] ; then
-  jobFailed "Error obtaining number of jobs"
+  jobFailed "Error obtaining number of jobs from $RUN_CHM_CONFIG file"
 fi
 
 # Verify we have a MATLAB_DIR set to a directory
@@ -92,24 +92,43 @@ if [ ! -d "$MATLAB_DIR" ] ; then
 fi
 
 logEcho ""
-  
-# get Image Directory
 
-# get model directory
+# Get the parameters for the first job cause we need to 
+# know where the image and model directories are
+getCHMTestJobParametersForTaskFromConfig "1" "$OUTPUT_DIR"
+if [ $? != 0 ] ; then
+  jobFailed "Error parsing the first job from config"
+fi
 
-# get last iteration
-# need to find the last iteration and increment by one
-# this also requires the MAX_RETRIES to be shifted in the runCHMTestJobs 
+# set image and model directories
+imageDir=`dirname $INPUT_IMAGE`
+modelDir="$MODEL_DIR"
 
-runCHMTestJobs "1" "$OUTPUT_DIR" "$imageDir" "$modelDir" "${NUMBER_JOBS}" "$CHM_JOB_NAME"
+# set iteration to 1 initially
+iteration="1"
+
+# If a iteration file exists set iteration to
+# the value from that file +1
+if [ -s "$OUTPUT_DIR/$CHM_TEST_ITERATION_FILE" ] ; then
+  iteration=`cat $OUTPUT_DIR/$CHM_TEST_ITERATION_FILE`
+  let iteration++
+  logMessage "$CHM_TEST_ITERATION_FILE file found setting iteration to $iteration"
+fi
+
+# Chum, submit, and wait for jobs to complete
+runCHMTestJobs "$iteration" "$OUTPUT_DIR" "$imageDir" "$modelDir" "${NUMBER_JOBS}" "$CHM_JOB_NAME"
 
 runJobsExit=$?
+if [ "$runJobsExit" != 0 ] ; then
+  logEndTime "Full run" $modeStartTime $runJobsExit
+  jobFailed "Error running CHMTest"
+fi
+
 logEcho ""
+logMessage "CHMTest successfully run."
 
 # need to write out a this phase is happy file so the next step can skip all the checks
 
-logEndTime "$MODE mode" $modeStartTime $runJobsExit
+logEndTime "Full run" $modeStartTime $runJobsExit
 
 exit $runJobsExit
-
-
