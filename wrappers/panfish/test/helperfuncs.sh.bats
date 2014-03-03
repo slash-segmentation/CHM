@@ -161,6 +161,148 @@ teardown(){
 }
 
 #
+# parseProperties() tests
+#
+@test "parseProperties() tests" {
+  
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # test where no properties file is found
+  run parseProperties "$THE_TMP" "$THE_TMP/s"
+
+  [ "$status" -eq 1 ]
+  echo "${lines[0]}" 1>&2
+  [ "${lines[0]}" == "  Config $THE_TMP/panfishCHM.properties not found" ]
+
+
+  echo "panfish.bin.dir=/xx" > "$THE_TMP/panfishCHM.properties"
+  echo "matlab.dir=/matlab" >> "$THE_TMP/panfishCHM.properties"
+  echo "batch.and.walltime.args=batch" >> "$THE_TMP/panfishCHM.properties"
+  echo "cluster.list=foo.q" >> "$THE_TMP/panfishCHM.properties"
+  echo "chm.bin.dir=/bin/chm" >> "$THE_TMP/panfishCHM.properties"
+  echo "max.retries=3" >> "$THE_TMP/panfishCHM.properties"
+  echo "retry.sleep=10" >> "$THE_TMP/panfishCHM.properties"
+  echo "job.wait.sleep=20" >> "$THE_TMP/panfishCHM.properties"
+  echo "land.job.options=ljo" >> "$THE_TMP/panfishCHM.properties"
+  echo "chum.job.options=cjo" >> "$THE_TMP/panfishCHM.properties"
+  echo "chum.image.options=-b --deletebefore -x *.*" >> "$THE_TMP/panfishCHM.properties"
+  echo "chum.model.options=--exclude *.foo" >> "$THE_TMP/panfishCHM.properties"
+  # test with valid complete config
+  parseProperties "$THE_TMP" "$THE_TMP/s"
+  
+  [ "$PANFISH_BIN_DIR" == "/xx" ]
+  [ "$MATLAB_DIR" == "/matlab" ]
+  [ "$BATCH_AND_WALLTIME_ARGS" == "batch" ]
+  [ "$CHUMMEDLIST" == "foo.q" ]
+  [ "$CHM_BIN_DIR" == "/bin/chm" ]
+  [ "$MAX_RETRIES" == "3" ]
+  [ "$RETRY_SLEEP" == "10" ]
+  [ "$WAIT_SLEEP_TIME" == "20" ]
+
+  [ "$LAND_JOB_OPTS" == "ljo" ]
+  [ "$CHUM_JOB_OPTS" == "cjo" ]
+  [ "$CHUM_IMAGE_OPTS" == "-b --deletebefore -x *.*" ]
+  [ "$CHUM_MODEL_OPTS" == "--exclude *.foo" ]
+
+  [ "$CASTBINARY" == "/xxpanfishcast" ]
+  [ "$CHUMBINARY" == "/xxpanfishchum" ]
+  [ "$LANDBINARY" == "/xxpanfishland" ]
+  [ "$PANFISHSTATBINARY" == "/xxpanfishstat" ]
+}
+
+# 
+# getSingleCHMTestTaskStdOutFile() tests
+#
+@test "getSingleCHMTestTaskStdOutFile() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where job path is not a directory
+  run getSingleCHMTestTaskStdOutFile "$THE_TMP/doesnotexist" "1"
+#  echo "$output" 1>&2
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" == "WARNING:    $THE_TMP/doesnotexist is not a directory" ]
+
+  # Test where log file does not exist
+  getSingleCHMTestTaskStdOutFile "$THE_TMP" "1"
+  [ "$?" -eq 0 ] 
+  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/out/stdout/1.stdout" ]
+
+  # Test with valid log file
+  mkdir -p "$THE_TMP/out/stdout"
+  echo "blah" > "$THE_TMP/out/stdout/4.stdout"
+  getSingleCHMTestTaskStdOutFile "$THE_TMP" "4"
+  [ "$?" == 0 ] 
+  [ "$CHM_STD_OUT_FILE" == "$THE_TMP/out/stdout/4.stdout" ]
+
+}
+
+# 
+# getSingleCHMTestTaskStdErrFile() tests
+#
+@test "getSingleCHMTestTaskStdErrFile() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where job path is not a directory
+  run getSingleCHMTestTaskStdErrFile "$THE_TMP/doesnotexist" "1"
+#  echo "$output" 1>&2
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" == "WARNING:    $THE_TMP/doesnotexist is not a directory" ]
+
+  # Test where log file does not exist
+  getSingleCHMTestTaskStdErrFile "$THE_TMP" "1"
+  [ $? -eq 0 ]
+  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/out/stderr/1.stderr" ]
+
+  # Test with valid log file
+  mkdir -p "$THE_TMP/out/stderr"
+  echo "blah" > "$THE_TMP/out/stderr/24.stderr"
+  getSingleCHMTestTaskStdErrFile "$THE_TMP" "24"
+  [ "$?" == 0 ]     
+  [ "$CHM_STD_ERR_FILE" == "$THE_TMP/out/stderr/24.stderr" ]
+
+}
+
+#
+# checkSingleTask() tests
+#
+@test "checkSingleCHMTestTask() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  mkdir -p "$THE_TMP/out/stdout"
+  # Test where stdout file does not exist
+  run checkSingleCHMTestTask "$THE_TMP" "1"
+  [ "$status" -eq 2 ]
+
+  # Test where stdout file is zero size
+  touch "$THE_TMP/out/stdout/1.stdout"
+  run checkSingleCHMTestTask "$THE_TMP" "1"
+  [ "$status" -eq 2 ]
+
+  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1:::yy" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::zz" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::out/uh.png" >> "$THE_TMP/runCHM.sh.config"
+
+  echo "blah" > "$THE_TMP/out/stdout/1.stdout"
+  # Test where no output image is found
+  run checkSingleCHMTestTask "$THE_TMP" "1"
+  echo "$output" 1>&2
+  [ "$status" -eq 3 ]
+
+  echo "hi" > "$THE_TMP/out/uh.png"  
+  # Test where we are all good
+  run checkSingleCHMTestTask "$THE_TMP" "1"
+  [ "$status" -eq 0 ]
+}
+
+#
 # parseWidthHeightParameter() with various values
 #
 @test "parseWidthHeightParameter() with various values" {
@@ -1623,3 +1765,412 @@ teardown(){
 
 }
 
+  # Test where getStatus errors 1st time and works second going to run state and finishes 3rd time
+  echo "1,status=uh,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=running,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+   
+  run waitForJobs "2" "$THE_TMP" "cast.out"
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == " WaitForJobs in cast.out Iteration 2 Start Time: "* ]]
+  [ "${lines[1]}" == "  Iteration 2 job status is NA.  Sleeping 0 seconds" ]
+  [ "${lines[2]}" == "WARNING:    Error calling $PANFISHSTATBINARY --statusofjobs $THE_TMP/cast.out" ]
+  [ "${lines[3]}" == "  Iteration 2 job status is NA.  Sleeping 0 seconds" ]
+  [ "${lines[4]}" == "  Iteration 2 job status is running.  Sleeping 0 seconds" ]
+  [[ "${lines[5]}" == " WaitForJobs in cast.out Iteration 2 End Time: "* ]]
+
+  
+  # Test where a kill file is found
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  export PANFISHSTATBINARY="$THE_TMP/panfish/panfishstat"
+  export CHUMBINARY="/bin/true"
+  echo "die" > "$THE_TMP/KILL.JOB.REQUEST"
+  run waitForJobs "3" "$THE_TMP" "cast.out"
+  [ "$status" -eq 1 ]
+  [[ "${lines[0]}" == " WaitForJobs in cast.out Iteration 3 Start Time: "* ]]
+  [ "${lines[1]}" == "  $THE_TMP/KILL.JOB.REQUEST detected.  Chumming kill file to remote cluster(s) and exiting..." ]
+  [ "${lines[2]}" == "  Running /bin/true --path $THE_TMP/KILL.JOB.REQUEST --cluster foo.q > $THE_TMP/killed.chum.out" ]
+
+  # Test where DOWNLOAD.DATA.REQUEST file shows up and job then finishes after
+  echo "yo" > "$THE_TMP/chm.cast.out"
+  export LANDBINARY="/bin/echo"
+  export LAND_JOB_OPTS="--exclude hi.* --exclude bye.*" 
+  echo "0,status=running,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=running,,touch $THE_TMP/DOWNLOAD.DATA.REQUEST" >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=running,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"  
+  /bin/rm -f $THE_TMP/KILL.JOB.REQUEST
+
+  run waitForJobs "3" "$THE_TMP" "chm.cast.out"
+  [ "$status" -eq 0 ]
+  echo "$output" 1>&2
+  [[ "${lines[0]}" == " WaitForJobs in chm.cast.out Iteration 3 Start Time: "* ]]
+  [ "${lines[1]}" == "  Iteration 3 job status is NA.  Sleeping 0 seconds" ]
+  [ "${lines[2]}" == "  Iteration 3 job status is running.  Sleeping 0 seconds" ]
+  [ "${lines[3]}" == "  Iteration 3 job status is running.  Sleeping 0 seconds" ]
+  [ "${lines[4]}" == "  DOWNLOAD.DATA.REQUEST file found.  Performing download" ]
+  [ "${lines[5]}" == "--path $THE_TMP --cluster foo.q --exclude hi.* --exclude bye.*" ]
+  [ "${lines[6]}" == "  Removing DOWNLOAD.DATA.REQUEST file" ]
+  [ "${lines[7]}" == "  Iteration 3 job status is running.  Sleeping 0 seconds" ]
+  [[ "${lines[8]}" == " WaitForJobs in chm.cast.out Iteration 3 End Time: "* ]] 
+  [ ! -e "$THE_TMP/DOWNLOAD.DATA.REQUEST" ]
+
+}
+
+#
+# moveCastOutFile() tests
+#
+@test "moveCastOutFile() tests" {
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where there isn't a cast.out file
+  run moveCastOutFile "1" "$THE_TMP" "hi"
+  [ "$status" -eq 0 ]
+
+  # Test where there is a cast.out file
+  echo "hi" > "$THE_TMP/cast.out"
+  run moveCastOutFile "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 0 ]
+  [ -e "$THE_TMP/cast.out.1.out" ]
+  [ ! -e "$THE_TMP/cast.out" ]
+
+  # Test where there is a cast.1.out file
+  echo "bye" > "$THE_TMP/cast.out"
+  run moveCastOutFile "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 0 ]
+  [ -e "$THE_TMP/cast.out.1.out" ]
+  [ ! -e "$THE_TMP/cast.out" ]
+  aLine=`head -n 1 "$THE_TMP/cast.out.1.out"`
+  [ "$aLine" == "bye" ]
+
+  # Test where mv command fails
+  export MV_CMD="/bin/false"
+  echo "yo" > "$THE_TMP/cast.out" "cast.out"
+  run moveCastOutFile "1" "$THE_TMP"
+  [ "$status" -eq 1 ]
+}
+
+#
+# moveOldDataForNewIteration() tests
+#
+@test "moveOldDataForNewIteration() tests" {
+    
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+ 
+  # test where CHUMMEDLIST is empty and no cast.out file
+  unset CHUMMEDLIST
+  run moveOldDataForNewIteration "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 0 ]
+ 
+  # test where there is an error moving the old cluster folders
+  export MV_CMD="/bin/false"
+  export CHUMMEDLIST="foo.q"
+  mkdir -p "$THE_TMP/foo.q" 1>&2
+  run moveOldDataForNewIteration "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" == "WARNING:    Unable to move cluster folders for previous iteration 0" ]
+
+  # test where there is an error moving cluster folders and moving cast.out file
+  export MV_CMD="/bin/false"
+  echo "hi" > "$THE_TMP/cast.out"
+  run moveOldDataForNewIteration "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" == "WARNING:    Unable to move cluster folders for previous iteration 0" ]
+  [ "${lines[1]}" == "WARNING:    Unable to move cast.out file for previous iteration 0" ]
+
+  unset CHUMMEDLIST
+  export MV_CMD="/bin/false"
+  echo "hi" > "$THE_TMP/cast.out"
+  run moveOldDataForNewIteration "1" "$THE_TMP" "cast.out"
+  [ "$status" -eq 2 ]
+  [ "${lines[0]}" == "WARNING:    Unable to move cast.out file for previous iteration 0" ]
+
+  
+
+}
+
+#
+# castCHMTestJob() tests
+#
+@test "castCHMTestJob() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # Test where cast fails
+  export CASTBINARY="/bin/false"
+  export CHUMMEDLIST="hi.q"
+  /bin/rm -f "$THE_TMP/cast.out" 1>&2
+  thecurdir=`pwd`
+  run castCHMTestJob "1" "$THE_TMP" "1" "2" "foo"
+  [ "$status" -eq 2 ]
+  [ "${lines[0]}" == "WARNING:    Error calling /bin/false -t 1-2 -q hi.q -N foo  --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh > $THE_TMP/chm.test.cast.out" ]
+  newcurdir=`pwd`
+  [ "$thecurdir" == "$newcurdir" ]
+
+  # Test where all is good and there is a task file
+  export CASTBINARY="/bin/echo"
+  export CHUMMEDLIST="hi.q"
+  export BATCH_AND_WALLTIME_ARGS="--walltime 2:00:00 --batchfactor hi.q::0.5"
+  /bin/rm -f "$THE_TMP/cast.out" 1>&2
+  thecurdir=`pwd`
+  echo "blah" > "$THE_TMP/tasky"
+  run castCHMTestJob "1" "$THE_TMP" "$THE_TMP/tasky" "2" "foo"
+  [ "$status" -eq 0 ]
+  aLine=`head -n 1 "$THE_TMP/chm.test.cast.out"`
+  echo "$aLine" 1>&2
+  [ "$aLine" == "--taskfile $THE_TMP/tasky -q hi.q -N foo --walltime 2:00:00 --batchfactor hi.q::0.5 --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
+  newcurdir=`pwd`
+  [ "$thecurdir" == "$newcurdir" ]
+}
+
+#
+# chumModelImageAndJobData() tests
+#
+@test "chumModelImageAndJobData() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  /bin/cp -a "$PANFISH_TEST_BIN" "$THE_TMP/panfish" 1>&2
+  export CHUMMEDLIST="foo.q"
+
+  export CHUMBINARY="$THE_TMP/panfish/panfishchum"
+
+
+  # Test where chum of model data fails
+  echo "1,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP/model failed" ]
+  [ "${lines[1]}" == "WARNING:    Unable to upload input model directory" ]
+
+
+  # Test where upload input image data fails
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  [ "$status" -eq 2 ]
+  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP/image failed" ]
+  [ "${lines[1]}" == "WARNING:    Unable to upload input image directory" ]
+
+  # Test where upload Job directory fails
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  [ "$status" -eq 3 ]
+  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP failed" ]
+  [ "${lines[1]}" == "WARNING:    Unable to upload job directory" ]
+
+
+  # Test successful run
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  [ "$status" -eq 0 ]
+}
+
+# 
+# waitForDownloadAndVerifyCHMTestJobs() tests
+#
+@test "waitForDownloadAndVerifyCHMTestJobs() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  /bin/cp -a "$PANFISH_TEST_BIN" "$THE_TMP/panfish" 1>&2
+  export WAIT_SLEEP_TIME=0
+  export RETRY_SLEEP=0
+  export CHUMMEDLIST="foo.q"
+  export LANDBINARY="$THE_TMP/panfish/panfishland"
+
+  # no cast.out file and land fails and verify fails
+  echo "1,error,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "1,error,," >> "$THE_TMP/panfish/panfishland.tasks"
+  echo "1,error,," >> "$THE_TMP/panfish/panfishland.tasks"
+ 
+  run waitForDownloadAndVerifyCHMTestJobs "1" "$THE_TMP" "3" "cast.out"
+  [ "$status" -eq 1 ]
+  [ "${lines[4]}" == "  While checking if any jobs exist, it appears no cast.out exists." ]
+  [ "${lines[11]}" == "WARNING:    Unable to download data.  Will continue on with checking results just in case." ] 
+ 
+
+  # all good but verify fails
+  export PANFISHSTATBINARY="$THE_TMP/panfish/panfishstat"
+  echo "hi" > "$THE_TMP/cast.out"
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,error,," > "$THE_TMP/panfish/panfishland.tasks"
+ 
+  run waitForDownloadAndVerifyCHMTestJobs "1" "$THE_TMP" "3" "cast.out"
+ 
+  [ "$status" -eq 1 ]
+  [ "${lines[7]}" == "  Creating failed.jobs file" ]
+  [ -s "$THE_TMP/failed.jobs" ]
+
+  # all good
+  echo "hi" > "$THE_TMP/cast.out"
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,error,," > "$THE_TMP/panfish/panfishland.tasks"
+  mkdir -p "$THE_TMP/out/stdout" 1>&2
+  mkdir -p "$THE_TMP/out/stderr" 1>&2
+  mkdir -p "$THE_TMP/out/1.png" 1>&2
+  echo "yo" > "$THE_TMP/out/1.png/1.png"
+  echo "hi" > "$THE_TMP/out/stdout/1.stdout"
+
+     # make runchm.sh.config file
+  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+
+  run waitForDownloadAndVerifyCHMTestJobs "1" "$THE_TMP" "1" "cast.out"
+
+  [ "$status" -eq 0 ]
+
+}
+
+#
+# runCHMTestJobs() tests
+# 
+@test "runCHMTestJobs() tests" {
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+  /bin/cp -a "$PANFISH_TEST_BIN" "$THE_TMP/panfish" 1>&2
+  export CHUMMEDLIST="foo.q"
+
+  export CHUMBINARY="$THE_TMP/panfish/panfishchum"
+  export CASTBINARY="$THE_TMP/panfish/panfishcast"
+  export LANDBINARY="$THE_TMP/panfish/panfishland"
+  export PANFISHSTATBINARY="$THE_TMP/panfish/panfishstat"
+  export RETRY_SLEEP=0
+  export WAIT_SLEEP_TIME=0
+  export MAX_RETRIES=5
+
+  # Test jobs already completed successfully
+  echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
+  mkdir -p "$THE_TMP/out/stdout" 1>&2
+  mkdir -p "$THE_TMP/out/stderr" 1>&2
+  mkdir -p "$THE_TMP/out/1.png" 1>&2
+  echo "yo" > "$THE_TMP/out/1.png/1.png"
+  echo "hi" > "$THE_TMP/out/stdout/1.stdout"
+
+     # make runchm.sh.config file
+  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+ 
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
+  [[ "${lines[1]}" == " WaitForJobs in chm.test.cast.out Iteration 0 Start Time: "* ]]
+  [ "${lines[2]}" == "  Iteration 0 job status is NA.  Sleeping 0 seconds" ]
+  [ "${lines[3]}" == "WARNING:    No $THE_TMP/chm.test.cast.out file found" ]
+  [[ "${lines[4]}" == " WaitForJobs in chm.test.cast.out Iteration 0 End Time: "* ]]
+  [ "${lines[5]}" == "  While checking if any jobs exist, it appears no chm.test.cast.out exists." ]
+  [ "${lines[6]}" == "landcall" ]
+  [[ "${lines[7]}" == " RunCHMTestJobs End Time: "* ]]
+
+ 
+  # Test failure to chum data
+  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+  echo "0,download,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "1,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 1 ]
+  [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
+  [ "${lines[11]}" == "ERROR:    Unable to upload job data" ]
+  [ -s "$THE_TMP/failed.jobs" ]
+  aLine=`head -n 1 "$THE_TMP/failed.jobs"`
+  [ "$aLine" == "1" ]
+   
+  # Test failure to submit jobs
+  echo "0,download,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1,chumerror,," > "$THE_TMP/panfish/panfishcast.tasks"
+
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 1 ]
+  [ "${lines[10]}" == "ERROR:    Unable to submit jobs" ]
+
+  # Test success 1st time
+  export CASTBINARY="/bin/echo"
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,,echo hi > $THE_TMP/out/stdout/1.stdout" >> "$THE_TMP/panfish/panfishland.tasks"
+  /bin/rm -f "$THE_TMP/out/stdout/1.stdout" 1>&2 
+  echo "hi" > "$THE_TMP/out/1.png/1.png"
+     # make runchm.sh.config file
+  echo "1:::xx" > "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::xx" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::out/1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
+  [[ "${lines[11]}" == " RunCHMTestJobs End Time: "* ]]
+  [ -s "$THE_TMP/chm.test.cast.out" ]
+  aLine=`head -n 1 "$THE_TMP/chm.test.cast.out"`
+  [ "$aLine" == "--taskfile $THE_TMP/failed.jobs -q foo.q -N jobname --writeoutputlocal -o $THE_TMP/out/stdout/\$TASK_ID.stdout -e $THE_TMP/out/stderr/\$TASK_ID.stderr $THE_TMP/runCHM.sh" ]
+
+  # Test 1st iteration fail then success
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,,echo hi > $THE_TMP/out/1.png/1.png" >> "$THE_TMP/panfish/panfishland.tasks"
+
+  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
+  [[ "${lines[16]}" == " WaitForJobs in chm.test.cast.out Iteration 1 End Time: "* ]]
+
+  # Test where failures exceed MAX_RETRIES
+  export MAX_RETRIES=1
+  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,status=done,," > "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,status=done,," >> "$THE_TMP/panfish/panfishstat.tasks"
+  echo "0,landcall,," > "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
+  echo "0,landcall,," >> "$THE_TMP/panfish/panfishland.tasks"
+
+  /bin/rm -f "$THE_TMP/out/1.png/1.png" 1>&2
+
+  run runCHMTestJobs "0" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model" "1" "jobname"
+  [ "$status" -eq 1 ]
+  [[ "${lines[0]}" == " RunCHMTestJobs Start Time: "* ]]
+  [ "${lines[21]}" == "WARNING:    Error running jobs...." ]
+  [[ "${lines[22]}" == " RunCHMTestJobs End Time: "* ]]
+
+
+}

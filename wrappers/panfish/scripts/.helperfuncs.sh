@@ -1071,7 +1071,6 @@ function runCHMTestJobs {
     # dump the current iteration to a file
     echo "$iteration" > "$jobDir/$CHM_TEST_ITERATION_FILE"
 
-
     if [ $iteration -gt 1 ] ; then
       # Move old panfish job folders out of way
       moveOldDataForNewIteration "$iteration" "$jobDir" "$CHM_TEST_CAST_OUT_FILE"
