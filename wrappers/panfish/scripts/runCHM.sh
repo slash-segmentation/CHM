@@ -85,15 +85,24 @@ declare -r modelDir="$PANFISH_BASEDIR/$MODEL_DIR"
 declare -r chmOpts="$CHM_OPTS"
 declare -r finalImage="$SCRIPT_DIR/$OUTPUT_IMAGE"
 
-# Set environment variables
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PANFISH_BASEDIR}/${MATLAB_DIR}/bin/glnxa64
-export MATLAB_BIN_DIR="${PANFISH_BASEDIR}/${MATLAB_DIR}/bin"
-export PATH=$PATH:$MATLAB_BIN_DIR
+declare compiledMatlabFlag=""
+
+
+# Set environment variables if we are NOT using compiled matlab
+# we make this determination by looking for CHM_TEST_BLOCKS_BINARY
+# in the chm bin directory.  If that file is there we will use that
+if [ ! -s "$PANFISH_BASEDIR/$CHM_BIN_DIR/$CHM_TEST_BINARY" ] ; then
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${PANFISH_BASEDIR}/${MATLAB_DIR}/bin/glnxa64
+  export MATLAB_BIN_DIR="${PANFISH_BASEDIR}/${MATLAB_DIR}/bin"
+  export PATH=$PATH:$MATLAB_BIN_DIR
+else
+  compiledMatlabFlag="-M ${PANFISH_BASEDIR}/${MATLAB_DIR}"
+fi
 
 # Todo: Need to make this task run in the background and then check on job completion
 #       this will allow the script to catch KILL requests etc.. and to track memory
 #       usage etc.
-/usr/bin/time -v $PANFISH_BASEDIR/$CHM_BIN_DIR/$CHM_TEST_SH "$inputImage" "$scratchDir" -m "$modelDir" $chmOpts -s
+/usr/bin/time -v $PANFISH_BASEDIR/$CHM_BIN_DIR/$CHM_TEST_SH "$inputImage" "$scratchDir" -m "$modelDir" $chmOpts -s $compiledMatlabFlag
 
 declare chmExitCode=$?
 
