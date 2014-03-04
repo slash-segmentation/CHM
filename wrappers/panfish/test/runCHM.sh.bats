@@ -130,6 +130,46 @@ teardown(){
   [ -s "$THE_TMP/out/hist1.png/1.png" ]
 }
 
+
+@test "Simple valid run with successful fake CHM_test.sh call using compiled CHM" {
+  export SGE_TASK_ID=1
+  export PANFISH_BASEDIR="$THE_TMP"
+  export PANFISH_SCRATCH="/tmp/pan"
+  unset SKIP_COPY
+  mkdir -p "$THE_TMP/cc/" 1>&2
+  /bin/cp -a ${SUCCESS_CHM_TEST}/* "$THE_TMP/cc/." 1>&2
+
+  # create fake panfishCHM.properties file
+  echo "chm.bin.dir=/cc" > "$THE_TMP/panfishCHM.properties"
+  echo "matlab.dir=/hello" >> "$THE_TMP/panfishCHM.properties" 
+  echo "hi" > "$THE_TMP/cc/CHM_test"
+
+  # create runCHM.sh.config file
+  echo "1:::/foo/input.png" > "$THE_TMP/runCHM.sh.config"
+  echo "1:::/foo/modeldir" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::chmopts" >> "$THE_TMP/runCHM.sh.config"
+  echo "1:::out/hist1.png/1.png" >> "$THE_TMP/runCHM.sh.config"
+
+  # make output directory
+  mkdir -p "$THE_TMP/out/hist1.png/" 1>&2
+
+  export SGE_TASK_ID=1
+
+  run $RUNCHM
+  echo "$output" 1>&2
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" == "(task 1) runCHM.sh Start Time:"* ]]
+  [[ "${lines[1]}" == "(task 1)  Creating directory /tmp/pan/chm"* ]]
+  [[ "${lines[2]}" == "$THE_TMP//foo/input.png /tmp/pan/chm"* ]]
+  [[ "${lines[2]}" == *" -m $THE_TMP//foo/modeldir chmopts -s -M $THE_TMP//hello" ]]
+  [[ "${lines[26]}" == "(task 1) runCHM.sh End Time: "* ]]
+  [[ "${lines[26]}" == *" Exit Code: 0" ]]
+
+  [ -s "$THE_TMP/out/hist1.png/1.png" ]
+}
+
+
+
 # Simple valid run with failing fake CHM_test.sh call
 @test "Simple valid run with failing fake CHM_test.sh call" {
   export SGE_TASK_ID=3

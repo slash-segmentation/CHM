@@ -33,6 +33,7 @@ declare -r OUT_SUFFIX="out"
 declare -r IMAGE_TILE_DIR_SUFFIX="tiles"
 declare -r KILL_JOB_REQUEST="KILL.JOB.REQUEST"
 declare -r CHM_TEST_ITERATION_FILE="chm.test.iteration"
+declare -r CHM_TEST_BINARY="CHM_test"
 # Command defines
 declare MV_CMD="/bin/mv"
 declare RM_CMD="/bin/rm"
