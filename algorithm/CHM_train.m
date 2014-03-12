@@ -1,4 +1,26 @@
 function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart)
+% CHM_train   CHM Image Training Phase Script
+%   CHM_train(trainpath, labelpath, [savingpath='./temp'], [Nstage=2], [Nstage=4], [restart=0])
+%
+%   trainpath is a set of data files to train on, see below for details.
+%   labelpath is a set of label files to train on, see below for details.
+%   savingpath is the folder to save the trained model to (along with temporary files)
+%       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
+%   Nstage is the number of stages to train with, must be >=2
+%   Nlevel is the number of levels to train with, must be >=1
+%   restart is if the model should be able to restart a previous model
+%
+% traingpath and labelpath are comma-seperated lists of the following:
+%   path to a folder            - all PNGs in that folder
+%   path to a file              - only that file 
+%   path with numerical pattern - get all files matching the pattern
+%       pattern must have #s in it and end with a semicolon and number range
+%       the #s are replaced by the values at the end with leading zeros
+%       example: in/####.png;5-15 would do in/0005.png through in/0015.png
+%   path with wildcard pattern  - get all files matching the pattern
+%       pattern has * in it which means any number of any characters
+%       example: in/*.tif does all TIFF images in that directory
+
 if nargin < 2 || nargin > 6; error('CHM_train must have 2 to 6 input arguments'); end
 if nargin < 3; savingpath = fullfile('.', 'temp'); end
 if nargin < 4; Nstage = 2; end
@@ -21,8 +43,7 @@ files_la = GetInputFiles(labelpath);
 if numel(files_tr) < 1 || numel(files_tr) ~= numel(files_la); error('You must provide at least 1 image set and equal numbers of training and label images'); end;
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
-if restart
-    % Note: Support chaning the Nlevel and Nstage values, either truncating or expanding a previous model
+if restart && exist(fullfile(savingpath,'param.mat'),'file') == 2
     param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
     if GetImageSize(files_tr{1}) ~= param.TrainingSize; error('Cannot restart since training data is a different size'); end;
     % Remove all stages/levels that would be invalid if Nlevel/Nstage change

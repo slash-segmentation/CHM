@@ -1,4 +1,30 @@
 function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
+% CHM_test   CHM Image Testing Phase Script
+%   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=[0 0]], [savingpath='./temp'], [tiles_to_proc=[]])
+%
+%   input_files is a set of data files to test, see below for details.
+%   outputpath is the folder to save the generated images to.
+%       The images will have the same name and type as the input files but be placed in this folder.
+%   blocksize is the size of the blocks to process, which should be identical to the training image sizes.
+%       By default this reads the information from the param.mat file.
+%   bordersize is the amount of overlap between blocks to discard.
+%       By default no overlap, but 25-75px overlap is recommended (will depend on whats being segmented).
+%   savingpath is the folder to save the trained model to (along with temporary files)
+%       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
+%   tiles_to_proc is a list of tiles to process.
+%       By default all tiles are processed.
+%
+% input_files is a comma-seperated list of the following:
+%   path to a folder            - all PNGs in that folder
+%   path to a file              - only that file 
+%   path with numerical pattern - get all files matching the pattern
+%       pattern must have #s in it and end with a semicolon and number range
+%       the #s are replaced by the values at the end with leading zeros
+%       example: in/####.png;5-15 would do in/0005.png through in/0015.png
+%   path with wildcard pattern  - get all files matching the pattern
+%       pattern has * in it which means any number of any characters
+%       example: in/*.tif does all TIFF images in that directory
+
 if nargin < 2 || nargin > 6; error('CHM_test must have 2 to 6 input arguments'); end
 if nargin < 3; blocksize = 'auto'; end
 if nargin < 4; bordersize = 0; end

@@ -1,11 +1,14 @@
 Cascaded Hierarchical Model Automatic Segmentation Algorithm
 ============================================================
 
-This is an algorithm designed for automatic segmention of cellular structures in electron microscopy data.
+This is an algorithm designed for automatic segmention of cellular structures
+in electron microscopy data.
 
-The core algorithm is in the "algorithm" directory while wrappers for it to do things such as run on a cluster are in the "wrappers" directory.
+The core algorithm is in the "algorithm" directory while wrappers for it to do
+things such as run on a cluster are in the "wrappers" directory.
 
-More details about running the algorithm or any of the wrappers is contained in readmes in the respective directories.
+More details about running the algorithm or any of the wrappers is contained in
+readmes in the respective directories.
 
 
 Basic Usage
@@ -33,8 +36,9 @@ seperated list of the following:
      pattern has * in it which means any number of any characters
      example: in/*.tif does all TIFF images in that directory
      note: the asterisk needs to be escaped or in quotes in some shells
-Training will take on the order of a day and require lots of memory (25-100GB)
-depending on the size of the dataset.
+Training will take on the order of a day and require lots of memory (50-150GB)
+depending on the size of the dataset. Recommended that you use between 500x500
+and 1000x1000 size training images with a total of 20-40 slices.
 
 The output model is by default stored in ./temp. The only files required to
 save are the .mat files in the root directory (the subdirectories contain

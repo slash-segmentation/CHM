@@ -6,9 +6,9 @@ usage()
     
 $0 <input_files> <output_folder> <optional arguments>
   input_files     The input files to use. See below for the specification.
-  output_folder   The folder to save the generated images to
+  output_folder   The folder to save the generated images to.
                   The images will have the same name and type as the input
-                  files but be placed in this folder
+                  files but be placed in this folder.
 	
 Optional Arguments:
   -m model_folder The folder that contains the model data. Default is ./temp/.
