@@ -102,7 +102,7 @@ if [ -n "$PANFISH_SCRATCH" ] ; then
   scratchDir="$PANFISH_SCRATCH/mergetiles.${uuidVal}"
 fi
 
-getMergeTilesJobParametersForTaskFromConfig "${SGE_TASK_ID}" "$SCRIPT_DIR"
+getMergeTilesJobParametersForTaskFromConfig "$SCRIPT_DIR" "${SGE_TASK_ID}"
 if [ $? != 0 ] ; then
   logEndTime "$RUN_MERGE_TILES_SH" $runMergeTilesStartTime 1
   exit 1
