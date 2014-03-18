@@ -112,8 +112,8 @@ function checkSingleTask {
 #
 function chumJobData {
   local task=$1
-  local iteration=$1
-  local jobDir=$2
+  local iteration=$2
+  local jobDir=$3
 
   # parse the first job for image directory
   getParameterForTaskFromConfig "1" "1" "$jobDir/$RUN_CHM_CONFIG"
@@ -345,7 +345,7 @@ else
 fi
 
 # Chum, submit, and wait for jobs to complete
-runJobs "$RUN_CHM_SH" "$iteration" "$OUTPUT_DIR" "${NUMBER_JOBS}" "$CHM_JOB_NAME" "$CHM_TEST_CAST_OUT_FILE" "$CHUMMEDLIST" "$LAND_JOB_OPTS" "$FAILED" "$FAILED_JOBS_TMP_FILE" "$FAILED_JOBS_FILE" "$MAX_RETRIES" "$WAIT_SLEEP_TIME" "$CHM_TEST_ITERATION_FILE" "$BATCH_AND_WALLTIME_ARGS" "$OUT_DIR_NAME" 
+runJobs "$RUN_CHM_SH" "$iteration" "$OUTPUT_DIR" "${NUMBER_JOBS}" "$CHM_JOB_NAME" "$CHM_TEST_CAST_OUT_FILE" "$CHUMMEDLIST" "$LAND_JOB_OPTS" "$FAILED" "$FAILED_JOBS_TMP_FILE" "$FAILED_JOBS_FILE" "$MAX_RETRIES" "$WAIT_SLEEP_TIME" "$CHM_TEST_ITERATION_FILE" "$RETRY_SLEEP" "$BATCH_AND_WALLTIME_ARGS" "$OUT_DIR_NAME" 
 
 runJobsExit=$?
 if [ "$runJobsExit" != 0 ] ; then
