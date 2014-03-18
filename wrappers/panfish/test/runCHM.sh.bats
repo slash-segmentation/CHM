@@ -9,7 +9,7 @@ setup() {
   /bin/cp -a ${BATS_TEST_DIRNAME}/../scripts/runCHM.sh "$THE_TMP/." 1>&2
   export RUNCHM="$THE_TMP/runCHM.sh"
   chmod a+x $RUNCHM
-
+  export HELPERFUNCS="$THE_TMP/.helperfuncs.sh"
   export SUCCESS_CHM_TEST="$BATS_TEST_DIRNAME/bin/fakesuccesschmtest"
   export FAIL_CHM_TEST="$BATS_TEST_DIRNAME/bin/fakefailchmtest"
 
@@ -22,6 +22,53 @@ teardown(){
   /bin/rm -rf "$THE_TMP"
   #echo "teardown" 1>&2
 }
+
+#
+# getCHMTestJobParametersForTaskFromConfig() tests
+#
+@test "getCHMTestJobParametersForTaskFromConfig() tests" {
+  
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # source runCHM.sh so we can unit test this function
+  . $RUNCHM source
+
+  # Test where we can't get first parameter
+  run getCHMTestJobParametersForTaskFromConfig "$THE_TMP" "1"
+  [ "$status" -eq 1 ]
+
+  # Test where we can't get 2nd parameter
+  echo "1${CONFIG_DELIM}a" > "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}b" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}c" >> "$THE_TMP/runCHM.sh.config"
+  echo "1${CONFIG_DELIM}d" >> "$THE_TMP/runCHM.sh.config"
+  echo "2${CONFIG_DELIM}e" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "$THE_TMP" "2"
+  [ "$status" -eq 2 ]
+
+  # Test where we cant get 3rd parameter
+  echo "2${CONFIG_DELIM}f" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "$THE_TMP" "2"
+  [ "$status" -eq 3 ]
+
+
+  # Test where we cant get 4th parameter
+  echo "2${CONFIG_DELIM}g" >> "$THE_TMP/runCHM.sh.config"
+  run getCHMTestJobParametersForTaskFromConfig "$THE_TMP" "2"
+  [ "$status" -eq 4 ]
+
+  # Test success
+  echo "2${CONFIG_DELIM}h" >> "$THE_TMP/runCHM.sh.config"
+  getCHMTestJobParametersForTaskFromConfig "$THE_TMP" "2"
+  [ "$?" -eq 0 ]
+
+  [ "$INPUT_IMAGE" == "e" ]
+  [ "$MODEL_DIR" == "f" ]
+  [ "$CHM_OPTS" == "g" ]
+  [ "$OUTPUT_IMAGE" == "h" ]
+}
+
 
 
 #

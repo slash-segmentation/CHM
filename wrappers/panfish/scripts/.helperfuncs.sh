@@ -15,7 +15,7 @@ declare -r CHUM_IMAGE_OUT_FILE="chum.image.out"
 declare -r CHUM_MODEL_OUT_FILE="chum.model.out"
 declare -r KILLED_CHUM_OUT_FILE="killed.chum.out"
 declare -r PANFISH_CHM_PROPS="panfishCHM.properties"
-declare -r OUT_DIR_NAME="runchmout"
+declare -r OUT_DIR_NAME="runChmOut"
 declare -r CONFIG_DELIM=":::"
 declare -r JOB_ERR_DIR_NAME="joberr"
 declare -r JOB_OUT_DIR_NAME="jobout"
@@ -34,10 +34,33 @@ declare -r IMAGE_TILE_DIR_SUFFIX="tiles"
 declare -r KILL_JOB_REQUEST="KILL.JOB.REQUEST"
 declare -r CHM_TEST_ITERATION_FILE="chm.test.iteration"
 declare -r CHM_TEST_BINARY="CHM_test"
+declare -r DOWNLOAD_DATA_REQUEST="DOWNLOAD.DATA.REQUEST"
+declare -r DONE_JOB_STATUS="done"
+
+# Merge tiles defines
+declare -r RUN_MERGE_TILES_SH="runMergeTiles.sh"
+declare -r RUN_MERGE_TILES_CONFIG="runMergeTiles.sh.config"
+declare -r MERGE_TILES_OUT_DIR_NAME="runMergeTilesOut"
+declare -r MERGED_IMAGES_OUT_DIR_NAME="mergedimages"
+declare -r MERGE_TILES_CAST_OUT_FILE="merge.tiles.cast.out"
+declare -r MERGE_TILES_ITERATION_FILE="merge.tiles.iteration"
+declare -r MERGE_TILES_FAILED_PREFIX="failed.merge.tiles"
+declare -r MERGE_TILES_TMP_FILE="${MERGE_TILES_FAILED_PREFIX}.${JOBS_SUFFIX}.tmp"
+declare -r MERGE_TILES_FAILED_FILE="${MERGE_TILES_FAILED_PREFIX}.${JOBS_SUFFIX}"
 # Command defines
 declare MV_CMD="/bin/mv"
 declare RM_CMD="/bin/rm"
-
+declare IDENTIFY_CMD="identify"
+declare CONVERT_CMD="convert"
+declare CP_CMD="/bin/cp"
+declare TIME_V_CMD="/usr/bin/time -v"
+declare UUIDGEN_CMD="uuidgen"
+declare UNIQ_CMD="uniq"
+declare CAT_CMD="cat"
+declare SORT_CMD="sort"
+declare DU_CMD="du"
+declare SED_CMD="sed"
+declare FIND_CMD="find"
 #
 # Parses $PANFISH_CHM_PROPS properties file, setting several
 # variables
@@ -61,27 +84,32 @@ function parseProperties {
   fi
 
   # if set must end with /
-  PANFISH_BIN_DIR=`egrep "^panfish.bin.dir" $theConfig | sed "s/^.*= *//"`
+  PANFISH_BIN_DIR=`egrep "^panfish.bin.dir" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  MATLAB_DIR=`egrep "^matlab.dir" $theConfig | sed "s/^.*= *//"`
-  BATCH_AND_WALLTIME_ARGS=`egrep "^batch.and.walltime.args" $theConfig | sed "s/^.*= *//"`
+  MATLAB_DIR=`egrep "^matlab.dir" $theConfig | $SED_CMD "s/^.*= *//"`
+  BATCH_AND_WALLTIME_ARGS=`egrep "^batch.and.walltime.args" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  CHUMMEDLIST=`egrep "^cluster.list" $theConfig | sed "s/^.*= *//"`
+  CHUMMEDLIST=`egrep "^cluster.list" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  CHM_BIN_DIR=`egrep "^chm.bin.dir" $theConfig | sed "s/^.*= *//"`
+  CHM_BIN_DIR=`egrep "^chm.bin.dir" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  MAX_RETRIES=`egrep "^max.retries" $theConfig | sed "s/^.*= *//"`
-  RETRY_SLEEP=`egrep "^retry.sleep" $theConfig | sed "s/^.*= *//"`
+  MAX_RETRIES=`egrep "^max.retries" $theConfig | $SED_CMD "s/^.*= *//"`
+  RETRY_SLEEP=`egrep "^retry.sleep" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  WAIT_SLEEP_TIME=`egrep "^job.wait.sleep" $theConfig | sed "s/^.*= *//"`
+  WAIT_SLEEP_TIME=`egrep "^job.wait.sleep" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  LAND_JOB_OPTS=`egrep "^land.job.options" $theConfig | sed "s/^.*= *//"`
+  LAND_JOB_OPTS=`egrep "^land.job.options" $theConfig | $SED_CMD "s/^.*= *//"`
   
-  CHUM_JOB_OPTS=`egrep "^chum.job.options" $theConfig | sed "s/^.*= *//"`
+  CHUM_JOB_OPTS=`egrep "^chum.job.options" $theConfig | $SED_CMD "s/^.*= *//"`
   
-  CHUM_IMAGE_OPTS=`egrep "^chum.image.options" $theConfig | sed "s/^.*= *//"`
+  CHUM_IMAGE_OPTS=`egrep "^chum.image.options" $theConfig | $SED_CMD "s/^.*= *//"`
 
-  CHUM_MODEL_OPTS=`egrep "^chum.model.options" $theConfig | sed "s/^.*= *//"`
+  CHUM_MODEL_OPTS=`egrep "^chum.model.options" $theConfig | $SED_CMD "s/^.*= *//"`
+
+  MERGE_TILES_BATCH_AND_WALLTIME_ARGS=`egrep "^mergetiles.batch.and.walltime.args" $theConfig | $SED_CMD "s/^.*= *//"`
+  MERGE_TILES_CHUMMEDLIST=`egrep "^mergetiles.cluster.list" $theConfig | $SED_CMD "s/^.*= *//"`
+  LAND_MERGE_TILES_OPTS=`egrep "^land.mergetiles.options" $theConfig | $SED_CMD "s/^.*= *//"`
+  CHUM_MERGE_TILES_OPTS=`egrep "^chum.mergetiles.options" $theConfig | $SED_CMD "s/^.*= *//"`
 
   CASTBINARY="${PANFISH_BIN_DIR}panfishcast"
   CHUMBINARY="${PANFISH_BIN_DIR}panfishchum"
@@ -160,183 +188,102 @@ function getSizeOfPath {
      return 1
   fi
 
-  NUM_BYTES=`du $1 -bs | sed "s/\W.*//"`  
+  NUM_BYTES=`$DU_CMD $1 -bs | $SED_CMD "s/\W.*//"`  
   return 0
 }
 
-#
-#
-# Sets CHM_STD_OUT_FILE with path to standard out file for job
-#
-function getSingleCHMTestTaskStdOutFile {
-  # $1 - Job Directory
-  # $2 - Task Id
 
+#
+# Sets MERGE_TILES_STD_OUT_FILE to stdout file for MergeTiles job
+#
+function getSingleMergeTilesStdOutFile {
   local jobDir=$1
   local taskId=$2
-
   if [ ! -d "$jobDir" ] ; then
-    logWarning "$jobDir is not a directory"
     return 1
   fi
 
-  CHM_STD_OUT_FILE="$jobDir/$OUT_DIR_NAME/$STD_OUT_DIR_NAME/${taskId}.${STD_OUT_SUFFIX}"
-
+  MERGE_TILES_STD_OUT_FILE="$jobDir/$MERGE_TILES_OUT_DIR_NAME/$STD_OUT_DIR_NAME/${taskId}.${STD_OUT_SUFFIX}"
   return 0
 }
 
 #
+# Checks a given task to see if it ran successfully
+# checkSingleTask(task ie runCHM.sh or runMergeTiles.sh,jobDir,taskId)
+# NEEDS TO BE IMPLEMENTED ELSEWHERE
 #
-# Sets CHM_STD_ERR_FILE with path to standard err file for job
-#
-function getSingleCHMTestTaskStdErrFile {
-  # $1 - Job Directory
-  # $2 - Task Id
-
-  local jobDir=$1
-  local taskId=$2
-
-  if [ ! -d "$jobDir" ] ; then
-    logWarning "$jobDir is not a directory"
-    return 1
-  fi
-
-  CHM_STD_ERR_FILE="$jobDir/$OUT_DIR_NAME/$STD_ERR_DIR_NAME/${taskId}.${STD_ERR_SUFFIX}"
-
-  return 0
+function checkSingleTask {
+  
+  logWarning "checkSingleTask Not implemented..."
+  return 10
 }
 
 
 #
-# Checks that a single task ran successfully by verifying an output
-# image was created and that the stdout file has size greater then 0.
+# Uploads data to remote clusters
+# chumJobData(task ie runCHM.sh or runMergeTiles.sh,jobDir,taskId)
+# NEEDS TO BE IMPLEMENTED ELSEWHERE
 #
-function checkSingleCHMTestTask {
-  local jobDir=$1
-  local taskId=$2
-
-  getSingleCHMTestTaskStdOutFile "$jobDir" "$taskId"
-
-  if [ $? != 0 ] ; then
-    return 1
-  fi
-
-  if [ ! -s "$CHM_STD_OUT_FILE" ] ; then
-    logWarning "$CHM_STD_OUT_FILE file not found"
-    return 2
-  fi
-
-  local outputImageRelativePath=`egrep "^${taskId}${CONFIG_DELIM}" "$jobDir/$RUN_CHM_CONFIG" | sed "s/^.*${CONFIG_DELIM}//" | head -n 4 | tail -n 1`
-
-  if [ ! -s "$jobDir/${outputImageRelativePath}" ] ; then
-    logWarning "No output image found for task $taskId $jobDir/${outputImageRelativePath}"
-    return 3
-  fi
-
-  return 0
+function chumJobData {
+  
+  logWarning "chumJobData Not implemented..."
+  return 10
 }
 
-
-
 #
-# Verify Results
-# verifyCHMTestResults(iteration,jobDir,jobs,writeToFailFile)
-#
-function verifyCHMTestResults {
-  local iteration=$1
-  local jobDir=$2
-  local jobStart=$3
-  local jobEnd=$4
-  local writeToFailFile=$5
+# This function calls a user defined checkSingleTask on every
+# task optionally writting out a file containining list of failed
+# tasks. 
+# verifyResults (task,iteration,jobDir,jobStart,jobEnd,write failed file [yes|no],failed file prefix,failed file tmp,failed file)
+# 
+# returns 0 if all jobs succeeded otherwise 1 
+function verifyResults {
+  local task=$1
+  local iteration=$2
+  local jobDir=$3
+  local jobStart=$4
+  local jobEnd=$5
+  local writeToFailFile=$6
+  local failedPrefix=$7
+  local failedJobsTmpFile=$8
+  local failedJobsFile=$9
+
   local numFailedJobs=0
   local anyFailed="no"
 
   for Y in `seq $jobStart $jobEnd` ; do
-    checkSingleCHMTestTask "$jobDir" $Y
+    checkSingleTask "$task" "$jobDir" "$Y"
     if [ $? != 0 ] ; then
       anyFailed="yes"
       let numFailedJobs++
       if [ "$writeToFailFile" == "yes" ] ; then
-        echo "$Y" >> "$jobDir/$FAILED_JOBS_TMP_FILE"
+        echo "$Y" >> "$jobDir/$failedJobsTmpFile"
       fi
     fi
   done
- 
+
   local verifyExit=0
 
   if [ "$writeToFailFile" == "yes" ] ; then
-    if [ -e "$jobDir/$FAILED_JOBS_FILE" ] ; then
-      $MV_CMD "$jobDir/$FAILED_JOBS_FILE" $jobDir/${FAILED}.$(( $iteration - 1 )).${JOBS_SUFFIX}
+    if [ -e "$jobDir/$failedJobsFile" ] ; then
+      logMessage "Renaming $jobDir/$failedJobsFile to $jobDir/${failedPrefix}.$(( $iteration - 1 )).${JOBS_SUFFIX}"
+      $MV_CMD "$jobDir/$failedJobsFile" $jobDir/${failedPrefix}.$(( $iteration - 1 )).${JOBS_SUFFIX}
     fi
   fi
 
   # make sure we have a sorted unique list of failed jobs
   if [ "$anyFailed" == "yes" ] ; then
     verifyExit=1
+    logMessage "Found $numFailedJobs failed job(s)"
     if [ "$writeToFailFile" == "yes" ] ; then
-      logMessage "Creating $FAILED_JOBS_FILE file"
-      cat "$jobDir/$FAILED_JOBS_TMP_FILE" | sort -g | uniq > "$jobDir/$FAILED_JOBS_FILE"
-      $RM_CMD -f "$jobDir/$FAILED_JOBS_TMP_FILE"
+      logMessage "Creating $failedJobsFile file"
+      $CAT_CMD "$jobDir/$failedJobsTmpFile" | $SORT_CMD -g | $UNIQ_CMD > "$jobDir/$failedJobsFile"
+      $RM_CMD -f "$jobDir/$failedJobsTmpFile"
     fi
   fi
 
   NUM_FAILED_JOBS=$numFailedJobs
   return $verifyExit
-}
-
-#
-#
-#
-function getFatalExceptionFromSingleCHMTestTask {
-  # $1 - Job Directory
-  # $2 - Task Id
-
-  JOBDIR=$1
-  TASKID=$2
-
-  getSingleCHMTestTaskLogFile $JOBDIR $TASKID
-  if [ $? != 0 ] ; then
-    return 1
-  fi
-
-  FATAL_MESSAGE=""
-
-  grep "Caught Fatal Exception" $LOG_FILE > /dev/null 2>&1
-  if [ $? != 0 ] ; then
-     return 0
-  fi
-
-  FATAL_MESSAGE=`cat $LOG_FILE | grep "Caught Fatal Exception" | sed "s/^Caught Fatal Exception://"`
-
-  return 0
-}
-
-
-#
-# This function parses log file from single CHM job and outputs
-# its run time in seconds setting the variable RUNTIME_SECONDS
-#
-function getRunTimeOfSingleCHMTestTask {
-  # $1 - Job Directory
-  # $2 - Task Id
-  RUNTIME_SECONDS=-1
-
-  JOBDIR=$1
-  TASKID=$2
-
-  getSingleCHMTestTaskLogFile $JOBDIR $TASKID
-  if [ $? != 0 ] ; then
-    return 1
-  fi
-
-  grep "Running <<" $LOG_FILE > /dev/null 2>&1
-  if [ $? != 0 ] ; then
-     logWarning "Unable to parse runtime from $LOG_FILE for task $TASKID"
-     return 1
-  fi 
-  RUNTIME_SECONDS=`cat $LOG_FILE | grep "Running <<" | sed "s/^.*took //" | sed "s/\..*//"`
-  
-  return 0
 }
 
 #
@@ -435,8 +382,13 @@ function getFullPath {
 #
 function checkForKillFile {
   local jobDir=$1
-  local shouldExit=$2
+  local chummedList=$2
+  local shouldExit=$3
   local killFile="$jobDir/$KILL_JOB_REQUEST"
+
+  if [ -z "$chummedList" ] ; then
+    chummedList=$CHUMMEDLIST
+  fi
 
   # If kill file exists, chum it to remote clusters and
   # exit 
@@ -447,8 +399,8 @@ function checkForKillFile {
       logMessage "$killFile detected.  Chumming kill file to remote cluster(s)"
     fi
     
-    logMessage "Running $CHUMBINARY --path $killFile --cluster $CHUMMEDLIST > $jobDir/$KILLED_CHUM_OUT_FILE"
-    $CHUMBINARY --path $killFile --cluster $CHUMMEDLIST >> "$jobDir/$KILLED_CHUM_OUT_FILE"
+    logMessage "Running $CHUMBINARY --path $killFile --cluster $chummedList > $jobDir/$KILLED_CHUM_OUT_FILE"
+    $CHUMBINARY --path $killFile --cluster $chummedList >> "$jobDir/$KILLED_CHUM_OUT_FILE"
     if [ -z "$shouldExit" ] ; then
       exit 1
     fi
@@ -468,7 +420,7 @@ function moveOldClusterFolders {
   local returnValue=0
   
   if [ -n "$CHUMMEDLIST" ] ; then
-    for Y in `echo "$CHUMMEDLIST" | sed "s/,/\n/g"` ; do
+    for Y in `echo "$CHUMMEDLIST" | $SED_CMD "s/,/\n/g"` ; do
       if [ -d "$jobDir/$Y" ] ; then
         $MV_CMD -f "$jobDir/$Y" "$jobDir/${Y}.$iteration.${OLD_SUFFIX}"
         if [ $? != 0 ] ; then
@@ -480,41 +432,21 @@ function moveOldClusterFolders {
   return $returnValue
 }
 
-#
-# gets number of jobs in config by looking at #::: of the last line
-# of config file
-# getNumberOfCHMTestJobsFromConfig $jobDirectory
-#
-function getNumberOfCHMTestJobsFromConfig {
+function getNumberOfJobsFromConfig {
   local jobDir=$1
-  if [ ! -e "$jobDir/$RUN_CHM_CONFIG" ] ; then
+  local configFileName=$2
+  if [ ! -e "$jobDir/$configFileName" ] ; then
      return 1
   fi
-  local lastLine=`tail -n 1 $jobDir/$RUN_CHM_CONFIG`
-  
+  local lastLine=`tail -n 1 $jobDir/$configFileName`
+
   if [ -z "$lastLine" ] ; then
     return 2
   fi
 
-  NUMBER_JOBS=`echo "$lastLine" | sed "s/${CONFIG_DELIM}.*//"`
+  NUMBER_JOBS=`echo "$lastLine" | $SED_CMD "s/${CONFIG_DELIM}.*//"`
   return 0
 }
-
-#
-# Get input Image data directory
-#
-#
-function getInputDataDirectory {
-  if [ ! -e "$1/$RUN_CHM_CONFIG" ] ; then
-     logWarning "getInputDataDirectory - $1/$RUN_CHM_CONFIG not found"
-     return 1
-  fi
-
-  FIRST_INPUT_IMAGE=`head -n 1 $1/$RUN_CHM_CONFIG | sed "s/^.*${CONFIG_DELIM}//"`
-  INPUT_DATA=`dirname $FIRST_INPUT_IMAGE`
-  return 0
-}
-
 
 #     
 # Download data in path
@@ -523,52 +455,29 @@ function landData {
   local clusterList=$1   # $1 cluster list
   local thePath=$2       # $2 path
   local otherArgs=$3     # $3 other args to pass to land
-  local numRetries=$4
-  local retrySleep=$5
 
-  # bail if there are no clusters
-  if [ -z "$clusterList" ] ; then
-      logWarning "No clusters in cluster list"
-      return 1
-  fi
-
-  for y in `seq 0 $numRetries` ; do
-    $LANDBINARY --path $thePath --cluster $clusterList $otherArgs
-
-    if [ $? == 0 ] ; then
-      return 0
-    fi
-    logWarning "Download attempt # $(($y + 1)) of $(($numRetries+1)) of $thePath failed.  Sleeping $retrySleep seconds"
-    sleep $retrySleep
-  done
-  return 1
+  $LANDBINARY --path $thePath --cluster $clusterList $otherArgs
+  return $?
 }
 
 #
 # Upload data in path
 #
 function chumData {
- local clusterList=$1 # $1 cluster list
- local thePath=$2     # $2 path
- local chumOut=$3     # $3 chum out file
- local otherArgs=$4   # $4 other args to pass to chum
-
-  # bail if there are no clusters
-  if [ -z "$clusterList" ] ; then
-      logWarning "No clusters in cluster list"
-      return 1
-  fi
+  local clusterList=$1 # $1 cluster list
+  local thePath=$2     # $2 path
+  local chumOut=$3     # $3 chum out file
+  local otherArgs=$4   # $4 other args to pass to chum
 
   $CHUMBINARY --listchummed --path $thePath --cluster $clusterList $otherArgs > "$chumOut" 
  
   if [ $? != 0 ] ; then
-     
      logWarning "Chum of $thePath failed"
-     return 2
+     return 1
   fi
 
   # Update the CHUMMEDLIST with the clusters the job was uploaded too
-  CHUMMEDLIST=`cat $chumOut | egrep "^chummed.clusters" | sed "s/^chummed.clusters=//"`
+  CHUMMEDLIST=`$CAT_CMD $chumOut | egrep "^chummed.clusters" | $SED_CMD "s/^chummed.clusters=//"`
   
   return 0
 }
@@ -596,76 +505,7 @@ function getStatusOfJobsInCastOutFile {
       return 1
   fi
       
-  JOBSTATUS=`echo $OUT | egrep "^status=" | sed "s/^status=//" | tr \[:upper:\] \[:lower:\]`
-  return 0
-}
-
-#
-# This function creates a configuration file to run CHM on each tile of each
-# image.  It is assumed the images all have the same size and need every tile
-# processed.  The code will create an entry for every tile in this format:
-# JOBID:::<full path to input image ie /home/foo/histeq_1.png>
-# JOBID:::<chmOpts ie overlap> -t R,C 
-# JOBID:::<output image path relative to job directory ie out/histeq_1.png/RxC.png>
-#
-function createCHMTestConfig {
-  local imageDir=$1
-  local configFile=$2
-  local tilesW=$3
-  local tilesH=$4
-  local tilesPerJob=$5
-  local chmOpts=$6
-  local modelDir=$7
-  local imageSuffix=$8
-  local cntr=0
-  local outputFile=""
-
-  # Calculate the tile sets we will be using
-  local allTiles=() # simply a list of a tiles
-
-  for c in `seq 1 $tilesW`; do
-    for r in `seq 1 $tilesH`; do
-      allTiles[$cntr]="-t $c,$r"
-      let cntr++
-    done
-  done
-  
-  local tsCntr=0
-  # Batch tiles by $tilesPerJob into new array named $tileSets
-  let allTilesIndex=${#allTiles[@]}-1
- 
-  local tileSets=()
-  while [ $allTilesIndex -ge 0 ] ; do
-    for (( i=0 ; i < ${tilesPerJob} ; i++ )) ; do
-      if [ $allTilesIndex -lt 0 ] ; then
-        break
-      fi
-      tileSets[$tsCntr]="${tileSets[$tsCntr]} ${allTiles[$allTilesIndex]}"
-      let allTilesIndex--
-    done
-    let tsCntr++
-   
-  done
-
-  # Using tileSets array generate jobs for each image
-  # Each job consists of 3 config lines
-  # <JOBID>:::<Input image full path>
-  # <JOBID>:::<Model directory full path>
-  # <JOBID>:::<CHM options and tile flags from tileSets>
-  # <JOBID>:::<relative output path for image of format out/[image name]/[JOBID].[image suffix]
-  let cntr=1
-  for z in `find $imageDir -name "*.${imageSuffix}" -type f | sort -n` ; do
-    imageName=`echo $z | sed "s/^.*\///"`
-    for (( y=0 ; y < ${#tileSets[@]} ; y++ )) ; do
-      echo "${cntr}${CONFIG_DELIM}${z}" >> "$configFile"
-      echo "${cntr}${CONFIG_DELIM}${modelDir}" >> "$configFile"
-      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]}" >> "$configFile"
-      outputFile="${OUT_DIR_NAME}/${imageName}.${IMAGE_TILE_DIR_SUFFIX}/${cntr}.${imageSuffix}" >> "$configFile"
-      echo "${cntr}${CONFIG_DELIM}$outputFile" >> "$configFile"
-      let cntr++
-    done
-  done
-
+  JOBSTATUS=`echo $OUT | egrep "^status=" | $SED_CMD "s/^status=//" | tr \[:upper:\] \[:lower:\]`
   return 0
 }
 
@@ -708,11 +548,11 @@ function getImageDimensions {
      return 1
   fi
 
-  local identifyOutput=`identify -format '%wx%h' "${image}" 2>&1`
+  local identifyOutput=`$IDENTIFY_CMD -format '%wx%h' "${image}" 2>&1`
   # weird thing is in the unit tests identify never seems to kick back
   # a non zero exit code
   if [ $? -ne 0 ] ; then
-     logWarning "Unable to run identify on image ${image}"
+     logWarning "Unable to run $IDENTIFY_CMD on image ${image}"
      return 1
   fi
 
@@ -735,7 +575,7 @@ function getImageDimensionsFromDirOfImages {
     return 1
   fi
 
-  local anImage=`find $imageDir -name "*.${imageSuffix}" -type f | head -n 1` 
+  local anImage=`$FIND_CMD $imageDir -name "*.${imageSuffix}" -type f | head -n 1` 
 
   if [ ! -f "$anImage" ] ; then
     logWarning "No images found in $imageDir with suffix $imageSuffix"
@@ -745,68 +585,6 @@ function getImageDimensionsFromDirOfImages {
   getImageDimensions "$anImage"
   
   return $?
-}
-
-#
-# Given dimensions of an image along with tile size this function returns
-# the number of tiles in horizontal (TILES_W) and vertical (TILES_H) 
-# that are needed to cover the image
-#
-function calculateTilesFromImageDimensions {
-  local width=$1
-  local height=$2
-  local blockWidth=$3
-  local blockHeight=$4
-
-  if [ $width -le 0 ] ; then
-    logWarning "Width must be larger then 0"
-    return 1
-  fi
-
-  if [ $height -le 0 ] ; then
-    logWarning "Height must be larger then 0"
-    return 1
-  fi
-
-  if [ $blockWidth -le 0 ] ; then
-    logWarning "BlockWidth must be larger then 0"
-    return 1
-  fi  
-
-  if [ $blockHeight -le 0 ] ; then
-    logWarning "BlockHeight must be larger then 0"
-    return 1
-  fi
-
-  TILES_W=`echo "scale=0;($width + $blockWidth - 1)/ $blockWidth" | bc -l`
-  TILES_H=`echo "scale=0;($height + $blockHeight - 1)/ $blockHeight" | bc -l`
-  return 0
-}
-
-# 
-# Creates output directories based on list of input images
-# createImageOutputDirectories(output directory,image directory, image suffix)
-function createImageOutputDirectories {
-  local outDir=$1
-  local imageDir=$2
-  local imageSuffix=$3
-
-  if [ ! -d "$outDir" ] ; then
-     logWarning "Output directory $outDir is not a directory"
-     return 1
-  fi
-
-  if [ ! -d "$imageDir" ] ; then
-     logWarning "Image directory $imageDir is not a directory"
-     return 1
-  fi
-
-  for z in `find $imageDir -name "*.${imageSuffix}" -type f` ; do
-    imageName=`echo $z | sed "s/^.*\///"`
-    makeDirectory "$outDir/${imageName}.${IMAGE_TILE_DIR_SUFFIX}"
-  done
-
-  return 0
 }
 
 #
@@ -835,21 +613,23 @@ function waitForJobs {
   local iteration=$1
   local jobDir=$2
   local castOutFile=$3
+  local chummedList=$4
+  local landJobOpts=$5
+  local waitSleepTime=$6
 
   logStartTime "WaitForJobs in $castOutFile Iteration $iteration"
   local waitForJobsStartTime=$START_TIME
   local jobStatus="NA"
   local firstTime="yes"
-  DOWNLOAD_DATA_REQUEST="DOWNLOAD.DATA.REQUEST"
 
-  while [ "$jobStatus" != "done" ]
+  while [ "$jobStatus" != "$DONE_JOB_STATUS" ]
   do
 
-      checkForKillFile "$jobDir"
+      checkForKillFile "$jobDir" "$chummedList"
 
-      if [ "$firstTime" == "yes" ] ; then
-        logMessage "Iteration $iteration job status is $jobStatus.  Sleeping $WAIT_SLEEP_TIME seconds"
-        sleep $WAIT_SLEEP_TIME
+      if [ "$firstTime" == "no" ] ; then
+        logMessage "Iteration $iteration job status is $jobStatus.  Sleeping $waitSleepTime seconds"
+        sleep $waitSleepTime
       else
         firstTime="no"
       fi
@@ -857,7 +637,7 @@ function waitForJobs {
       if [ -e "$jobDir/$DOWNLOAD_DATA_REQUEST" ] ; then
           $RM_CMD -f "$jobDir/$DOWNLOAD_DATA_REQUEST"
           logMessage "$DOWNLOAD_DATA_REQUEST file found.  Performing download"
-          landData "$CHUMMEDLIST" "$jobDir" "$LAND_JOB_OPTS" "0" "0"
+          landData "$chummedList" "$jobDir" "$landJobOpts"
           $RM_CMD -f "$jobDir/$DOWNLOAD_DATA_REQUEST"
           logMessage "Removing $DOWNLOAD_DATA_REQUEST file"
       fi
@@ -908,13 +688,18 @@ function moveCastOutFile {
 # jobName - Name of job to give to job scheduler must start with [A-Z|a-z] and stay away from funny chars
 #           other then _
 #
-function castCHMTestJob {
-
-  local iteration=$1
+function castJob {
+  
+  local task=$1
   local jobDir=$2
   local jobStart=$3
   local jobEnd=$4
   local jobName=$5
+  local castOutFile=$6
+  local chummedList=$7
+  local batchAndWallTimeArgs=$8
+  local jobOutDirName=$9
+  
 
   local curdir=`pwd`
   cd $jobDir
@@ -925,11 +710,11 @@ function castCHMTestJob {
     taskArg="--taskfile $jobStart"
   fi
 
-  $CASTBINARY $taskArg -q $CHUMMEDLIST -N $jobName $BATCH_AND_WALLTIME_ARGS --writeoutputlocal -o $jobDir/${OUT_DIR_NAME}/${STD_OUT_DIR_NAME}/\$TASK_ID.${STD_OUT_SUFFIX} -e $jobDir/${OUT_DIR_NAME}/${STD_ERR_DIR_NAME}/\$TASK_ID.${STD_ERR_SUFFIX} $jobDir/${RUN_CHM_SH} > $jobDir/$CHM_TEST_CAST_OUT_FILE
+  $CASTBINARY $taskArg -q $chummedList -N $jobName $batchAndWallTimeArgs --writeoutputlocal -o $jobDir/$jobOutDirName/${STD_OUT_DIR_NAME}/\$TASK_ID.${STD_OUT_SUFFIX} -e $jobDir/$jobOutDirName/${STD_ERR_DIR_NAME}/\$TASK_ID.${STD_ERR_SUFFIX} $jobDir/$task > $jobDir/$castOutFile
 
   if [ $? != 0 ] ; then
       cd $curdir
-      logWarning "Error calling $CASTBINARY $taskArg -q $CHUMMEDLIST -N $jobName $BATCH_AND_WALLTIME_ARGS --writeoutputlocal -o $jobDir/${OUT_DIR_NAME}/${STD_OUT_DIR_NAME}/\$TASK_ID.${STD_OUT_SUFFIX} -e $jobDir/${OUT_DIR_NAME}/${STD_ERR_DIR_NAME}/\$TASK_ID.${STD_ERR_SUFFIX} $jobDir/${RUN_CHM_SH} > $jobDir/$CHM_TEST_CAST_OUT_FILE"
+      logWarning "Error calling $CASTBINARY $taskArg -q $chummedList -N $jobName $batchAndWallTimeArgs --writeoutputlocal -o $jobDir/$jobOutDirName/${STD_OUT_DIR_NAME}/\$TASK_ID.${STD_OUT_SUFFIX} -e $jobDir/$jobOutDirName/${STD_ERR_DIR_NAME}/\$TASK_ID.${STD_ERR_SUFFIX} $jobDir/$task > $jobDir/$castOutFile"
       return 2
   fi
 
@@ -939,41 +724,6 @@ function castCHMTestJob {
   # Your job-array 144.5-11:1 ("line") has been submitted
 
   cd $curdir
-  return 0
-}
-
-#
-# upload Model, Image and Job data via Panfish
-#
-function chumModelImageAndJobData {
-  local iteration=$1
-  local jobDir=$2
-  local imageDir=$3
-  local modelDir=$4
-
-
-  # Upload model data
-  chumData "$CHUMMEDLIST" "$modelDir" "$jobDir/$CHUM_MODEL_OUT_FILE" "$CHUM_MODEL_OPTS"
-  if [ $? != 0 ] ; then
-    logWarning "Unable to upload input model directory"
-    return 1
-  fi
-
-  # Upload input image data
-  chumData "$CHUMMEDLIST" "$imageDir" "$jobDir/$CHUM_IMAGE_OUT_FILE" "$CHUM_IMAGE_OPTS"
-  if [ $? != 0 ] ; then
-    logWarning "Unable to upload input image directory"
-    return 2
-  fi
-
-  # Upload job directory
-  chumData "$CHUMMEDLIST" "$jobDir" "$jobDir/$CHUM_OUT_FILE" "$CHUM_JOB_OPTS"
-
-  if [ $? != 0 ] ; then
-    logWarning "Unable to upload job directory"
-    return 3
-  fi
-
   return 0
 }
 
@@ -1003,100 +753,130 @@ function moveOldDataForNewIteration {
   return $returnValue
 }
 
-#
-#
-#
-function waitForDownloadAndVerifyCHMTestJobs {
-  local iteration=$1
-  local jobDir=$2
-  local jobEnd=$3
-  local castOutFile=$4
-    
+
+function waitForDownloadAndVerifyJobs {
+  local task=$1
+  local iteration=$2
+  local jobDir=$3
+  local jobEnd=$4
+  local castOutFile=$5
+  local chummedList=$6
+  local landJobOpts=$7
+  local waitSleepTime=$8
+  local failedPrefix=$9
+  shift  # using shift cause only 1st 9 vars are accesible via $#
+  local failedJobsTmpFile=$9
+  shift
+  local failedJobsFile=$9
+
   # Wait for jobs to complete
-  waitForJobs $iteration "$jobDir" "$castOutFile"
+  waitForJobs $iteration "$jobDir" "$castOutFile" "$chummedList" "$landJobOpts" "$waitSleepTime"
 
   if [ $? -eq 1 ] ; then
     logMessage "While checking if any jobs exist, it appears no $castOutFile exists."
   fi
-  
+ 
   # Download completed job results
-  landData  "$CHUMMEDLIST" "$jobDir" "$LAND_JOB_OPTS" "2" "$RETRY_SLEEP"
+  landData  "$chummedList" "$jobDir" "$landJobOpts"
 
   if [ $? != 0 ] ; then
     logWarning "Unable to download data.  Will continue on with checking results just in case."
   fi
 
-  checkForKillFile "$jobDir"
+  checkForKillFile "$jobDir" "$chummedList"
 
   # Verify Results
-  verifyCHMTestResults $iteration "$jobDir" "1" "$jobEnd" "yes"
+  verifyResults "$task" "$iteration" "$jobDir" "1" "$jobEnd" "yes" "$failedPrefix" "$failedJobsTmpFile" "$failedJobsFile"
   return $?
 }
-
 
 #
 # run jobs up to value specified with multiple retries built in
 #
-# runCHMTestJobs(jobDir,jobs,jobnName)
+# runJobs(jobDir,jobs,jobnName)
 #
-function runCHMTestJobs {
+function runJobs {
 
-  local iteration=$1
-  local jobDir=$2
-  local imageDir=$3
-  local modelDir=$4
-  local jobEnd=$5
-  local jobName=$6
+  local task=$1
+  local iteration=$2
+  local jobDir=$3
+  local jobEnd=$4
+  local jobName=$5
+  local castOutFile=$6
+  local chummedList=$7
+  local landJobOpts=$8
+  local failedPrefix=$9
+  shift  # using shift cause only 1st 9 vars are accesible via $#
+  local failedJobsTmpFile=$9
+  shift  
+  local failedJobsFile=$9
+  shift
+  local maxIterationRetries=$9
+  shift
+  local iterationSleep=$9
+  shift
+  local iterationFile=$9
+  shift
+  local waitSleep=$9
+  shift
+  local batchAndWallTimeArgs=$9
+  shift
+  local jobOutDirName=$9
 
   local altJobStart=""
-  logStartTime "RunCHMTestJobs"
+
+  logStartTime "$task"
   local runJobsStartTime=$START_TIME
 
   local runJobsExit=1
 
+  logMessage "Checking for already running jobs and previously completed jobs" 
   # Check if jobs have already completed successfully
-  waitForDownloadAndVerifyCHMTestJobs "$iteration" "$jobDir" "$jobEnd" "$CHM_TEST_CAST_OUT_FILE"
+  waitForDownloadAndVerifyJobs "$task" "$iteration" "$jobDir" "$jobEnd" "$castOutFile" "$chummedList" "$landJobOpts" "$waitSleep" "$failedPrefix" "$failedJobsTmpFile" "$failedJobsFile"
   if [ $? == 0 ] ; then
-     logEndTime "RunCHMTestJobs" $runJobsStartTime 0
+     logEndTime "$task" $runJobsStartTime 0
      return 0
   fi
 
-  local altJobStart="$jobDir/${FAILED_JOBS_FILE}"
+  local altJobStart="$jobDir/$failedJobsFile"
 
   # take whatever iteration we are starting with and add max # of retries
-  local maxRetries=$MAX_RETRIES
+  local maxRetries=$maxIterationRetries
   let maxRetries=$maxRetries+$iteration
 
   while [ $iteration -le $maxRetries ]
   do
     # dump the current iteration to a file
-    echo "$iteration" > "$jobDir/$CHM_TEST_ITERATION_FILE"
+    echo "$iteration" > "$jobDir/$iterationFile"
 
     if [ $iteration -gt 1 ] ; then
       # Move old panfish job folders out of way
-      moveOldDataForNewIteration "$iteration" "$jobDir" "$CHM_TEST_CAST_OUT_FILE"
-      logMessage "Iteration $iteration.  Jobs failed in previous iteration. sleeping $RETRY_SLEEP seconds before trying again"
-      sleep $RETRY_SLEEP
+      moveOldDataForNewIteration "$iteration" "$jobDir" "$castOutFile"
+      logMessage "Iteration $iteration.  Jobs failed in previous iteration. sleeping $iterationSleep seconds before trying again"
+      sleep $iterationSleep
     fi
 
-    checkForKillFile "$jobDir"
+    checkForKillFile "$jobDir" "$chummedList"
 
+    logMessage "Uploading data for $task job(s)"
     # Upload data to clusters
-    chumModelImageAndJobData "$iteration" "$jobDir" "$imageDir" "$modelDir"
+    chumJobData "$task" "$iteration" "$jobDir"
     if [ $? != 0 ] ; then
-      jobFailed "Unable to upload job data"
+      logWarning "Unable to upload data for $task job(s)"
+      return 10
     fi 
 
-    checkForKillFile "$jobDir"
+    checkForKillFile "$jobDir" "$chummedList"
 
     # Submit job via Panfish
-    castCHMTestJob $iteration "$jobDir" "$altJobStart" "1" "$jobName"
+    castJob "$task" "$jobDir" "$altJobStart" "1" "$jobName" "$castOutFile" "$chummedList" "$batchAndWallTimeArgs" "$jobOutDirName"
 
     if [ $? != 0 ] ; then
-      jobFailed "Unable to submit jobs"
+      logWarning "Unable to submit jobs"
+      return 11
     fi
 
-    waitForDownloadAndVerifyCHMTestJobs "$iteration" "$jobDir" "$jobEnd" "$CHM_TEST_CAST_OUT_FILE"
+    waitForDownloadAndVerifyJobs "$task" "$iteration" "$jobDir" "$jobEnd" "$castOutFile" "$chummedList" "$landJobOpts" "$waitSleep" "$failedPrefix" "$failedJobsTmpFile" "$failedJobsFile"
     if [ $? == 0 ] ; then
       runJobsExit=0
       break
@@ -1111,7 +891,7 @@ function runCHMTestJobs {
     logWarning "Error running jobs...."
   fi
 
-  logEndTime "RunCHMTestJobs" $runJobsStartTime $runJobsExit
+  logEndTime "$task" $runJobsStartTime $runJobsExit
 
   return $runJobsExit
 }
@@ -1142,47 +922,26 @@ function getParameterForTaskFromConfig {
     return 2
   fi
 
-  TASK_CONFIG_PARAM=`echo "$linesOfInterest" | head -n $lineToParse | tail -n 1 | sed "s/^.*${CONFIG_DELIM}//"`
+  TASK_CONFIG_PARAM=`echo "$linesOfInterest" | head -n $lineToParse | tail -n 1 | $SED_CMD "s/^.*${CONFIG_DELIM}//"`
 
   return 0
 }
 
+# 
+# getNextIteration
 #
-# Given a task id this function gets job parameters set as
-# the following variables
-# INPUT_IMAGE
-# MODEL_DIR
-# CHM_OPTS
-# OUTPUT_IMAGE
-# If the config file does not exist or there was a problem parsing
-# function returns with non zero exit code
-#
-function getCHMTestJobParametersForTaskFromConfig {
-  local taskId=$1
-  local jobDir=$2
-
-  getParameterForTaskFromConfig "$taskId" "1" "$jobDir/$RUN_CHM_CONFIG"
-  if [ $? != 0 ] ; then
-    return 1
-  fi 
-  INPUT_IMAGE=$TASK_CONFIG_PARAM
-
-  getParameterForTaskFromConfig "$taskId" "2" "$jobDir/$RUN_CHM_CONFIG"
-  if [ $? != 0 ] ; then
-    return 2
-  fi 
-  MODEL_DIR=$TASK_CONFIG_PARAM
-
-  getParameterForTaskFromConfig "$taskId" "3" "$jobDir/$RUN_CHM_CONFIG"
-  if [ $? != 0 ] ; then
-    return 3
+function getNextIteration {
+  local jobDir=$1
+  local iterationFileName=$2
+  NEXT_ITERATION=1
+  if [ -s "$jobDir/$iterationFileName" ] ; then
+    iteration=`$CAT_CMD $jobDir/$iterationFileName`
+    let iteration++
+    if [ $? != 0 ] ; then
+      return 2
+    fi
+    NEXT_ITERATION=$iteration
+    return 0
   fi
-  CHM_OPTS=$TASK_CONFIG_PARAM
-
-  getParameterForTaskFromConfig "$taskId" "4" "$jobDir/$RUN_CHM_CONFIG"
-  if [ $? != 0 ] ; then
-    return 4
-  fi
-  OUTPUT_IMAGE=$TASK_CONFIG_PARAM
-  return 0
+  return 1
 }

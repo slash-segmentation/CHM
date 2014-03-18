@@ -1,6 +1,68 @@
 #!/bin/bash
 
 
+
+###########################################################
+#
+# Functions
+#
+###########################################################
+
+#
+# Given a task id this function gets job parameters set as
+# the following variables
+# INPUT_IMAGE
+# MODEL_DIR
+# CHM_OPTS
+# OUTPUT_IMAGE
+# If the config file does not exist or there was a problem parsing
+# function returns with non zero exit code
+#
+function getCHMTestJobParametersForTaskFromConfig {
+  local jobDir=$1
+  local taskId=$2
+
+  getParameterForTaskFromConfig "$taskId" "1" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 1
+  fi
+  INPUT_IMAGE=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "2" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 2
+  fi
+  MODEL_DIR=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "3" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 3
+  fi
+  CHM_OPTS=$TASK_CONFIG_PARAM
+
+  getParameterForTaskFromConfig "$taskId" "4" "$jobDir/$RUN_CHM_CONFIG"
+  if [ $? != 0 ] ; then
+    return 4
+  fi
+  OUTPUT_IMAGE=$TASK_CONFIG_PARAM
+  return 0
+}
+
+###########################################################
+#
+# Start of script
+#
+###########################################################
+
+# Check if caller just wants to source this file for testing purposes
+if [ $# -eq 1 ] ; then
+  if [ "$1" == "source" ] ; then
+    return 0
+  fi
+fi
+
+
+
 # Look for the helper functions file and bail if not found
 SCRIPT_DIR=`dirname $0`
 if [ ! -s "$SCRIPT_DIR/.helperfuncs.sh" ] ; then
@@ -13,14 +75,6 @@ fi
 
 # Parse the properties file
 parseProperties "$SCRIPT_DIR" "$SCRIPT_DIR"
-
-
-###########################################################
-#
-# Functions
-#
-###########################################################
-
 
 function usage {
   echo "This script runs CHM on a slice/image of data.
@@ -37,13 +91,6 @@ code upon success otherwise failure.
    
   exit 1
 }
-
-
-###########################################################
-#
-# Start of script
-#
-###########################################################
 
 # Dont allow job to run if SGE_TASK_ID is NOT set
 if [ -z "$SGE_TASK_ID" ] ; then
@@ -70,15 +117,15 @@ if [ -n "$PANFISH_SCRATCH" ] ; then
 fi
 
 
-getCHMTestJobParametersForTaskFromConfig "${SGE_TASK_ID}" "$SCRIPT_DIR"
+getCHMTestJobParametersForTaskFromConfig "$SCRIPT_DIR" "${SGE_TASK_ID}"
 if [ $? != 0 ] ; then
   logEndTime "$RUN_CHM_SH" $runChmStartTime 1
   exit 1
 fi
 
-makeDirectory "$scratchDir"
 
 # Parse the config for job parameters
+
 declare -r inputImage="$PANFISH_BASEDIR/$INPUT_IMAGE"
 declare -r inputImageName=`echo $inputImage | sed "s/^.*\///"`
 declare -r modelDir="$PANFISH_BASEDIR/$MODEL_DIR"
@@ -87,6 +134,8 @@ declare -r finalImage="$SCRIPT_DIR/$OUTPUT_IMAGE"
 
 declare compiledMatlabFlag=""
 
+
+makeDirectory "$scratchDir"
 
 # Set environment variables if we are NOT using compiled matlab
 # we make this determination by looking for CHM_TEST_BLOCKS_BINARY
