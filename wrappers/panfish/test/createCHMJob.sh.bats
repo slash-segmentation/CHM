@@ -31,9 +31,11 @@ teardown(){
 #
 #
 @test "createMergeTilesConfig() tests" {
-  skip "need to fix"
-  # source helperfuncs.sh to we can call the function
+  # source helperfuncs.sh 
   . $HELPERFUNCS
+
+  # source the script so we can call the function
+  . $CREATECHM source
 
   # test no directory
   run createMergeTilesConfig "$THE_TMP/doesnotexist"
