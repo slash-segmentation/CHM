@@ -39,9 +39,11 @@ declare -r DONE_JOB_STATUS="done"
 
 # Merge tiles defines
 declare -r RUN_MERGE_TILES_SH="runMergeTiles.sh"
+declare -r RUN_MERGE_TILES_VIA_PANFISH_SH="runMergeTilesViaPanfish.sh"
 declare -r RUN_MERGE_TILES_CONFIG="runMergeTiles.sh.config"
 declare -r MERGE_TILES_OUT_DIR_NAME="runMergeTilesOut"
 declare -r MERGED_IMAGES_OUT_DIR_NAME="mergedimages"
+declare -r MERGE_TILES_CHUM_OUT="merge.tiles.chum.out"
 declare -r MERGE_TILES_CAST_OUT_FILE="merge.tiles.cast.out"
 declare -r MERGE_TILES_ITERATION_FILE="merge.tiles.iteration"
 declare -r MERGE_TILES_FAILED_PREFIX="failed.merge.tiles"
@@ -205,29 +207,6 @@ function getSingleMergeTilesStdOutFile {
 
   MERGE_TILES_STD_OUT_FILE="$jobDir/$MERGE_TILES_OUT_DIR_NAME/$STD_OUT_DIR_NAME/${taskId}.${STD_OUT_SUFFIX}"
   return 0
-}
-
-#
-# Checks a given task to see if it ran successfully
-# checkSingleTask(task ie runCHM.sh or runMergeTiles.sh,jobDir,taskId)
-# NEEDS TO BE IMPLEMENTED ELSEWHERE
-#
-function checkSingleTask {
-  
-  logWarning "checkSingleTask Not implemented..."
-  return 10
-}
-
-
-#
-# Uploads data to remote clusters
-# chumJobData(task ie runCHM.sh or runMergeTiles.sh,jobDir,taskId)
-# NEEDS TO BE IMPLEMENTED ELSEWHERE
-#
-function chumJobData {
-  
-  logWarning "chumJobData Not implemented..."
-  return 10
 }
 
 #
@@ -679,7 +658,7 @@ function moveCastOutFile {
 #    
 # Submit job(s) via Panfish
 # 
-# castCHMTestJob(iteration,jobDir,jobStart,jobEnd,jobName)
+# castJob(iteration,jobDir,jobStart,jobEnd,jobName)
 # 
 # iteration - numeric value denoting iteration ie 1 or 2 ...
 # jobDir - directory containing job
