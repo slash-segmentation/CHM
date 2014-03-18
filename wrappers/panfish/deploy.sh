@@ -101,7 +101,7 @@ fi
 
 if [ "$DEPLOY_ENV" == "prod" ] ; then
    HOST="tomcat@cylume.camera.calit2.net"
-   DEPLOY_BASE_DIR="/home/validation/camera/release/bin"
+   DEPLOY_BASE_DIR="/home/validation/camera/release/ncmir/bin"
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
 
