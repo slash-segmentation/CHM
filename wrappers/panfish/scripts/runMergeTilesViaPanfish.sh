@@ -33,14 +33,27 @@ Optional Arguments:
 #
 #######################################################################
 
+#
+# Chums data to remote clusters
+#
+function chumJobData {
+  local task=$1
+  local iteration=$2
+  local jobDir=$3
+ 
+  chumData "$MERGE_TILES_CHUMMEDLIST" "$jobDir" "$MERGE_TILES_CHUM_OUT" "$CHUM_MERGE_TILES_OPTS"
+  return $?
+
+}
 
 #
 # Checks that a single Merge Tiles task ran successfully by verifying
 # an output image was created and std out file has size greater then 0
 #
-function checkSingleMergeTilesTask {
-  local jobDir=$1
-  local taskId=$2
+function checkSingleTask {
+  local task=$1
+  local jobDir=$2
+  local taskId=$3
 
   getSingleMergeTilesStdOutFile "$jobDir" "$taskId"
 
@@ -64,55 +77,6 @@ function checkSingleMergeTilesTask {
   return 0
 }
 
-# 
-# Creates merge tiles configuration file
-# 
-# createMergeTilesConfig(jobdir)
-#
-# Code examines the output directory of chm looking for all
-# directories with tiles suffix, generating a job for each
-# directory and setting output file name to be the tiles suffix 
-# directory minus the tiles suffix.
-# Code will also remove any preexisting config file and error out
-# with return code of 1 if there is a problem removing the config
-# file.
-# Format of output
-# #:::<full path to tile directory for a given image>
-# #:::<full path where output image should be written>
-#
-function createMergeTilesConfig {
-  local jobDir=$1
-
-  local outConfig="${jobDir}/$RUN_MERGE_TILES_CONFIG"
-  local cntr=1
-
-  # bail if the job directory does not exist
-  if [ ! -d "$jobDir" ] ; then
-    return 1
-  fi
-
-  # remove the config if it exists already
-  if [ -e "$outConfig" ] ; then
-    $RM_CMD -f "$outConfig"
-    if [ $? != 0 ] ; then
-      return 2
-    fi
-  fi
-
-  # another is to look in runchmout (OUT_DIR_NAME) directory and for every <IMAGE>.tiles dir make a
-  # job and set output to be <IMAGE> in destination runmergetilesout folder
-  for y in `find "$jobDir/${OUT_DIR_NAME}" -maxdepth 1 -name "*.${IMAGE_TILE_DIR_SUFFIX}" -type d | sort -g` ; do
-    outImage=`echo $y | sed "s/^.*\///" | sed "s/\.${IMAGE_TILE_DIR_SUFFIX}//"`
-    echo "${cntr}${CONFIG_DELIM}${y}" >> "$outConfig"
-    echo "${cntr}${CONFIG_DELIM}$MERGE_TILES_OUT_DIR_NAME/$MERGED_IMAGES_OUT_DIR_NAME/${outImage}" >> "$outConfig"
-    let cntr++
-  done
-
-  return 0
-}
-
-
-
 #
 # function called when USR2 signal is caught
 #
@@ -132,12 +96,22 @@ trap 'on_usr2' USR2
 #
 ###########################################################
 
+# Check if caller just wants to source this file for testing purposes
+if [ $# -eq 1 ] ; then
+  if [ "$1" == "source" ] ; then
+    return 0
+  fi
+fi
+
+
+
 declare CHECK_MODE="false"
 declare DOWNLOAD_MODE="false"
 declare UPLOAD_MODE="false"
 declare STATUS_MODE="false"
 
-declare CHM_JOB_NAME="mergetiles_job"
+declare MERGE_TILES_JOB_NAME="mergetiles_job"
+
 # get the directory where the script resides
 declare SCRIPT_DIR=`dirname $0`
 
@@ -147,7 +121,7 @@ while getopts ":CDSUhn:" o; do
       usage
       ;;
     n)
-      CHM_JOB_NAME="${OPTARG}"
+      MERGE_TILES_JOB_NAME="${OPTARG}"
       ;;
     C)
       CHECK_MODE="true"
@@ -228,7 +202,7 @@ fi
 #######################################################################
 if [ "$CHECK_MODE" == "true" ] ; then
   logMessage "Checking results..."
-  verifyMergeTilesResults "1" "$OUTPUT_DIR" "1" "${NUMBER_JOBS}"
+  verifyResults "$RUN_CHM_SH" "1" "$OUTPUT_DIR" "1" "${NUMBER_JOBS}" "no" "$MERGE_TILES_FAILED_PREFIX" "$MERGE_TILES_TMP_FILE" "$MERGE_TILES_FAILED_FILE"
   if [ $? != 0 ] ; then
      logMessage "$NUM_FAILED_JOBS out of ${NUMBER_JOBS} job(s) failed."
      logEndTime "Merge Tiles" $modeStartTime 1
@@ -246,7 +220,7 @@ fi
 #######################################################################
 if [ "$DOWNLOAD_MODE" == "true" ] ; then
   logMessage "Downloading/Landing data..."
-  landData "$CHUMMEDLIST" "$OUTPUT_DIR" "$LAND_MERGE_TILES_OPTS" "0" "0"
+  landData "$MERGE_TILES_CHUMMEDLIST" "$OUTPUT_DIR" "$LAND_MERGE_TILES_OPTS" "0" "0"
   if [ $? != 0 ] ; then
      logWarning "Unable to retreive data"
      logEndTime "Merge Tiles" $modeStartTime 1
@@ -266,7 +240,7 @@ logEcho ""
 #######################################################################
 if [ "$UPLOAD_MODE" == "true" ] ; then
   logMessage "Uploading/Chumming data..."
-  chumMergeTilesData "1" "$OUTPUT_DIR"
+  chumJobData "$RUN_MERGE_TILES_SH" "1" "$OUTPUT_DIR"
   if [ $? != 0 ] ; then
      logWarning "Unable to upload data"
      logEndTime "Merge Tiles" $modeStartTime 1
@@ -289,7 +263,7 @@ if [ $? == 0 ] ; then
 fi
 
 # Chum, submit, and wait for jobs to complete
-runMergeTilesJobs "$iteration" "$OUTPUT_DIR" "${NUMBER_JOBS}" "$CHM_JOB_NAME"
+runJobs "$RUN_MERGE_TILES_SH" "$iteration" "$OUTPUT_DIR" "${NUMBER_JOBS}" "$MERGE_TILES_JOB_NAME" "$MERGE_TILES_CAST_OUT_FILE" "$MERGE_TILES_CHUMMEDLIST" "$LAND_MERGE_TILES_OPTS" "$MERGE_TILES_FAILED_PREFIX" "$MERGE_TILES_TMP_FILE" "$MERGE_TILES_FAILED_FILE" "$MAX_RETRIES" "$WAIT_SLEEP_TIME" "$MERGE_TILES_ITERATION_FILE" "$RETRY_SLEEP" "$MERGE_TILES_BATCH_AND_WALLTIME_ARGS" "$MERGE_TILES_OUT_DIR_NAME"
 
 runJobsExit=$?
 if [ "$runJobsExit" != 0 ] ; then
