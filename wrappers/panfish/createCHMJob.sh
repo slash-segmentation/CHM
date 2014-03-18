@@ -70,6 +70,56 @@ function createMergeTilesOutputDirectories {
 }
 
 # 
+# Creates merge tiles configuration file
+# 
+# createMergeTilesConfig(jobdir)
+#
+# Code examines the output directory of chm looking for all
+# directories with tiles suffix, generating a job for each
+# directory and setting output file name to be the tiles suffix 
+# directory minus the tiles suffix.
+# Code will also remove any preexisting config file and error out
+# with return code of 1 if there is a problem removing the config
+# file.
+# Format of output
+# #:::<full path to tile directory for a given image>
+# #:::<full path where output image should be written>
+#
+function createMergeTilesConfig {
+  local jobDir=$1
+
+  local outConfig="${jobDir}/$RUN_MERGE_TILES_CONFIG"
+  local cntr=1
+
+  # bail if the job directory does not exist
+  if [ ! -d "$jobDir" ] ; then
+    return 1
+  fi
+
+  # remove the config if it exists already
+  if [ -e "$outConfig" ] ; then
+    $RM_CMD -f "$outConfig"
+    if [ $? != 0 ] ; then
+      return 2
+    fi
+  fi
+
+  # another is to look in runchmout (OUT_DIR_NAME) directory and for every <IMAGE>.tiles dir make a
+  # job and set output to be <IMAGE> in destination runmergetilesout folder
+  for y in `find "$jobDir/${OUT_DIR_NAME}" -maxdepth 1 -name "*.${IMAGE_TILE_DIR_SUFFIX}" -type d | sort -g` ; do
+    outImage=`echo $y | sed "s/^.*\///" | sed "s/\.${IMAGE_TILE_DIR_SUFFIX}//"`
+    echo "${cntr}${CONFIG_DELIM}${y}" >> "$outConfig"
+    echo "${cntr}${CONFIG_DELIM}$MERGE_TILES_OUT_DIR_NAME/$MERGED_IMAGES_OUT_DIR_NAME/${outImage}" >> "$outConfig"
+    let cntr++
+  done
+
+  return 0
+}
+
+
+
+
+# 
 # Creates output directories based on list of input images
 # createImageOutputDirectories(output directory,image directory, image suffix)
 function createImageOutputDirectories {
@@ -239,6 +289,14 @@ function runCreatePreTrainedMode {
   if [ $? != 0 ] ; then
     jobFailed "Error running /bin/cp \"$outputDir/$RUN_MERGE_TILES_SH\" \"$outputDir/.\""
   fi
+
+  # Copy over runMergeTilesViaPanfish.sh script
+  /bin/cp "$SCRIPTS_SUBDIR/$RUN_MERGE_TILES_VIA_PANFISH_SH" "$outputDir/."
+
+  if [ $? != 0 ] ; then
+    jobFailed "Error running /bin/cp \"$outputDir/$RUN_MERGE_TILES_VIA_PANFISH_SH\" \"$outputDir/.\""
+  fi
+
 
   # Copy the helperfuncs.sh
   /bin/cp "$SCRIPTS_SUBDIR/$HELPER_FUNCS_SH" "$outputDir/."
