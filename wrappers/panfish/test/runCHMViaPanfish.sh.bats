@@ -3,14 +3,14 @@
 setup() {
 
   export THE_TMP="${BATS_TMPDIR}/runCHMJobViaPanfish" 1>&2
-  /bin/mkdir -p "$THE_TMP/panfish" 1>&2
+  /bin/mkdir -p $THE_TMP 1>&2 
   /bin/cp ${BATS_TEST_DIRNAME}/../scripts/.helperfuncs.sh "$THE_TMP/." 1>&2
   /bin/cp ${BATS_TEST_DIRNAME}/../scripts/runCHMViaPanfish.sh "$THE_TMP/." 1>&2
 
   export RUNCHM_VIA_PANFISH="$THE_TMP/runCHMViaPanfish.sh"
   chmod a+x $RUNCHM_VIA_PANFISH
   unset SGE_TASK_ID
-  /bin/cp -a "${BATS_TEST_DIRNAME}/bin/panfish" "${THE_TMP}/panfish/."
+  /bin/cp -a  "${BATS_TEST_DIRNAME}/bin/panfish" "${THE_TMP}/." 1>&2
   export HELPERFUNCS="$THE_TMP/.helperfuncs.sh" 
   export FAKEHELPERFUNCS="$THE_TMP/fakehelperfuncs"
   # Make fake base helperfuncs used by some tests
@@ -151,49 +151,58 @@ teardown(){
 #
 # chumModelImageAndJobData() tests
 #
-@test "chumModelImageAndJobData() tests" {
-  skip "need to fix"
+@test "chumJobData() tests" {
+  
   # source helperfuncs.sh to we can call the function
   . $HELPERFUNCS
+  . $RUNCHM_VIA_PANFISH source
 
-  /bin/cp -a "$PANFISH_TEST_BIN" "$THE_TMP/panfish" 1>&2
   export CHUMMEDLIST="foo.q"
 
   export CHUMBINARY="$THE_TMP/panfish/panfishchum"
 
-
-  # Test where chum of model data fails
-  echo "1,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
-  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  # Test where there is an error parsing image dir from config
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP/model failed" ]
-  [ "${lines[1]}" == "WARNING:    Unable to upload input model directory" ]
-
-
-  # Test where upload input image data fails
-  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
-  echo "1,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
-  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  
+  # Test where there is an error parsing model dir from config
+  echo "1${CONFIG_DELIM}/blah/dir/1.png" > "$THE_TMP/$RUN_CHM_CONFIG"
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
+  echo "status is $status and $output" 1>&2
   [ "$status" -eq 2 ]
-  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP/image failed" ]
-  [ "${lines[1]}" == "WARNING:    Unable to upload input image directory" ]
 
-  # Test where upload Job directory fails
-  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
-  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
-  echo "1,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
-  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+
+  # Test where upload of model fails
+  echo "1,,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1${CONFIG_DELIM}${THE_TMP}" >> "$THE_TMP/$RUN_CHM_CONFIG"
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
   [ "$status" -eq 3 ]
-  [ "${lines[0]}" == "WARNING:    Chum of $THE_TMP failed" ]
-  [ "${lines[1]}" == "WARNING:    Unable to upload job directory" ]
+  
+
+  # Test where upload of image data fails
+  echo "0,,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1,,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
+  echo "$output and $status" 1>&2
+  [ "$status" -eq 4 ]
+
+  # Test where upload of job directory fails
+  echo "0,,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "1,,," >> "$THE_TMP/panfish/panfishchum.tasks"
+
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
+  [ "$status" -eq 5 ]
 
 
-  # Test successful run
-  echo "0,chummed.clusters=foo.q,," > "$THE_TMP/panfish/panfishchum.tasks"
-  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
-  echo "0,chummed.clusters=foo.q,," >> "$THE_TMP/panfish/panfishchum.tasks"
-  run chumModelImageAndJobData "$iteration" "$THE_TMP" "$THE_TMP/image" "$THE_TMP/model"
+  # Test successful
+  echo "0,,," > "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  echo "0,,," >> "$THE_TMP/panfish/panfishchum.tasks"
+  run chumJobData "runCHM.sh" "1" "$THE_TMP"
   [ "$status" -eq 0 ]
+
+
 }
 
 #
@@ -276,41 +285,56 @@ teardown(){
 # Unable to get parameters from first job
 #
 @test "Unable to get parameters from first job" {
-
-  echo "panfish.bin.dir=$THE_TMP/panfish" > "$THE_TMP/panfishCHM.properties"
+  
+  echo "panfish.bin.dir=$THE_TMP/panfish/" > "$THE_TMP/panfishCHM.properties"
   echo "matlab.dir=$THE_TMP" >> "$THE_TMP/panfishCHM.properties"
-  echo "1:::a" > "$THE_TMP/runCHM.sh.config"
-  ls -la "$THE_TMP" 1>&2
   run $RUNCHM_VIA_PANFISH
   [ "$status" -eq 1 ]
   echo "$output" 1>&2
-  [ "${lines[1]}" == "ERROR:    Error parsing the first job from config" ]
-
-
-
+  [ "${lines[1]}" == "ERROR:    Error obtaining number of jobs from runCHM.sh.config file" ]
 }
 
 
 #
-# full run failure no iteration file
+# full run failure
 #
-@test "fullrun failure no iteration file" {
-
+@test "fullrun failure" {
+  
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
   
   /bin/mv "$FAKEHELPERFUNCS" "$THE_TMP/.helperfuncs.sh" 1>&2
 
+
+  
   # make a fake helperfuncs file to test main script
-  echo "CHM_TEST_ITERATION_FILE=\"chm.test.iteration\"
+  echo "
   function getFullPath {
-  GETFULLPATHRET=$THE_TMP
+  GETFULLPATHRET=\$THE_TMP
   return 0 
   }
   function parseProperties {
-   MATLAB_DIR=$THE_TMP
+   RUN_CHM_SH=run
+   OUTPUT_DIR=out
+   CHM_TEST_ITERATION_FILE=iteration
+   CHM_TEST_CAST_OUT_FILE=cast
+   CHUMMEDLIST=chum.q
+   LAND_JOB_OPTS=landopts
+   FAILED=failed
+   FAILED_JOBS_TMP_FILE=failedtmp
+   FAILED_JOBS_FILE=failedjobs
+   MAX_RETRIES=3
+   WAIT_TIME_SLEEP=0
+   RETRY_SLEEP=4
+   BATCH_AND_WALLTIME_ARGS=batch
+   OUT_DIR_NAME=ha
+   MATLAB_DIR=\$THE_TMP
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
+    return 0
+  }
+  function getNextIteration {
+    NEXT_ITERATION=1
     return 0
   }
   function getCHMTestJobParametersForTaskFromConfig {
@@ -318,9 +342,15 @@ teardown(){
     MODEL_DIR=$THE_TMP/model
     return 0
   }
-  function runCHMTestJobs {
+  function runJobs {
     echo \$*
     return 1
+  }
+  function chumData {
+    return 0
+  }
+  function landData {
+    return 0
   }
 " >> "$THE_TMP/.helperfuncs.sh"
 
@@ -328,32 +358,49 @@ teardown(){
   [ "$status" -eq 1 ]
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
-  [ "${lines[1]}" == "1 $THE_TMP $THE_TMP/foo $THE_TMP/model chm_job" ]
-  [ "${lines[2]}" == "Full run 0 1" ]
-  [ "${lines[3]}" == "Error running CHMTest" ]
+  
+  [ "${lines[2]}" == "run 1 out chm_job cast chum.q landopts failed failedtmp failedjobs 3 iteration 4 batch ha" ]
+  [ "${lines[3]}" == "Full run 0 1" ]
+  [ "${lines[4]}" == "Error running CHMTest" ]
 }
 
 #
-# full run failure with iteration file
+# full run success
 #
-@test "full run failure with iteration file" {
-  /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
+@test "full run success" {
+  
+ /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
-
-  echo "4" > "$THE_TMP/chm.test.iteration"  
   /bin/mv "$FAKEHELPERFUNCS" "$THE_TMP/.helperfuncs.sh" 1>&2
-
-  # make a fake helperfuncs file to test main script
-  echo "CHM_TEST_ITERATION_FILE=\"chm.test.iteration\"
+ # make a fake helperfuncs file to test main script
+  echo "
   function getFullPath {
-  GETFULLPATHRET=$THE_TMP
+  GETFULLPATHRET=\$THE_TMP
   return 0
   }
   function parseProperties {
-   MATLAB_DIR=$THE_TMP
+   RUN_CHM_SH=run
+   OUTPUT_DIR=out
+   CHM_TEST_ITERATION_FILE=iteration
+   CHM_TEST_CAST_OUT_FILE=cast
+   CHUMMEDLIST=chum.q
+   LAND_JOB_OPTS=landopts
+   FAILED=failed
+   FAILED_JOBS_TMP_FILE=failedtmp
+   FAILED_JOBS_FILE=failedjobs
+   MAX_RETRIES=3
+   WAIT_TIME_SLEEP=0
+   RETRY_SLEEP=4
+   BATCH_AND_WALLTIME_ARGS=batch
+   OUT_DIR_NAME=ha
+   MATLAB_DIR=\$THE_TMP
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
+    return 0
+  }
+  function getNextIteration {
+    NEXT_ITERATION=1
     return 0
   }
   function getCHMTestJobParametersForTaskFromConfig {
@@ -361,41 +408,68 @@ teardown(){
     MODEL_DIR=$THE_TMP/model
     return 0
   }
-  function runCHMTestJobs {
+  function runJobs {
     echo \$*
-    return 1
+    return 0
+  }
+  function chumData {
+    return 0
+  }
+  function landData {
+    return 0
   }
 " >> "$THE_TMP/.helperfuncs.sh"
 
   run $RUNCHM_VIA_PANFISH
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
-  [ "${lines[2]}" == "5 $THE_TMP $THE_TMP/foo $THE_TMP/model chm_job" ]
-  [ "${lines[3]}" == "Full run 0 1" ]
-  [ "${lines[4]}" == "Error running CHMTest" ]
+
+  [ "${lines[2]}" == "run 1 out chm_job cast chum.q landopts failed failedtmp failedjobs 3 iteration 4 batch ha" ]
+  [ "${lines[3]}" == "CHMTest successfully run." ]
+  [ "${lines[4]}" == "Full run 0 0" ]
+
+
 }
 
 
 # full run successful with -n flag
 @test "full run successful with -n flag" {
-  /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
+ /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
-  echo "1" > "$THE_TMP/chm.test.iteration"
   /bin/mv "$FAKEHELPERFUNCS" "$THE_TMP/.helperfuncs.sh" 1>&2
 
-  # make a fake helperfuncs file to test main script
-  echo "CHM_TEST_ITERATION_FILE=\"chm.test.iteration\"
+
+ # make a fake helperfuncs file to test main script
+  echo "
   function getFullPath {
-  GETFULLPATHRET=$THE_TMP
+  GETFULLPATHRET=\$THE_TMP
   return 0
   }
   function parseProperties {
-   MATLAB_DIR=$THE_TMP
+   RUN_CHM_SH=run
+   OUTPUT_DIR=out
+   CHM_TEST_ITERATION_FILE=iteration
+   CHM_TEST_CAST_OUT_FILE=cast
+   CHUMMEDLIST=chum.q
+   LAND_JOB_OPTS=landopts
+   FAILED=failed
+   FAILED_JOBS_TMP_FILE=failedtmp
+   FAILED_JOBS_FILE=failedjobs
+   MAX_RETRIES=3
+   WAIT_TIME_SLEEP=0
+   RETRY_SLEEP=4
+   BATCH_AND_WALLTIME_ARGS=batch
+   OUT_DIR_NAME=ha
+   MATLAB_DIR=\$THE_TMP
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
+    return 0
+  }
+  function getNextIteration {
+    NEXT_ITERATION=1
     return 0
   }
   function getCHMTestJobParametersForTaskFromConfig {
@@ -403,8 +477,14 @@ teardown(){
     MODEL_DIR=$THE_TMP/model
     return 0
   }
-  function runCHMTestJobs {
+  function runJobs {
     echo \$*
+    return 0
+  }
+  function chumData {
+    return 0
+  }
+  function landData {
     return 0
   }
 " >> "$THE_TMP/.helperfuncs.sh"
@@ -412,15 +492,13 @@ teardown(){
   run $RUNCHM_VIA_PANFISH -n hello
   [ "$status" -eq 0 ]
   echo ":$output:" 1>&2
-  [ "${lines[0]}" == "Full run" ]
-  [ "${lines[2]}" == "2 $THE_TMP $THE_TMP/foo $THE_TMP/model hello" ]
-  [ "${lines[3]}" == "CHMTest successfully run." ]
+  [ "${lines[2]}" == "run 1 out hello cast chum.q landopts failed failedtmp failedjobs 3 iteration 4 batch ha" ]
   [ "${lines[4]}" == "Full run 0 0" ]
 }
 
 # -C flag to check run where run has failed jobs
 @test "-C flag to check run where run has failed jobs" {
-
+  
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -436,16 +514,11 @@ teardown(){
    MATLAB_DIR=$THE_TMP
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
     return 0
   }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
-    return 0
-  }
-  function verifyCHMTestResults {
+  function verifyResults {
     echo \$*
     NUM_FAILED_JOBS=3
     return 1
@@ -457,14 +530,13 @@ teardown(){
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
   [ "${lines[1]}" == "Checking results..." ]
-  [ "${lines[2]}" == "1 $THE_TMP 1 10" ]
+  [ "${lines[2]}" == "1 $THE_TMP 1 10 no" ]
   [ "${lines[3]}" == "3 out of 10 job(s) failed." ]
   [ "${lines[4]}" == "Full run 0 1" ]
 }
 
 # -C flag to check run where run is successful
 @test "-C flag to check run where run is successful" {
-
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -480,16 +552,11 @@ teardown(){
    MATLAB_DIR=$THE_TMP
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
     return 0
   }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
-    return 0
-  }
-  function verifyCHMTestResults {
+  function verifyResults {
     echo \$*
     NUM_FAILED_JOBS=0
     return 0
@@ -501,14 +568,13 @@ teardown(){
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
   [ "${lines[1]}" == "Checking results..." ]
-  [ "${lines[2]}" == "1 $THE_TMP 1 10" ]
+  [ "${lines[2]}" == "1 $THE_TMP 1 10 no" ]
   [ "${lines[3]}" == "All 10 job(s) completed successfully." ]
   [ "${lines[4]}" == "Full run 0 0" ]
 }
 
 # -D flag where download fails
 @test "-D flag where download fails" {
-
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -526,13 +592,8 @@ teardown(){
    LAND_JOB_OPTS=yikes
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
-    return 0
-  }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
     return 0
   }
   function landData {
@@ -554,7 +615,6 @@ teardown(){
 
 # -D flag where download is successful
 @test "-D flag where download is successful" {
-
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -572,13 +632,8 @@ teardown(){
    LAND_JOB_OPTS=yikes
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
-    return 0
-  }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
     return 0
   }
   function landData {
@@ -600,7 +655,7 @@ teardown(){
 
 # -U flag where upload fails
 @test "-U flag where upload fails" {
-
+  
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -608,6 +663,7 @@ teardown(){
 
   # make a fake helperfuncs file to test main script
   echo "CHM_TEST_ITERATION_FILE=\"chm.test.iteration\"
+  RUN_CHM_SH=runchm
   function getFullPath {
   GETFULLPATHRET=$THE_TMP
   return 0
@@ -618,16 +674,11 @@ teardown(){
    LAND_JOB_OPTS=yikes
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
     return 0
   }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
-    return 0
-  }
-  function chumModelImageAndJobData {
+  function chumJobData {
     echo \$*
     return 1
   }
@@ -639,7 +690,7 @@ teardown(){
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
   [ "${lines[1]}" == "Uploading/Chumming data..." ]
-  [ "${lines[2]}" == "1 $THE_TMP $THE_TMP/foo $THE_TMP/model" ]
+  [ "${lines[2]}" == "runchm 1 $THE_TMP" ]
   [ "${lines[3]}" == "Unable to upload data" ]
   [ "${lines[4]}" == "Full run 0 1" ]
 }
@@ -647,7 +698,6 @@ teardown(){
 
 # -U flag where upload is successful
 @test "-U flag where upload is successful" {
-
   /bin/rm -f "$THE_TMP/.helperfuncs.sh" 1>&2
 
   echo "1" > "$THE_TMP/chm.test.iteration"
@@ -655,6 +705,7 @@ teardown(){
 
   # make a fake helperfuncs file to test main script
   echo "CHM_TEST_ITERATION_FILE=\"chm.test.iteration\"
+  RUN_CHM_SH=runchm
   function getFullPath {
   GETFULLPATHRET=$THE_TMP
   return 0
@@ -665,16 +716,11 @@ teardown(){
    LAND_JOB_OPTS=yikes
    return 0
   }
-  function getNumberOfCHMTestJobsFromConfig {
+  function getNumberOfJobsFromConfig {
     NUMBER_JOBS=10
     return 0
   }
-  function getCHMTestJobParametersForTaskFromConfig {
-    INPUT_IMAGE=$THE_TMP/foo/blah
-    MODEL_DIR=$THE_TMP/model
-    return 0
-  }
-  function chumModelImageAndJobData {
+  function chumJobData {
     echo \$*
     return 0
   }
@@ -686,7 +732,7 @@ teardown(){
   echo ":$output:" 1>&2
   [ "${lines[0]}" == "Full run" ]
   [ "${lines[1]}" == "Uploading/Chumming data..." ]
-  [ "${lines[2]}" == "1 $THE_TMP $THE_TMP/foo $THE_TMP/model" ]
+  [ "${lines[2]}" == "runchm 1 $THE_TMP" ]
   [ "${lines[3]}" == "Upload successful." ]
   [ "${lines[4]}" == "Full run 0 0" ]
 }
