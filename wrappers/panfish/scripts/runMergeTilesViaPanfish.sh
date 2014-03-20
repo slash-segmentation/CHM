@@ -181,12 +181,12 @@ if [ "$STATUS_MODE" == "true" ] ; then
   getStatusOfJobsInCastOutFile "$OUTPUT_DIR" "$MERGE_TILES_CAST_OUT_FILE"
   if [ $? != 0 ] ; then
     logMessage "Unable to get status of jobs"
-    logEndTime "Full run" $modeStartTime 1
+    logEndTime "Merge Tiles" $modeStartTime 1
     exit 1
   fi
   if [ "$JOBSTATUS" == "$DONE_JOB_STATUS" ] ; then
     logMessage "No running/pending jobs found."
-    logEndTime "Full run" $modeStartTime 0
+    logEndTime "Merge Tiles" $modeStartTime 0
     exit 0
   fi 
   logMessage "Job status returned $JOBSTATUS  Job(s) still running."
@@ -202,7 +202,7 @@ fi
 #######################################################################
 if [ "$CHECK_MODE" == "true" ] ; then
   logMessage "Checking results..."
-  verifyResults "$RUN_CHM_SH" "1" "$OUTPUT_DIR" "1" "${NUMBER_JOBS}" "no" "$MERGE_TILES_FAILED_PREFIX" "$MERGE_TILES_TMP_FILE" "$MERGE_TILES_FAILED_FILE"
+  verifyResults "$RUN_MERGE_TILES_SH" "1" "$OUTPUT_DIR" "1" "${NUMBER_JOBS}" "no" "$MERGE_TILES_FAILED_PREFIX" "$MERGE_TILES_TMP_FILE" "$MERGE_TILES_FAILED_FILE"
   if [ $? != 0 ] ; then
      logMessage "$NUM_FAILED_JOBS out of ${NUMBER_JOBS} job(s) failed."
      logEndTime "Merge Tiles" $modeStartTime 1
@@ -222,7 +222,7 @@ if [ "$DOWNLOAD_MODE" == "true" ] ; then
   logMessage "Downloading/Landing data..."
   landData "$MERGE_TILES_CHUMMEDLIST" "$OUTPUT_DIR" "$LAND_MERGE_TILES_OPTS" "0" "0"
   if [ $? != 0 ] ; then
-     logWarning "Unable to retreive data"
+     logWarning "Unable to retrieve data"
      logEndTime "Merge Tiles" $modeStartTime 1
      exit 1
   fi
@@ -267,8 +267,9 @@ runJobs "$RUN_MERGE_TILES_SH" "$iteration" "$OUTPUT_DIR" "${NUMBER_JOBS}" "$MERG
 
 runJobsExit=$?
 if [ "$runJobsExit" != 0 ] ; then
+  logWarning "Error running Merge Tiles"
   logEndTime "Merge Tiles" $modeStartTime $runJobsExit
-  jobFailed "Error running Merge Tiles"
+  exit $runJobsExit
 fi
 
 logEcho ""
