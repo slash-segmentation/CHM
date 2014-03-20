@@ -183,7 +183,7 @@ START_TIME=0
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[2]}" == "runMergeTiles 0 1" ]
 
 }
@@ -226,7 +226,7 @@ CONVERT_CMD=/bin/echo
   echo "$output" 1>&2
   [ "$status" -eq 9 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[2]}" == "Found 0 tiles" ]
   [ "${lines[3]}" == "No tiles to merge" ]
   [ "${lines[4]}" == "runMergeTiles 0 9" ]
@@ -273,7 +273,7 @@ CONVERT_CMD=/bin/echo
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[2]}" == "Found 1 tiles" ]
   [ "${lines[3]}" == "/$THE_TMP/tiles/1.png $THE_TMP/foo.png" ]
   [ "${lines[4]}" == "runMergeTiles 0 0" ]
@@ -323,7 +323,7 @@ UUIDGEN_CMD=\"/bin/echo 1\"
   echo "$output" 1>&2
   [ "$status" -eq 2 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[2]}" == "Found 3 tiles" ]
   [[ "${lines[3]}" == "Running convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/"* ]]
   [ "${lines[4]}" == "convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/mergetiles.1/foo.png" ]
@@ -378,7 +378,7 @@ UUIDGEN_CMD=\"/bin/echo 1\"
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[3]}" == "Found 3 tiles" ]
   [ "${lines[4]}" == "Running convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite $THE_TMP/hi/mergetiles.1/foo.png" ]
   [ "${lines[5]}" == "convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite $THE_TMP/hi/mergetiles.1/foo.png" ]
@@ -430,7 +430,7 @@ UUIDGEN_CMD=\"/bin/echo 1\"
   echo "$output" 1>&2
   [ "$status" -eq 3 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[3]}" == "Found 3 tiles" ]
   [ "${lines[4]}" == "Running /bin/false /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite $THE_TMP/hi/mergetiles.1/foo.png" ]
   [ "${lines[5]}" == "No $THE_TMP/hi/mergetiles.1/foo.png found to copy" ]
@@ -485,7 +485,7 @@ UUIDGEN_CMD=\"/bin/echo 1\"
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   [ "${lines[0]}" == "runMergeTiles" ]
-  [ "${lines[1]}" == "1 $THE_TMP" ]
+  [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[3]}" == "Found 3 tiles" ]
   [ "${lines[4]}" == "Running convert $THE_TMP/pan/tiles/1.png -compose plus $THE_TMP/pan/tiles/2.png -composite $THE_TMP/pan/tiles/3.png -composite $THE_TMP/hi/mergetiles.1/foo.png" ]
   [ "${lines[5]}" == "convert $THE_TMP/pan/tiles/1.png -compose plus $THE_TMP/pan/tiles/2.png -composite $THE_TMP/pan/tiles/3.png -composite $THE_TMP/hi/mergetiles.1/foo.png" ]
