@@ -54,15 +54,15 @@ teardown() {
 
 
 #
-# CHM_train.sh where -m points to a nonexistant directory
+# CHM_train.sh where -m points to a nonexistant directory that cannot be created
 #
-@test "CHM_train.sh where -m points to a nonexistant directory" {
-  run $CHM_TRAIN "$THE_TMP" "$THE_TMP" -m "$THE_TMP/doesnotexist"
+@test "CHM_train.sh where -m points to a nonexistant directory that cannot be created" {
+  run $CHM_TRAIN "$THE_TMP" "$THE_TMP" -m "/dev/null"
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "Model folder is not a directory." ]
-  [ "${lines[1]}" = "CHM Image Training Phase Script." ]
-  [ "${lines[2]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
+  [ "${lines[1]}" = "Model folder could not be created." ]
+  [ "${lines[2]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[3]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
 #
@@ -106,7 +106,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4);');" ]
+  [ "${lines[0]}" = "-nodisplay -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -129,7 +129,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -152,7 +152,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -173,7 +173,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
  
   # reset path
   export PATH=$A_TEMP_PATH
@@ -192,7 +192,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -212,26 +212,26 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',4,3);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',4,3,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
 }
 
 #
-# CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m
+# CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m -r
 #
-@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m " {
+@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m -r" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
   export PATH=$SUCCESS_MATLAB:$PATH
 
-  run $CHM_TRAIN blah alsoblah -s -S 2 -L 1 -m "$THE_TMP"
+  run $CHM_TRAIN blah alsoblah -s -S 2 -L 1 -m "$THE_TMP" -r
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''$THE_TMP'',2,1);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''$THE_TMP'',2,1,1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
