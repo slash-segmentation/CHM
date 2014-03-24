@@ -122,7 +122,7 @@ declare tempOutFile="$scratchDir/$tempImageName"
 #       this will allow the script to catch KILL requests etc.. and to track memory
 #       usage etc.
 
-declare fileList=( `find $tileDir -name "*.*" -type f | sort -h` )
+declare fileList=( `find $tileDir -name "*.*" -type f | sort` )
 
 logMessage "Found ${#fileList[@]} tiles"
 
