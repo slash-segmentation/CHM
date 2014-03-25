@@ -42,9 +42,9 @@ else
     tiles_to_proc = ParseArgument(tiles_to_proc);
 end
 
-param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage');
+param = load(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 if ischar(blocksize) && strcmpi(blocksize, 'auto')
-    pts = load(fullfile(savingpath, 'param'), 'TrainingSize');
+    pts = load(fullfile(savingpath, 'param.mat'), 'TrainingSize');
     if ~isfield(pts, 'TrainingSize'); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
     blocksize = pts.TrainingSize;
 end

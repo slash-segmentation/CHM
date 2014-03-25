@@ -44,7 +44,7 @@ if numel(files_tr) < 1 || numel(files_tr) ~= numel(files_la); error('You must pr
 if exist(savingpath,'file')~=7; mkdir(savingpath); end
 
 if restart && exist(fullfile(savingpath,'param.mat'),'file') == 2
-    param = load(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
+    param = load(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
     if GetImageSize(files_tr{1}) ~= param.TrainingSize; error('Cannot restart since training data is a different size'); end;
     % Remove all stages/levels that would be invalid if Nlevel/Nstage change
     files_m = dir(fullfile(savingpath,'MODEL_level*_stage*.mat'));
@@ -98,7 +98,7 @@ for l = 1:Nlevel; im = MyDownSample(im,1); PixN(l+1) = numel(im); end
 %for l = 1:Nlevel; sz = floor((sz + 1) / 2); PixN(l+1) = sz(1)*sz(2); end
 PixN = PixN*length(files_tr);
 
-save(fullfile(savingpath, 'param'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', '-v7.3');
+save(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', '-v7.3');
 
 param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;

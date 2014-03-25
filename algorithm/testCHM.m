@@ -19,7 +19,7 @@ for stage = 1:Nstage
                 fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
             end
             X = [fv;fvcontext];
-            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]));
+            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage) '.mat']));
             [~, Y_floats] = EvaluateAndOrNetMX(X,model);
             clabels{level+1} = reshape(Y_floats,size(img));
 
@@ -35,7 +35,7 @@ for stage = 1:Nstage
                 fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
             end
             X = [fv;fvcontext];
-            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]));
+            load(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage) '.mat']));
             [~, Y_floats] = EvaluateAndOrNetMX(X,model);
             clabels{level+1} = reshape(Y_floats,size(img));
         end

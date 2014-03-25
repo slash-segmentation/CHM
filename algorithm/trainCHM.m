@@ -20,7 +20,7 @@ if stage==1 || level~=0
 
         fvcontext = zeros(level*Nfeatcontext,numel(img));
         for j = 0:level-1
-            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], filename), 'clabels');
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], [filename '.mat']), 'clabels');
             temp = MyDownSample(temp.clabels,level-j);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
         end
@@ -46,7 +46,7 @@ else
 
         fvcontext = zeros((Nlevel+1)*Nfeatcontext,numel(img));
         for j = 0:Nlevel
-            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], filename), 'clabels');
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], [filename '.mat']), 'clabels');
             temp = MyUpSample(temp.clabels,j);
             temp = temp(1:size(img,1),1:size(img,2),:);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
@@ -84,7 +84,7 @@ fprintf('Start learning LDNN ... stage %d level %d \n',stage,level);
 opt.level = level;
 opt.stage = stage;
 tic;model = LearnAndOrNetMEX(X,DD,opt);Time = toc;
-save(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage)]), 'model','Time', '-v7.3');
+save(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage) '.mat']), 'model','Time', '-v7.3');
 % Write the outputs
 fprintf('Generating outputs ... stage %d level %d \n',stage,level);
 str = fullfile(savingpath, ['output_level' num2str(level) '_stage' num2str(stage)]);
@@ -99,7 +99,7 @@ if stage==1 || level~=0
 
         fvcontext = zeros(level*Nfeatcontext,numel(img));
         for j = 0:level-1
-            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], filename), 'clabels');
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage)], [filename '.mat']), 'clabels');
             temp = MyDownSample(temp.clabels,level-j);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
         end
@@ -107,7 +107,7 @@ if stage==1 || level~=0
         X = [fv;fvcontext];
         [~, Y_floats] = EvaluateAndOrNetMX(X,model);
         clabels = reshape(Y_floats,size(img));
-        parsave(fullfile(str,filename),clabels);
+        parsave(fullfile(str,[filename '.mat']),clabels);
         %? imwrite(clabels, fullfile(str, [filename ext]));
     end
 else
@@ -119,7 +119,7 @@ else
 
         fvcontext = zeros((Nlevel+1)*Nfeatcontext,numel(img));
         for j = 0:Nlevel
-            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], filename), 'clabels');
+            temp = load(fullfile(savingpath, ['output_level' num2str(j) '_stage' num2str(stage-1)], [filename '.mat']), 'clabels');
             temp = MyUpSample(temp.clabels,j);
             temp = temp(1:size(img,1),1:size(img,2),:);
             fvcontext(j*Nfeatcontext+1:(j+1)*Nfeatcontext,:) = ConstructNeighborhoodsS(temp);
@@ -128,7 +128,7 @@ else
         X = [fv;fvcontext];
         [~, Y_floats] = EvaluateAndOrNetMX(X,model);
         clabels = reshape(Y_floats,size(img));
-        parsave(fullfile(str,filename),clabels);
+        parsave(fullfile(str,[filename '.mat']),clabels);
         %? imwrite(clabels, fullfile(str, [filename ext]));
     end
 end
