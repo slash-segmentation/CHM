@@ -102,7 +102,7 @@ fi
 
 # Set 'singleCompThread' for MATLAB if there are a lot of processors
 if [[ -n "${SINGLE_THREAD}" ]]; then SINGLE_THREAD="${SINGLE_THREAD} -singleCompThread";
-elif (( `nproc` > 24 )); then SINGLE_THREAD=-singleCompThread; fi;
+elif [[ -n `which nproc 2>/dev/null` ]] && (( `nproc` > 24 )); then SINGLE_THREAD=-singleCompThread; fi;
 
 # Run the main matlab script (need JVM for parallel)
 matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL},${RESTART});');";
