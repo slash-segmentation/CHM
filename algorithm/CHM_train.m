@@ -105,7 +105,7 @@ for l = 1:Nlevel; im = MyDownSample(im,1); PixN(l+1) = numel(im); end
 %for l = 1:Nlevel; sz = floor((sz + 1) / 2); PixN(l+1) = sz(1)*sz(2); end
 PixN = PixN*length(files_tr);
 
-save(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', 'hgram' '-v7.3');
+save(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', 'hgram', '-v7.3');
 
 param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;
