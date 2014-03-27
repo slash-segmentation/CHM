@@ -48,6 +48,7 @@ seperated list of the following:
      pattern has * in it which means any number of any characters
      example: `in/*.tif` does all TIFF images in that directory
      note: the asterisk needs to be escaped or in quotes in some shells
+All training images must be the same size.
 
 Training will take on the order of a day to complete and require lots of
 memory (50-150 GB) depending on the size of the dataset. Recommended that
@@ -68,6 +69,10 @@ the output directory. The set of data images uses the same format as training
 image inputs. The output must be a directory though. This will take about 5-15
 min per training-image-sized region and 5-15 GB of RAM depending on data image
 and training data size.
+
+Make sure the test images are comparable to the training images: same pixel
+size, same acquitision parameters, same source (e.g. brain region). Testing
+images do not need to be all the same size.
 
 
 Model Directory
@@ -109,17 +114,20 @@ the images youself).
 
 Speeding It Up
 --------------
-Training can typically only be sped up by sacrificing quality of results. The
-size of the training data along with the number of stages and levels used will
-effect the speed of training. There are many examples where a lower number of
-levels barely effect results, and even some cases where you get better results
-so lowering the number of levels is probably the only thing here that should
-be played with.
+Training can be sped up by reducing the size of the training data and/or
+reducing the number of stages and levels trained on. This has to be done
+carefully as to not reduce quality. Typically, large structures can have the
+data binned (e.g. we bin by 8 for neucli of cells) which greatly reduces the
+training data size. Additionally, we have been experimenting with lower the
+number of levels, and in many cases it barely effect results and even some
+cases produces better results.
 
 By default (except for compiled version) training will attempt to use all
 physical cores (up to 12) on your machine while "generating outputs". This
 isn't the most computationally heavy step so doesn't save too much time
 (relative to how long training takes). To disable this, use the `-s` flag.
+
+If training goes faster, then testing with that model will go faster as well.
 
 Testing has a lot more room speed-ups since it can be heavily parallelized.
 First, in the basic usage, testing will attempt to use all physical cores (up
