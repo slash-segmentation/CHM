@@ -29,6 +29,10 @@ Optional Arguments:
                   arguments. The tiles are defined by multiples of
                   block_size-2*overlap_size. A tile position out of range will
                   be ignored. If not included then all tiles will be processed.
+  -h              Don't histogram-equalize the testing images to the training
+                  image histogram (if provided in the model). This option
+                  should only be used if the testing data has already been
+                  equalized.
   -s              Single-thread / non-parallel. Normally the blocks in an image
                   are processed in parallel using all available physical cores.
 
@@ -81,6 +85,7 @@ OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
+HIST_EQ=true;
 declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
 BLOCKSIZE=\'\'auto\'\'; # or [${BLOCK_H} ${BLOCK_W}]
@@ -90,10 +95,13 @@ declare -i TILE_ROW=0; # temporary variables
 declare -i TILE_COL=0;
 TILES=; # the tiles to do as row1 col1;row2 col2;...
 shift 2
-while getopts ":sm:b:o:t:" o; do
+while getopts ":shm:b:o:t:" o; do
   case "${o}" in
     s)
       SINGLE_THREAD=-nojvm;
+      ;;
+    h)
+      HIST_EQ=false;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -140,7 +148,7 @@ fi
 
 
 # Run the main matlab script
-matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',$BLOCKSIZE,[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}]);');";
+matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',$BLOCKSIZE,[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}],''${HIST_EQ}'');');";
 matlab_err=$?;
 
 

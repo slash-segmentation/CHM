@@ -1,6 +1,6 @@
-function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc)
+function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc,hist_eq)
 % CHM_test   CHM Image Testing Phase Script
-%   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=[0 0]], [savingpath='./temp'], [tiles_to_proc=[]])
+%   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=[0 0]], [savingpath='./temp'], [tiles_to_proc=[]], [hist_eq=true])
 %
 %   input_files is a set of data files to test, see below for details.
 %   outputpath is the folder to save the generated images to.
@@ -13,6 +13,8 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
 %   tiles_to_proc is a list of tiles to process.
 %       By default all tiles are processed.
+%   hist_eq is either true or false if the testing data should be histogram-equalized to the training data or not.
+%       By default it is true if the model includes the histogram to equalize to.
 %
 % input_files is a comma-seperated list of the following:
 %   path to a folder            - all PNGs in that folder
@@ -25,11 +27,12 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       pattern has * in it which means any number of any characters
 %       example: in/*.tif does all TIFF images in that directory
 
-if nargin < 2 || nargin > 6; error('CHM_test must have 2 to 6 input arguments'); end
+if nargin < 2 || nargin > 7; error('CHM_test must have 2 to 7 input arguments'); end
 if nargin < 3; blocksize = 'auto'; end
 if nargin < 4; bordersize = 0; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 if nargin < 6; tiles_to_proc = []; end
+if nargin < 7; hist_eq = true; end
 
 if ~ismcc && ~isdeployed
     % Add path to functions required for feature extraction (already included in compiled version)
@@ -40,15 +43,26 @@ else
     blocksize  = ParseArgument(blocksize);
     bordersize = ParseArgument(bordersize);
     tiles_to_proc = ParseArgument(tiles_to_proc);
+    hist_eq = ParseArgument(hist_eq);
 end
 
+param_vars = whos('-file', fullfile(savingpath, 'param.mat'))
 param = load(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 if ischar(blocksize) && strcmpi(blocksize, 'auto')
+    if ~ismember('TrainingSize', {param_vars.name}); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
     pts = load(fullfile(savingpath, 'param.mat'), 'TrainingSize');
-    if ~isfield(pts, 'TrainingSize'); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
     blocksize = pts.TrainingSize;
 end
-
+my_imread = @imread
+if hist_eq
+    if ismember('hgram', {param_vars.name})
+        pts = load(fullfile(savingpath, 'param.mat'), 'hgram');
+        hgram = pts.hgram;
+        my_imread = @(fn) histeq(imread(fn), hgram);
+    else
+        fprintf('Warning: training data histogram not included in model, make sure you manually perform histogram equalization on the testing data.');
+    end
+end
 
 files_te  = GetInputFiles(input_files);
 files_out = GetOutputFiles(outputpath, files_te);
@@ -87,7 +101,8 @@ for i = 1:length(files_te)
     %    im = blockproc(imread(files_te{i}),bs,proc, args{:});
     %end
     %imwrite(im, files_out{i});
-    imwrite(blockproc(imread(files_te{i}),bs,proc, 'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true), files_out{i});
+
+    imwrite(blockproc(my_imread(files_te{i}),bs,proc, 'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true), files_out{i});
 end
 
 if opened_pool; matlabpool close; end

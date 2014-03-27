@@ -78,13 +78,20 @@ else
     Nlevel_start = 0;
 end
 
-% Only for preallocation purpose
+% Getting training image size and histogram
 im = imread(files_tr{1});
 TrainingSize = size(im);
 if numel(TrainingSize) ~= 2; error('You must use grayscale images'); end;
-for i = 2:length(files_tr); if TrainingSize ~= GetImageSize(files_tr{i}); error('All training images must have the same dimensions'); end; end;
+[hgram,~] = imhist(im{1});
+for i = 2:length(files_tr);
+    im = imread(files_tr{i});
+    if TrainingSize ~= size(im); error('All training images must have the same dimensions'); end;
+    [hg,~] = imhist(im);
+    hgram = hgram + hg;
+end;
 
-im = imread(files_tr{1});
+% Only for preallocation purpose
+%im = imread(files_tr{1});
 Nfeat = size(Filterbank(im),1);
 Nfeatcontext = size(ConstructNeighborhoodsS(im),1); % TODO: make shortcut function for getting size?
 PixN = zeros(Nlevel+1,1);
@@ -98,7 +105,7 @@ for l = 1:Nlevel; im = MyDownSample(im,1); PixN(l+1) = numel(im); end
 %for l = 1:Nlevel; sz = floor((sz + 1) / 2); PixN(l+1) = sz(1)*sz(2); end
 PixN = PixN*length(files_tr);
 
-save(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', '-v7.3');
+save(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize', 'hgram' '-v7.3');
 
 param.Nfeat = Nfeat;
 param.Nfeatcontext = Nfeatcontext;

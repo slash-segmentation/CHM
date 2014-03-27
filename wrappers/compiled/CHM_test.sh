@@ -6,9 +6,9 @@ usage()
     
 $0 <input_files> <output_folder> <optional arguments>
   input_files     The input files to use. See below for the specification.
-  output_folder   The folder to save the generated images to
+  output_folder   The folder to save the generated images to.
                   The images will have the same name and type as the input
-                  files but be placed in this folder
+                  files but be placed in this folder.
 	
 Optional Arguments:
   -m model_folder The folder that contains the model data. Default is ./temp/.
@@ -29,6 +29,10 @@ Optional Arguments:
                   arguments. The tiles are defined by multiples of
                   block_size-2*overlap_size. A tile position out of range will
                   be ignored. If not included then all tiles will be processed.
+  -h              Don't histogram-equalize the testing images to the training
+                  image histogram (if provided in the model). This option
+                  should only be used if the testing data has already been
+                  equalized.
   -M matlab_dir   MATLAB or MCR directory. If not given will look for a MCR_DIR
                   environmental variable. If that doesn't exist then an attempt
                   will be made using 'which'. It must be the same version used
@@ -82,6 +86,7 @@ INPUT=$1;
 OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
+HIST_EQ=true;
 declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
 BLOCKSIZE=\'\'auto\'\'; # or [${BLOCK_H} ${BLOCK_W}]
@@ -92,10 +97,13 @@ declare -i TILE_COL=0;
 TILES=; # the tiles to do as row1 col1;row2 col2;...
 MATLAB_FOLDER=;
 shift 2
-while getopts ":sm:b:o:t:M:" o; do
+while getopts ":shm:b:o:t:M:" o; do
   case "${o}" in
     s)
       echo "Warning: argument -s is ignored for compiled version, it is always single-threaded" 1>&2;
+      ;;
+    h)
+      HIST_EQ=false;
       ;;
     m)
       MODEL_FOLDER=${OPTARG};
@@ -172,7 +180,7 @@ SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
-$SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]";
+$SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]" "${HIST_EQ}";
 
 
 # Done

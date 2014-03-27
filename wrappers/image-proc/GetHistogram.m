@@ -4,9 +4,9 @@ function counts=GetHistogram(im)
 % If a cell-array of matrices or strings is given, the histogram is summed across all images.
 if iscell(im);
     if numel(im) < 1; counts = zeros(256,1); return
-    [counts,~] = imhist(im{1});
+    [counts,~] = GetHistogram(im{1});
     for i in 2:numel(im)
-        [c,~] = imhist(im{i});
+        [c,~] = GetHistogram(im{i});
         counts = counts + c;
     end
 else
