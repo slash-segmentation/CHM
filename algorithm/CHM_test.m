@@ -60,7 +60,7 @@ if hist_eq
         hgram = pts.hgram;
         my_imread = @(fn) histeq(imread(fn), hgram);
     else
-        fprintf('Warning: training data histogram not included in model, make sure you manually perform histogram equalization on the testing data.');
+        fprintf('Warning: training data histogram not included in model, make sure you manually perform histogram equalization on the testing data.\n');
     end
 end
 
