@@ -1,28 +1,40 @@
 Cascaded Hierarchical Model Automatic Segmentation Algorithm
 ============================================================
-
 This is an algorithm designed for automatic segmention of cellular structures
 in electron microscopy data.
 
 The core algorithm is in the "algorithm" directory while wrappers for it to do
 things such as run on a cluster are in the "wrappers" directory.
 
-More details about running the algorithm or any of the wrappers is contained in
-readmes in the respective directories.
+Some additional details about running the algorithm or any of the wrappers is
+contained in readmes in the respective directories. However, for general usage
+this readme will suffice.
 
 
 Basic Usage
 ===========
+The two main entry points are `CHM_train.sh` and `CHM_test.sh`. The raw MATLAB
+and compiled versions work very similarly. It is recommend for most people to
+use these scripts as they simplify many of the options. However in some cases
+the use of the MATLAB functions `CHM_test` and `CHM_train` are fairly similar
+and may be used. All optional arguments must be at the end.
+
+
+Prerequisites
+-------------
 If you have a MATLAB license with the Image Processing toolbox you need the
 entire algorithm folder. If you don't then you need the wrappers/compiled
-folder. You will also need the MCR for the MATLAB listed in the file
-matlab-version.txt (downloadable from the Mathworks website).
+folder along with installing the the MCR for the MATLAB version listed in the
+file matlab-version.txt. The MCR can be downloaded from the Mathworks
+website: http://www.mathworks.com/products/compiler/mcr/. Then make sure the
+'matlab' command is on your PATH (basically `which matlab` works on the
+command-line).
 
-The two main entry points are CHM_test.sh and CHM_train.sh. The raw MATLAB and
-compiled versions work very similarly.
 
-The first thing you need to run in CHM_train. In the most basic usage it takes
-a set of training data images (grayscale, 8-bit) and a set of training label
+Training
+--------
+The first thing you need to run in `CHM_train.sh`. In the most basic usage it
+takes a set of training data images (grayscale) and a set of training label
 images (0=no label, 1=labeled). These file sets are specified as a comma
 seperated list of the following:
  * path to a folder            - all PNGs in that folder
@@ -30,54 +42,121 @@ seperated list of the following:
  * path with numerical pattern - get all files matching the pattern
      pattern must have #s in it and end with a semicolon and number range
      the #s are replaced by the values at the end with leading zeros
-     example: in/####.png;5-15 would do in/0005.png through in/0015.png
+     example: `in/####.png;5-15` would do in/0005.png through in/0015.png
      note: the semicolon needs to be escaped or in quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
      pattern has * in it which means any number of any characters
-     example: in/*.tif does all TIFF images in that directory
+     example: `in/*.tif` does all TIFF images in that directory
      note: the asterisk needs to be escaped or in quotes in some shells
-Training will take on the order of a day and require lots of memory (50-150GB)
-depending on the size of the dataset. Recommended that you use between 500x500
-and 1000x1000 size training images with a total of 20-40 slices.
 
-The output model is by default stored in ./temp. The only files required to
-save are the .mat files in the root directory (the subdirectories contain
-purely temporary files).
+Training will take on the order of a day to complete and require lots of
+memory (50-150 GB) depending on the size of the dataset. Recommended that
+you use between 500x500 and 1000x1000 size training images with a total of
+20-40 slices.
 
-CHM_test then takes the model generated with CHM_train and creates probability
-maps for how likely a pixel is the same thing as what was labelled during
-training. The basic usage is to give a set of data images to process and the
-output directory. This will take about 5-15 min per training-image-sized region
-and 5-10 GB of RAM depending on data image and training data size.
-
-Both CHM_test and CHM_train accept optional arguments. They share the arguments
--m to specify the model folder and -s to force single-threaded runs. The number
-of training levels and stages while training can be adjusted with -S and -L and
-the impact of changing them is being investigated at the moment. For testing
-you should consider adding the -o #x# argument to cause blocks to be overlapped
-which will remove edge effects both on the border of the images and the
-interior of the images but can increase processing time. Values from 25-50 seem
-to be good. You can tell CHM_test to only work on select tiles of the image
-using -t.
-
-The compiled version takes slightly different flags. First, it ignores the -s
-(single-threaded) flag. Second it has an additional argument -M to specify the
-location of MATLAB/MCR if it cannot be found automatically.
+If training fails for some reason (such as running out of memory) you can
+restart from the last completed stage/level by using the `-r` flag. The `-r`
+flag has no effect if the model directory does not exist/is empty.
 
 
 Testing
-=======
+-------
+`CHM_test.sh` then takes the model generated with CHM_train and creates
+probability maps for how likely a pixel is the same thing as what was labelled
+during training. The basic usage is to give a set of data images to process and
+the output directory. The set of data images uses the same format as training
+image inputs. The output must be a directory though. This will take about 5-15
+min per training-image-sized region and 5-15 GB of RAM depending on data image
+and training data size.
 
-In the directory test/ are unit tests written in BATS: Bash Automated Testing
-System to test CHM_test.sh and in the future hopefully the rest of CHM.  
 
-BATS can be obtained from here:  https://github.com/sstephenson/bats
+Model Directory
+---------------
+The output model is by default stored in ./temp. The only files required to
+save are the .mat files in the root directory (the subdirectories contain
+actual temporary files).
 
-To run the main unit tests simply run:
+To change the model directory use by either CHM_train or CHM_test you can use
+the `-m` argument.
 
- bats test/
 
-Under test/chm_system_tests are system tests that run CHM against real data.
-These tests require Image Magick to be installed as well as matlab with the
-image processing toolbox and appropriate licenses.
+Quality of Results
+------------------
+Many factors influence the quality of results, including some that are still be
+investigated.
 
+The quality of the training data and labels is by far the most important.
+Within the training set, every example of your feature must be labelled.
+Additionally, a large portion of the data must be that feature. For some
+datasets/features applying histogram equalization to a uniform histogram can
+help significantly. See the HistogramEqualize tool in wrappers/image-proc.
+
+During training you can also change the number of stages and levels of training
+that are performed using the `-S` and `-L` arguments respectively (they default
+to 2 and 4). It currently seems unlikely that values larger than this will be
+necessary, but in some cases smaller values provide better results than
+larger values (smaller values also run faster).
+
+During testing there is less adjustments you can make for quality and the
+defaults provided should be good in most cases. First, if you are seeing edge
+effects (either along the edge or in the middle of the image) you have to
+increase the amount of overlap between tiles using the `-o` argument. The
+default is 50 pixels. Additionally, the input images have their histograms
+equalized to the training data histogram. To prevent this from happening use
+the `-h` flag (this is probably only needed if you perform some equalization on
+the images youself).
+
+
+Speeding It Up
+--------------
+Training can typically only be sped up by sacrificing quality of results. The
+size of the training data along with the number of stages and levels used will
+effect the speed of training. There are many examples where a lower number of
+levels barely effect results, and even some cases where you get better results
+so lowering the number of levels is probably the only thing here that should
+be played with.
+
+By default (except for compiled version) training will attempt to use all
+physical cores (up to 12) on your machine while "generating outputs". This
+isn't the most computationally heavy step so doesn't save too much time
+(relative to how long training takes). To disable this, use the `-s` flag.
+
+Testing has a lot more room speed-ups since it can be heavily parallelized.
+First, in the basic usage, testing will attempt to use all physical cores (up
+to 12) for the bulk of each image (note that for the first 3 "tiles" of each
+image it will not be done in parallel).
+
+However, it is actually faster to many seperate instances of CHM_test with each
+operating over a portion of the test images. If you do it this way, use the
+`-s` flag to make each CHM_test not parallel itself. You can run these across
+multiple machines at this point.
+
+If you are trying to run CHM_test on a single very large image or have access
+to a cluster, you can divide single images down even further by using -t to
+specify a tile to process. You can chain multiple `-t` to process multiple
+tiles. Be careful to use seperate output directories for each tile-set in this
+case. To combine the images after they have been run you can use ImageMagick:
+
+    convert -compose plus tiles1.png tiles2.png -composite tiles3.png -composite ... output.png
+
+Another way to get some speed up is to reduce the overlap between tiles with
+`-o`. The default is 50 pixels and in many cases 25 is probably sufficient.
+However if this causes edges effects to appear (either at the edges or middle
+of the image) then you went too small.
+
+The time required for testing is directly poportional to the following formula:
+
+    CEIL(test_image_width / (training_image_width - 2*overlap_width)) * CEIL(test_image_height / (training_image_height - 2*overlap_height))
+
+Due to the CEIL, you may as well make the overlap width and height as large as
+possible before hitting the next integer.
+
+
+Compiled Version Differences
+----------------------------
+The compiled version always run in single-threaded mode (and thus ignores the
+-s flag). Also, you can specify the MATLAB/MCR location using the -M argument.
+It also looks for two environmental variables: MCR_DIR (same as -M argument)
+and MCR_CACHE_ROOT which sets where the program should unpack itself to, and
+should be some local file path (not on the network). The cache dir defaults to
+/tmp/mcr_cache_root_$USER

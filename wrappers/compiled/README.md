@@ -1,14 +1,14 @@
-These are simply compiled versions of the CHM_test, CHM_test_blocks, and
-CHM_train MATLAB entry points. These work just as the MATLAB functions do.
-The shell scripts provided are modified from the ones in the algorithm folder,
-modified to support some special features of the compiled versions (like always
-being single-threaded and needing to find the MATLAB directory).
+These are simply compiled versions of the CHM_test and CHM_train MATLAB entry
+points. These work just as the MATLAB functions do. The shell scripts provided
+are modified from the ones in the algorithm folder, modified to support some
+special features of the compiled versions (like always being single-threaded
+and needing to find the MATLAB directory).
 
 To run these you either need MATLAB installed with the Image Processing Toolbox
 or the MATLAB Compiler Runtime (MCR, which is free). They need to be the exact
 version which the programs were compiled for, which can be found in the file
 "matlab-version.txt" (including the platform and MATLAB version, for example
-glxna64, R2011b).
+glxna64, R2013a).
 
 To tell the shell script where to find MATLAB or MCR, you can either make sure
 'matlab' is in the PATH, define MCR_DIR to the root directory (which contains
