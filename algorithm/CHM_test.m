@@ -8,7 +8,7 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %   blocksize is the size of the blocks to process, which should be identical to the training image sizes.
 %       By default this reads the information from the param.mat file.
 %   bordersize is the amount of overlap between blocks to discard.
-%       By default no overlap, but 25-75px overlap is recommended (will depend on whats being segmented).
+%       By default a 50x50, but 25-75px overlap is recommended (will depend on whats being segmented).
 %   savingpath is the folder to save the trained model to (along with temporary files)
 %       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
 %   tiles_to_proc is a list of tiles to process.
@@ -29,7 +29,7 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 
 if nargin < 2 || nargin > 7; error('CHM_test must have 2 to 7 input arguments'); end
 if nargin < 3; blocksize = 'auto'; end
-if nargin < 4; bordersize = 0; end
+if nargin < 4; bordersize = 50; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 if nargin < 6; tiles_to_proc = []; end
 if nargin < 7; hist_eq = true; end

@@ -19,8 +19,8 @@ Optional Arguments:
                   of the training images so this argument must always be given
                   in that case.
   -o overlap_size Specifies how much the blocks should overlap given as WxH.
-                  Default is 0x0. The value used will depend on the size
-                  of the structures being segmenting but at most 50 pixels
+                  Default is 50x50. The value used will depend on the size
+                  of the structures being segmenting but at most 75 pixels
                   seems necessary.
   -t tile_pos     Specifies that only the given blocks/tiles be processed by
                   CHM while all others simply output black. Each tile is given
@@ -89,8 +89,8 @@ HIST_EQ=true;
 declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
 BLOCKSIZE=\'\'auto\'\'; # or [${BLOCK_H} ${BLOCK_W}]
-declare -i OVERLAP_W=0;
-declare -i OVERLAP_H=0;
+declare -i OVERLAP_W=50;
+declare -i OVERLAP_H=50;
 declare -i TILE_ROW=0; # temporary variables
 declare -i TILE_COL=0;
 TILES=; # the tiles to do as row1 col1;row2 col2;...
