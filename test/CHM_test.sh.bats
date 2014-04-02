@@ -101,7 +101,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP}
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''./temp/'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[0 0],''./temp/'',[]);');" ]
  
   # reset path
   export PATH=$A_TEMP_PATH
@@ -119,7 +119,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP}
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''./temp/'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -137,7 +137,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -s
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''./temp/'');');" ]
+[ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -154,7 +154,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 200x100
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -171,7 +171,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -s -b 200x100
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -191,7 +191,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 200x100
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -209,7 +209,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 200x100 -o 3x1
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -226,7 +226,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 50 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[50 50],[0 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[0 0],''./temp/'',[]);');" ]
   # reset path
   export PATH=$A_TEMP_PATH
 }
@@ -242,11 +242,10 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 50 -o 20
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[50 50],[20 20],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[20 20],''./temp/'',[]);');" ]
   # reset path
   export PATH=$A_TEMP_PATH
 }
-
 
 
 #
@@ -254,11 +253,16 @@ teardown() {
 #
 @test "CHM_test.sh with overlap argument but no block size argument" {
 
-  run $CHM_TEST blah ${THE_TMP} -o 3x1
+  A_TEMP_PATH=$PATH
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
+  
 
-  [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "Overlap size can only be used with block size." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  run $CHM_TEST blah ${THE_TMP} -o 3x1
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[1 3],''./temp/'',[]);');" ]
+
+  export PATH=$A_TEMP_PATH
 }
 
 #
@@ -266,11 +270,15 @@ teardown() {
 #
 @test "CHM_test.sh with tile argument but no block size argument" {
 
-  run $CHM_TEST blah ${THE_TMP} -t 3,1
+  A_TEMP_PATH=$PATH
+  # put fake matlab in path
+  export PATH=$SUCCESS_MATLAB:$PATH
 
-  [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "Tile position can only be used with block size." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  run $CHM_TEST blah ${THE_TMP} -t 3,1
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[0 0],''./temp/'',[1 3]);');" ]
+
+  export PATH=$A_TEMP_PATH
 }
 
 #
@@ -369,7 +377,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x2
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[2 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[2 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -389,7 +397,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 2x0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 2],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 2],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -408,7 +416,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -466,7 +474,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 0,0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[0 0]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[0 0]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -486,7 +494,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t -1,-1
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[-1 -1]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[-1 -1]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -508,7 +516,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 1,1 -t 2,3 -t 1,1
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test_blocks(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[1 1;3 2;1 1]);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[1 1;3 2;1 1]);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH

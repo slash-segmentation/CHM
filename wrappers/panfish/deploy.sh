@@ -80,32 +80,17 @@ if [ "$DEPLOY_ENV" == "local" ] ; then
   exit 0
 fi
 
-if [ "$DEPLOY_ENV" == "idoerg" ] ; then
-   HOST="churas@idoerg.ucsd.edu"
-   DEPLOY_BASE_DIR="/home/churas/tests/cam-dev/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
 if [ "$DEPLOY_ENV" == "coleslaw" ] ; then
    HOST="churas@localhost"
    DEPLOY_BASE_DIR="/home/churas/bin"
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
 
-
-if [ "$DEPLOY_ENV" == "dev" ] ; then
-   HOST="tomcat@cylume.camera.calit2.net"
-   DEPLOY_BASE_DIR="/camera/cam-dev/camera/release/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
 if [ "$DEPLOY_ENV" == "prod" ] ; then
    HOST="tomcat@cylume.camera.calit2.net"
-   DEPLOY_BASE_DIR="/home/validation/camera/release/bin"
+   DEPLOY_BASE_DIR="/home/validation/camera/release/ncmir/bin"
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
-
-
 
 if [ "$HOST" == "NOTSET" ] ; then
   echo "Please setup $DEPLOY_ENV in this script $0"
