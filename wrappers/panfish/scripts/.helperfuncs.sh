@@ -49,6 +49,23 @@ declare -r MERGE_TILES_ITERATION_FILE="merge.tiles.iteration"
 declare -r MERGE_TILES_FAILED_PREFIX="failed.merge.tiles"
 declare -r MERGE_TILES_TMP_FILE="${MERGE_TILES_FAILED_PREFIX}.${JOBS_SUFFIX}.tmp"
 declare -r MERGE_TILES_FAILED_FILE="${MERGE_TILES_FAILED_PREFIX}.${JOBS_SUFFIX}"
+
+# Train defines
+declare -r CHM_TRAIN_BINARY="CHM_train"
+declare -r CHM_TRAIN_SH="CHM_train.sh"
+declare -r CHM_TRAIN_OUT_DIR_NAME="runCHMTrainOut"
+declare -r CHM_TRAIN_TRAINEDMODEL_OUT_DIR_NAME="trainedmodel"
+declare -r RUN_CHM_TRAIN_SH="runCHMTrain.sh"
+declare -r RUN_CHM_TRAIN_CONFIG="${RUN_CHM_TRAIN_SH}.config"
+declare -r RUN_CHM_TRAIN_VIA_PANFISH_SH="runCHMTrainViaPanfish.sh"
+declare -r CHM_TRAIN_CHUM_OUT="chm.train.chum.out"
+declare -r CHM_TRAIN_CAST_OUT_FILE="chm.train.cast.out"
+declare -r CHM_TRAIN_ITERATION_FILE="chm.train.iteration"
+declare -r CHM_TRAIN_FAILED_PREFIX="failed.chmtrain.tiles"
+declare -r CHM_TRAIN_TMP_FILE="${CHM_TRAIN_FAILED_PREFIX}.${JOBS_SUFFIX}.tmp"
+declare -r CHM_TRAIN_FAILED_FILE="${CHM_TRAIN_FAILED_PREFIX}.${JOBS_SUFFIX}"
+
+
 # Command defines
 declare MV_CMD="/bin/mv"
 declare RM_CMD="/bin/rm"
@@ -112,6 +129,12 @@ function parseProperties {
   MERGE_TILES_CHUMMEDLIST=`egrep "^mergetiles.cluster.list" $theConfig | $SED_CMD "s/^.*= *//"`
   LAND_MERGE_TILES_OPTS=`egrep "^land.mergetiles.options" $theConfig | $SED_CMD "s/^.*= *//"`
   CHUM_MERGE_TILES_OPTS=`egrep "^chum.mergetiles.options" $theConfig | $SED_CMD "s/^.*= *//"`
+
+  CHM_TRAIN_CHUMMEDLIST=`egrep "^chmtrain.cluster.list" $theConfig | $SED_CMD "s/^.*= *//"`
+  CHUM_CHM_TRAIN_OPTS=`egrep "^chum.chmtrain.options" $theConfig | $SED_CMD "s/^.*= *//"` 
+  LAND_CHM_TRAIN_OPTS=`egrep "^land.chmtrain.options" $theConfig | $SED_CMD "s/^.*= *//"`
+  CHM_TRAIN_BATCH_AND_WALLTIME_ARGS=`egrep "^chmtrain.batch.and.walltime.args" $theConfig | $SED_CMD "s/^.*= *//"`
+
 
   CASTBINARY="${PANFISH_BIN_DIR}panfishcast"
   CHUMBINARY="${PANFISH_BIN_DIR}panfishchum"
