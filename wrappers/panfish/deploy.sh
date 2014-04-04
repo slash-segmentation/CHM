@@ -40,6 +40,18 @@ if [ $? != 0 ] ; then
   exit 1
 fi
 
+# copy over createCHMTrainJob.sh
+/bin/cp createCHMTrainJob.sh $TMPINSTALLDIR/.
+if [ $? != 0 ] ; then
+  echo "Error unable to run /bin/cp createCHMTrainJob.sh $TMPINSTALLDIR/."
+  exit 1
+fi
+
+chmod a+x $TMPINSTALLDIR/createCHMTrainJob.sh
+if [ $? != 0 ] ; then
+  echo "Error unable to run chmod a+x $TMPINSTALLDIR/createCHMTrainJob.sh"
+  exit 1
+fi
 
 # copy over scripts folder
 /bin/cp -a scripts $TMPINSTALLDIR/.
