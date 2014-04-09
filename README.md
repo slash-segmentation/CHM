@@ -10,6 +10,9 @@ Some additional details about running the algorithm or any of the wrappers is
 contained in readmes in the respective directories. However, for general usage
 this readme will suffice.
 
+If you use this program please cite the following paper:
+M. Seyedhosseini, M. Sajjadi, and T. Tasdizen. Image segmentation with cascaded hierarchical models and logistic disjunctive normal networks. In ICCV 2013.
+
 
 Basic Usage
 ===========
