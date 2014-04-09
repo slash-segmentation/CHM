@@ -32,10 +32,41 @@ function chumJobData {
   local task=$1
   local iteration=$2
   local jobDir=$3
- 
-  chumData "$CHM_TRAIN_CHUMMEDLIST" "$jobDir" "$CHM_TRAIN_CHUM_OUT" "$CHUM_CHM_TRAIN_OPTS"
-  return $?
 
+  # parse the first job for image directory
+  getParameterForTaskFromConfig "1" "1" "$jobDir/$RUN_CHM_TRAIN_CONFIG"
+  if [ $? != 0 ] ; then
+    return 1
+  fi
+  local imageDir=$TASK_CONFIG_PARAM
+
+  # parse first job for label directory
+  getParameterForTaskFromConfig "1" "2" "$jobDir/$RUN_CHM_TRAIN_CONFIG"
+  if [ $? != 0 ] ; then
+    return 2
+  fi
+  local labelDir=$TASK_CONFIG_PARAM
+
+  # Upload image directory
+  chumData "$CHM_TRAIN_CHUMMEDLIST" "$imageDir" "$CHM_TRAIN_CHUM_OUT" "$CHUM_CHM_TRAIN_IMAGE_OPTS"
+
+  if [ $? != 0 ] ; then
+    return 3
+  fi
+ 
+  # Upload label directory
+  chumData "$CHM_TRAIN_CHUMMEDLIST" "$labelDir" "$CHM_TRAIN_CHUM_OUT" "$CHUM_CHM_TRAIN_LABEL_OPTS"
+  if [ $? != 0 ] ; then
+    return 4
+  fi
+
+  # Upload job directory
+  chumData "$CHM_TRAIN_CHUMMEDLIST" "$jobDir" "$CHM_TRAIN_CHUM_OUT" "$CHUM_CHM_TRAIN_OPTS"
+  if [ $? != 0 ] ; then
+    return 5
+  fi
+
+  return 0
 }
 
 #
