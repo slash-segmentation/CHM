@@ -1,7 +1,7 @@
 Cascaded Hierarchical Model Automatic Segmentation Algorithm
 ============================================================
-This is an algorithm designed for automatic segmention of cellular structures
-in electron microscopy data.
+This is an algorithm designed for automatic segmention of images, including
+natural scene processing and cellular structures in electron microscopy data.
 
 The core algorithm is in the "algorithm" directory while wrappers for it to do
 things such as run on a cluster are in the "wrappers" directory.
@@ -19,19 +19,24 @@ Basic Usage
 The two main entry points are `CHM_train.sh` and `CHM_test.sh`. The raw MATLAB
 and compiled versions work very similarly. It is recommend for most people to
 use these scripts as they simplify many of the options. However in some cases
-the use of the MATLAB functions `CHM_test` and `CHM_train` are fairly similar
-and may be used. All optional arguments must be at the end.
+the use of the MATLAB functions `CHM_test` and `CHM_train` mya be desirable and
+are fairly similar. All optional arguments must be at the end.
 
 
 Prerequisites
 -------------
-If you have a MATLAB license with the Image Processing toolbox you need the
-entire algorithm folder. If you don't then you need the wrappers/compiled
-folder along with installing the the MCR for the MATLAB version listed in the
-file matlab-version.txt. The MCR can be downloaded from the Mathworks
-website: http://www.mathworks.com/products/compiler/mcr/. Then make sure the
-'matlab' command is on your PATH (basically `which matlab` works on the
-command-line).
+If you have a MATLAB R2009a or newer license with the Image Processing toolbox
+you need the entire algorithm folder. If you don't then you need the
+wrappers/compiled folder along with installing the the MCR for the MATLAB
+version listed in the file matlab-version.txt. The MCR can be downloaded for
+free from the Mathworks website: http://www.mathworks.com/products/compiler/mcr/.
+Then make sure the 'matlab' command is on your PATH (basically `which matlab`
+works on the command-line).
+
+Currently both are made and tested on Linux 64-bit machines. The compiled
+version cannot be run on any other architectures. To run the source version on
+a different architecture you must run the "compile_mex_files.m" script inside
+MATLAB.
 
 
 Training
@@ -167,9 +172,10 @@ possible before hitting the next integer.
 
 Compiled Version Differences
 ----------------------------
-The compiled version always run in single-threaded mode (and thus ignores the
+The compiled version always runs in single-threaded mode (and thus ignores the
 -s flag). Also, you can specify the MATLAB/MCR location using the -M argument.
 It also looks for two environmental variables: MCR_DIR (same as -M argument)
 and MCR_CACHE_ROOT which sets where the program should unpack itself to, and
 should be some local file path (not on the network). The cache dir defaults to
-/tmp/mcr_cache_root_$USER
+/tmp/mcr_cache_root_$USER. Setting it to a non-existent directory disables
+caching.
