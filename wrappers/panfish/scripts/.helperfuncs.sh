@@ -132,6 +132,11 @@ function parseProperties {
 
   CHM_TRAIN_CHUMMEDLIST=`egrep "^chmtrain.cluster.list" $theConfig | $SED_CMD "s/^.*= *//"`
   CHUM_CHM_TRAIN_OPTS=`egrep "^chum.chmtrain.options" $theConfig | $SED_CMD "s/^.*= *//"` 
+
+  CHUM_CHM_TRAIN_IMAGE_OPTS=`egrep "^chum.chmtrain.image.options" $theConfig | $SED_CMD "s/^.*= *//"`
+
+  CHUM_CHM_TRAIN_LABEL_OPTS=`egrep "^chum.chmtrain.label.options" $theConfig | $SED_CMD "s/^.*= *//"`
+
   LAND_CHM_TRAIN_OPTS=`egrep "^land.chmtrain.options" $theConfig | $SED_CMD "s/^.*= *//"`
   CHM_TRAIN_BATCH_AND_WALLTIME_ARGS=`egrep "^chmtrain.batch.and.walltime.args" $theConfig | $SED_CMD "s/^.*= *//"`
 

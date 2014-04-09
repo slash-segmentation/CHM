@@ -105,30 +105,142 @@ teardown(){
 
   . $RUN_CHM_TRAIN_VIA_PANFISH source
 
-  # Test where chumData fails
- echo "CHM_TRAIN_CHUMMEDLIST=chum.q
-   CHUM_CHM_TRAIN_OPTS=opts
-   function chumData {
+
+  # Test where there is an error parsing config for 1st parameter
+   echo "
+   function getParameterForTaskFromConfig {
    echo \$*
    return 1
-}" > "$THE_TMP/chum.sh"
-  . "$THE_TMP/chum.sh"
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" $THE_TMP
 
-  run chumJobData "runCHMTrain.sh" "1" "$THE_TMP"
-  [ "$status" -eq 1 ]
-  [ "${lines[0]}" == "chum.q $THE_TMP $CHM_TRAIN_CHUM_OUT opts" ]
+  [ "$status" -eq 1 ] 
+  [ "${lines[0]}" == "1 1 $THE_TMP/$RUN_CHM_TRAIN_CONFIG" ]
 
-  # Test where chumData succeeds
-   echo "CHM_TRAIN_CHUMMEDLIST=chum.q
-   CHUM_CHM_TRAIN_OPTS=opts
+
+  # Test where there is an error parsing config for 2nd parameter
+   echo "
+   function getParameterForTaskFromConfig {
+   if [ \$2 -eq 2 ] ; then
+     echo \$*
+     return 1
+   fi
+     return 0
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" $THE_TMP
+
+  [ "$status" -eq 2 ]
+  [ "${lines[0]}" == "1 2 $THE_TMP/$RUN_CHM_TRAIN_CONFIG" ]
+
+  
+  # Test where upload image directory chum fails
+  echo "
+   CHM_TRAIN_CHUMMEDLIST=chum.q
+   CHUM_CHM_TRAIN_IMAGE_OPTS=imageopts
    function chumData {
-   echo \$*
-   return 0
-}" > "$THE_TMP/chum.sh"
-  . "$THE_TMP/chum.sh"
-    run chumJobData "runCHMTrain.sh" "3" "hi"
+     echo \$*
+     return 1
+   }
+   function getParameterForTaskFromConfig {
+     if [ \$2 -eq 1 ] ; then
+       TASK_CONFIG_PARAM=images
+     fi
+     if [ \$2 -eq 2 ] ; then
+       TASK_CONFIG_PARAM=labels
+     fi
+     return 0
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" $THE_TMP
+
+  [ "$status" -eq 3 ]
+  echo "$output" 1>&2
+  [ "${lines[0]}" == "chum.q images chm.train.chum.out imageopts" ]
+
+
+  # Test where upload label directory chum fails
+  echo "
+   CHM_TRAIN_CHUMMEDLIST=chum.q
+   CHUM_CHM_TRAIN_IMAGE_OPTS=imageopts
+   CHUM_CHM_TRAIN_LABEL_OPTS=labelopts
+   function chumData {
+     if [ \$2 == images ] ; then
+       return 0
+     fi 
+     echo \$*
+     return 1
+   }
+   function getParameterForTaskFromConfig {
+     if [ \$2 -eq 1 ] ; then
+       TASK_CONFIG_PARAM=images
+     fi
+     if [ \$2 -eq 2 ] ; then
+       TASK_CONFIG_PARAM=labels
+     fi
+     return 0
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" $THE_TMP
+
+  [ "$status" -eq 4 ]
+  [ "${lines[0]}" == "chum.q labels chm.train.chum.out labelopts" ]
+
+  # Test where upload job directory chum fails
+    echo "
+   CHM_TRAIN_CHUMMEDLIST=chum.q
+   CHUM_CHM_TRAIN_IMAGE_OPTS=imageopts
+   CHUM_CHM_TRAIN_LABEL_OPTS=labelopts
+   CHUM_CHM_TRAIN_OPTS=jobopts
+   function chumData {
+     if [ \$2 == images ] ; then
+       return 0
+     fi
+     if [ \$2 == labels ] ; then
+       return 0
+     fi
+     echo \$*
+     return 1
+   }
+   function getParameterForTaskFromConfig {
+     if [ \$2 -eq 1 ] ; then
+       TASK_CONFIG_PARAM=images
+     fi
+     if [ \$2 -eq 2 ] ; then
+       TASK_CONFIG_PARAM=labels
+     fi
+     return 0
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" ha
+
+  [ "$status" -eq 5 ]
+  echo "$output" 1>&2
+  [ "${lines[0]}" == "chum.q ha chm.train.chum.out jobopts" ]
+
+
+  # Test success
+      echo "
+   CHM_TRAIN_CHUMMEDLIST=chum.q
+   function chumData {
+     return 0
+   }
+   function getParameterForTaskFromConfig {
+     if [ \$2 -eq 1 ] ; then
+       TASK_CONFIG_PARAM=images
+     fi
+     if [ \$2 -eq 2 ] ; then
+       TASK_CONFIG_PARAM=labels
+     fi
+     return 0
+   }" > "$THE_TMP/chum.sh"
+   . "$THE_TMP/chum.sh"
+  run chumJobData "1" "1" ha
+
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" == "chum.q hi $CHM_TRAIN_CHUM_OUT opts" ]
+
+
 }
 
 # -h flag
