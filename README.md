@@ -40,14 +40,16 @@ seperated list of the following:
  * path to a folder            - all PNGs in that folder
  * path to a file              - only that file
  * path with numerical pattern - get all files matching the pattern
-     pattern must have #s in it and end with a semicolon and number range
-     the #s are replaced by the values at the end with leading zeros
-     example: `in/####.png;5-15` would do in/0005.png through in/0015.png
-     note: the semicolon needs to be escaped or in quotes in some shells
+   pattern must have #s in it and end with a semicolon and number range
+   the #s are replaced by the values at the end with leading zeros
+   example: `in/####.png;5-15` would do in/0005.png through in/0015.png  
+   Note: the semicolon needs to be escaped or in quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
-     pattern has * in it which means any number of any characters
-     example: `in/*.tif` does all TIFF images in that directory
-     note: the asterisk needs to be escaped or in quotes in some shells
+   pattern has * in it which means any number of any characters
+   example: `in/*.tif` does all TIFF images in that directory  
+   Note: the asterisk needs to be escaped or in quotes in some shells
+
+
 All training images must be the same size.
 
 Training will take on the order of a day to complete and require lots of
