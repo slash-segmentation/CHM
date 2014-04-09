@@ -131,7 +131,7 @@ isn't the most computationally heavy step so doesn't save too much time
 
 If training goes faster, then testing with that model will go faster as well.
 
-Testing has a lot more room speed-ups since it can be heavily parallelized.
+Testing has a lot more room for speed-ups since it can be heavily parallelized.
 First, in the basic usage, testing will attempt to use all physical cores (up
 to 12) for the bulk of each image (note that for the first 3 "tiles" of each
 image it will not be done in parallel).
