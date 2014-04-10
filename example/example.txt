@@ -1,0 +1,63 @@
+Example CHM Run - With Training and Testing
+===========================================
+
+Every line starting with $ is a command to run in the Linux shell. Everything
+else are comments. We are assuming that the folders trainImages, trainLabels,
+and testImages are all copied to the CHM folder (either compiled or source) and
+your working directory is the CHM folder.
+
+You could easily set it up so that CHM_train.sh and CHM_test.sh are on your
+path instead. In that case you would have those image folders in your working
+directory, which could be any folder. Also, you would remove the ./ from the
+example commands.
+
+The example is just two commands:
+
+ $ ./CHM_train.sh trainImages trainLabels
+ $ ./CHM_test.sh testImages outputImages
+
+Below we go into further details.
+
+
+Training
+--------
+We have to train using the training data and labels, which are in the folders
+trainImages and trainLabels respectively.
+
+ $ ./CHM_train.sh trainImages trainLabels
+ 
+This will generate a folder called "temp" which holds the model (this can be
+changeed with the -m option).
+
+If you were using TIFF (or another format images instead of PNGs, you would run
+something like "./CHM_train.sh 'trainImages/*.tif' 'trainLabels/*.tif'"
+instead. If your training images were a subset of the testing images, other
+options are available as well, please see the full readme for that.
+
+Other options include setting the number of levels and stages for the algorithm
+(-L and -S) and running in single-threaded mode (-s). See the full readme for
+more information.
+
+
+Testing
+-------
+The testing program has a lot of options, all of which have good defaults so
+you can simply do the following:
+
+ $ ./CHM_test.sh testImages outputImages
+
+This will run every PNG image in testImages and output probability maps of the
+same name and file format in outputImages. The input images can also be
+specified as single images (e.g. testImages/slice01.png) and the other patterns
+(e.g. 'testImages/*.tif' - quotes are critical). See the full readme for more
+information.
+
+The defaults that are used are:
+ * The model folder is ./temp (-m to change)
+ * The images are split into tiles of the size of the training image before
+   testing (-b to change, but should not be necessary)
+ * Those tiles are overlap each other by 50 pixels on each side (-o to change)
+ * All tiles are processed (-t to select only some tiles)
+ * Up to 12 cores are used (-s to run single-threaded)
+ * The images need to have their histogram equalized to the training data's
+   histogram (-h to prevent, but only if you have done so yourself)
