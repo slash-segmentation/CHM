@@ -82,7 +82,7 @@ end
 im = imread(files_tr{1});
 TrainingSize = size(im);
 if numel(TrainingSize) ~= 2; error('You must use grayscale images'); end;
-[hgram,~] = imhist(im{1});
+[hgram,~] = imhist(im);
 for i = 2:length(files_tr);
     im = imread(files_tr{i});
     if TrainingSize ~= size(im); error('All training images must have the same dimensions'); end;
