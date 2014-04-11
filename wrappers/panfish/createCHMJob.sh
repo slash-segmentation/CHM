@@ -240,7 +240,7 @@ function createCHMTestConfig {
     for (( y=0 ; y < ${#tileSets[@]} ; y++ )) ; do
       echo "${cntr}${CONFIG_DELIM}${z}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}${modelDir}" >> "$configFile"
-      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]}" >> "$configFile"
+      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]} -h" >> "$configFile"
       outputFile="${OUT_DIR_NAME}/${imageName}.${IMAGE_TILE_DIR_SUFFIX}/${cntr}.${imageSuffix}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}$outputFile" >> "$configFile"
       let cntr++
