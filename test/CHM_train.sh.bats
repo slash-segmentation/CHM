@@ -3,7 +3,7 @@
 setup() {
   CHM_TEST="${BATS_TEST_DIRNAME}/../algorithm/CHM_test.sh"
   CHM_TRAIN="${BATS_TEST_DIRNAME}/../algorithm/CHM_train.sh"
-  export THE_TMP="${BATS_TMPDIR}/"`uuidgen`
+  export THE_TMP="${BATS_TMPDIR}/chmtrain."`uuidgen`
   /bin/mkdir -p $THE_TMP
   export SUCCESS_MATLAB="$BATS_TEST_DIRNAME/bin/fakesuccessmatlab"
   export FAIL_MATLAB="$BATS_TEST_DIRNAME/bin/fakefailmatlab"
@@ -12,10 +12,13 @@ setup() {
 
   export FAKE_NPROC="$BATS_TEST_DIRNAME/bin/fakenproc"
   chmod a+x $FAKE_NPROC
+  curdir=`pwd`
+  cd $THE_TMP
 }
 
 teardown() {
-  /bin/rmdir $THE_TMP
+  cd $curdir
+  /bin/rm -rf $THE_TMP
 }
 
 #
