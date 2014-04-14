@@ -297,7 +297,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}   -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}   -t 1,1 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -334,7 +334,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 1,1 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -372,7 +372,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 3,2" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 3,2 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -384,7 +384,7 @@ teardown(){
   [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 3,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 3,1 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
@@ -396,7 +396,7 @@ teardown(){
   [ "$aLine" == "3${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 11 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "3${CONFIG_DELIM}-o 1x1  -t 2,2" ]
+  [ "$aLine" == "3${CONFIG_DELIM}-o 1x1  -t 2,2 -h" ]
   aLine=`head -n 12 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "3${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/3.png" ]
 
@@ -407,7 +407,7 @@ teardown(){
   [ "$aLine" == "4${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 15 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "4${CONFIG_DELIM}-o 1x1  -t 2,1" ]
+  [ "$aLine" == "4${CONFIG_DELIM}-o 1x1  -t 2,1 -h" ]
 
   aLine=`head -n 16 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "4${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/4.png" ]
@@ -419,7 +419,7 @@ teardown(){
   [ "$aLine" == "5${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 19 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "5${CONFIG_DELIM}-o 1x1  -t 1,2" ]
+  [ "$aLine" == "5${CONFIG_DELIM}-o 1x1  -t 1,2 -h" ]
 
   aLine=`head -n 20 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "5${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/5.png" ]
@@ -431,7 +431,7 @@ teardown(){
   [ "$aLine" == "6${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 23 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "6${CONFIG_DELIM}-o 1x1  -t 1,1" ]
+  [ "$aLine" == "6${CONFIG_DELIM}-o 1x1  -t 1,1 -h" ]
 
   aLine=`head -n 24 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "6${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/6.png" ]
@@ -468,7 +468,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -505,7 +505,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -517,7 +517,7 @@ teardown(){
   [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 1,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 1,1 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/1.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
@@ -555,7 +555,7 @@ teardown(){
   [ "$aLine" == "1${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 3 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "1${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "1${CONFIG_DELIM}${OUT_DIR_NAME}/hist1.png.${IMAGE_TILE_DIR_SUFFIX}/1.png" ]
@@ -567,7 +567,7 @@ teardown(){
   [ "$aLine" == "2${CONFIG_DELIM}modeldir" ]
 
   aLine=`head -n 7 "$THE_TMP/foo" | tail -n 1`
-  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "2${CONFIG_DELIM}-o 1x1  -t 2,3 -t 2,2 -t 2,1 -t 1,3 -t 1,2 -t 1,1 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/foo" | tail -n 1`
   [ "$aLine" == "2${CONFIG_DELIM}${OUT_DIR_NAME}/hist2.png.${IMAGE_TILE_DIR_SUFFIX}/2.png" ]
@@ -687,7 +687,7 @@ teardown(){
   [ "$aLine" == "1:::$THE_TMP/model" ]
 
   aLine=`head -n 3 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::   -b 200x100  -t 3,4" ]
+  [ "$aLine" == "1:::   -b 200x100  -t 3,4 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
@@ -699,7 +699,7 @@ teardown(){
   [ "$aLine" == "2:::$THE_TMP/model" ]
 
   aLine=`head -n 7 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::   -b 200x100  -t 3,3" ]
+  [ "$aLine" == "2:::   -b 200x100  -t 3,3 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]
@@ -711,7 +711,7 @@ teardown(){
   [ "$aLine" == "12:::$THE_TMP/model" ]
 
   aLine=`head -n 47 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "12:::   -b 200x100  -t 1,1" ]
+  [ "$aLine" == "12:::   -b 200x100  -t 1,1 -h" ]
 
   aLine=`head -n 48 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "12:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/12.png" ]
@@ -768,7 +768,7 @@ teardown(){
   [ "$aLine" == "1:::$THE_TMP/model" ]
 
   aLine=`head -n 3 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::   -b 200x100  -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,4 -t 1,3 -t 1,2 -t 1,1" ]
+  [ "$aLine" == "1:::   -b 200x100  -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,4 -t 1,3 -t 1,2 -t 1,1 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
@@ -823,7 +823,7 @@ teardown(){
   [ "$aLine" == "1:::$THE_TMP/model" ]
 
   aLine=`head -n 3 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2" ]
+  [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
@@ -835,7 +835,7 @@ teardown(){
   [ "$aLine" == "2:::$THE_TMP/model" ]
 
   aLine=`head -n 7 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1" ]
+  [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]
@@ -894,7 +894,7 @@ teardown(){
   [ "$aLine" == "1:::$THE_TMP/model" ]
 
   aLine=`head -n 3 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2" ]
+  [ "$aLine" == "1:::  -o 4x5  -b 200x100  -t 4,5 -t 4,4 -t 4,3 -t 4,2 -t 4,1 -t 3,5 -t 3,4 -t 3,3 -t 3,2 -t 3,1 -t 2,5 -t 2,4 -t 2,3 -t 2,2 -t 2,1 -t 1,5 -t 1,4 -t 1,3 -t 1,2 -h" ]
 
   aLine=`head -n 4 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "1:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/1.png" ]
@@ -906,7 +906,7 @@ teardown(){
   [ "$aLine" == "2:::$THE_TMP/model" ]
 
   aLine=`head -n 7 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
-  [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1" ]
+  [ "$aLine" == "2:::  -o 4x5  -b 200x100  -t 1,1 -h" ]
 
   aLine=`head -n 8 "$THE_TMP/run/runCHM.sh.config" | tail -n 1`
   [ "$aLine" == "2:::${BATS_TEST_OUT_DIR_NAME}/600by400.png.tiles/2.png" ]

@@ -45,7 +45,7 @@ Optional Arguments:
 # Parse and minimally check arguments
 if [[ $# -lt 2 ]]; then usage; fi
 if [[ $# -gt 2 ]] && [ "${3:0:1}" != "-" ]; then
-  echo "You provided more than 2 requried arguments. Did you accidently use a glob expression without escaping the asterisk?" 1>&2; echo; usage; 
+  echo "You provided more than 2 required arguments. Did you accidently use a glob expression without escaping the asterisk?" 1>&2; echo; usage; 
 fi
 INPUTS=$1;
 LABELS=$2;

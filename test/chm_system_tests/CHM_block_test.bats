@@ -181,7 +181,7 @@ teardown() {
     skip "compare (Image Magick program) not in path"
   fi 
 
-  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -t 1,1
+  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -t 1,1 -o 0x0
 
   echo "Output from compare: $output" 1>&2
 
@@ -221,7 +221,7 @@ teardown() {
     skip "compare (Image Magick program) not in path"
   fi
 
-  run $CHM_TEST $TWOHONDO_IMAGE_TIFF $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -t 1,1
+  run $CHM_TEST $TWOHONDO_IMAGE_TIFF $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -o 0x0 -t 1,1
 
   echo "Output from compare: $output" 1>&2
 
@@ -260,7 +260,7 @@ teardown() {
     skip "compare (Image Magick program) not in path"
   fi
 
-  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -t 1,2 -t 3,5
+  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -o 0x0 -t 1,2 -t 3,5
 
   echo "Output from compare: $output" 1>&2
 

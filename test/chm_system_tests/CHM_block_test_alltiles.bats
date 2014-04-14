@@ -34,7 +34,7 @@ teardown() {
     skip "compare (Image Magick program) not in path"
   fi
 
-  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190
+  run $CHM_TEST $TWOHONDO_IMAGE $THE_TMP -m $TWOHONDO_TRAIN_DIR -s -b 200x190 -o 0x0
   [ "$status" -eq 0 ] 
 
   # Verify result image matches closely to original result
