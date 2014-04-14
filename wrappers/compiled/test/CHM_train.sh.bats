@@ -10,9 +10,13 @@ setup() {
   export FAKE_SUCCESS="${BATS_TEST_DIRNAME}/bin/fakesuccess/success.sh"
   export FAKE_FAIL="${BATS_TEST_DIRNAME}/bin/fakefail/fail.sh"
   export CHM_TRAIN_NAME="CHM_train"
+  curdir=`pwd`
+  cd $THE_TMP
+
 }
 
 teardown() {
+  cd $curdir
   /bin/rm -rf $THE_TMP
 }
 
