@@ -180,7 +180,7 @@ SOURCE="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 
 
 # Run the main matlab script
-$SOURCE/CHM_test_blocks "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]" "${HIST_EQ}";
+$SOURCE/CHM_test "${INPUT}" "${OUTPUT}" "$BLOCKSIZE" "[${OVERLAP_H} ${OVERLAP_W}]" "${MODEL_FOLDER}" "[${TILES}]" "${HIST_EQ}";
 
 
 # Done
