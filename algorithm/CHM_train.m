@@ -115,6 +115,7 @@ opened_pool = 0;
 try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
 
 % Train the CHM
+rng('shuffle'); % Comment this line out to get consitent results
 for s = Nstage_start:Nstage
     for l = Nlevel_start:Nlevel
         model = trainCHM(files_tr,files_la,savingpath,s,l,PixN(l+1),param); % uses Nfeat, Nfeatcontext, and Nlevel from param
