@@ -20,6 +20,7 @@ setup() {
 }
 
 teardown() {
+  #echo "skipping delete of $THE_TMP" 1>&2
   /bin/rm -rf "$THE_TMP" 1>&2
 }
 
@@ -27,7 +28,7 @@ teardown() {
 # Train and Test
 # Test single tile -s -b 100x95 -t 1,1 from 100x95train
 #
-@test "Train and Test single tile -s -b 100x95 -t 1,1 from 100x95rain (5 min runtime)" {
+@test "Train and Test single tile -s -b 100x95 -t 1,1 from 100x95train (5 min runtime)" {
   # Verify matlab is in the users path via which command
   run which matlab
 
@@ -44,7 +45,7 @@ teardown() {
 
   /bin/mkdir -p "$THE_TMP/result" 1>&2
 
-  run $CHM_TRAIN "$ONEHONDO_TINYIMAGES_DIR" "$ONEHONDO_TINYLABELS_DIR" -m "$THE_TMP/result" -S 2 -L 1 -s -M /home/churas/bin/matlab2013amcr/v81
+  run $CHM_TRAIN "$ONEHONDO_TINYIMAGES_DIR" "$ONEHONDO_TINYLABELS_DIR" -m "$THE_TMP/result" -S 2 -L 1 -s
 
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
@@ -52,41 +53,39 @@ teardown() {
 
   run $CHM_TEST $ONEHONDO_TINYIMAGE $THE_TMP -m "$THE_TMP/result" -s -b 100x95 -t 1,1 -o 0x0 -h
 
-  echo "Output from compare: $output" 1>&2
+  echo "Output from compare 1: $output" 1>&2
 
   [ "$status" -eq 0 ]
   
   # Verify result image was created
   [ -s "$THE_TMP/5.png" ]
    
-  run compare -metric ae "$THE_TMP/5.png" $ONEHONDO_DIR/5.alltiles.probmap.nooverlap.png /dev/null
+  run compare -fuzz 7% -metric ae "$THE_TMP/5.png" $ONEHONDO_DIR/5.alltiles.probmap.nooverlap.png /dev/null
 
-  echo "Output from compare: $output" 1>&2
+  echo "Output from compare 1: $output" 1>&2
   # verify the comparison ran without error
   [ "$status" -eq 0 ]
 
   # verify that no more then 0 pixels have different intensities
-  [ "${lines[0]}" -eq 0 ]
+  [ "${lines[0]}" -lt 1 ]
 
   # no run CHM again this time with no -h
   run $CHM_TEST $ONEHONDO_TINYIMAGE $THE_TMP -m "$THE_TMP/result" -s -b 100x95 -t 1,1 -o 0x0 
 
-  echo "Output from compare: $output" 1>&2
+  echo "Output from compare 2: $output" 1>&2
 
   [ "$status" -eq 0 ]
 
   # Verify result image was created
   [ -s "$THE_TMP/5.png" ]
 
-  run compare -metric ae "$THE_TMP/5.png" $ONEHONDO_DIR/5.alltiles.probmap.nooverlap.png /dev/null
+  run compare -fuzz 7% -metric ae "$THE_TMP/5.png" $ONEHONDO_DIR/5.alltiles.probmap.nooverlap.png /dev/null
 
-  echo "Output from compare: $output" 1>&2
+  echo "Output from compare 2: $output" 1>&2
   # verify the comparison ran without error
   [ "$status" -eq 0 ]
 
   # verify that no more then 0 pixels have different intensities
-  [ "${lines[0]}" -eq 0 ]
-
-
+  [ "${lines[0]}" -lt 1 ]
 }
 
