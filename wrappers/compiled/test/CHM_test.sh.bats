@@ -8,7 +8,7 @@ setup() {
   export CHM_TEST="$THE_TMP/CHM_test.sh"
   export FAKE_SUCCESS="${BATS_TEST_DIRNAME}/bin/fakesuccess/success.sh"
   export FAKE_FAIL="${BATS_TEST_DIRNAME}/bin/fakefail/fail.sh"
-  export CHM_TEST_BLOCKS_NAME="CHM_test_blocks"
+  export CHM_TEST_NAME="CHM_test"
 }
 
 teardown() {
@@ -110,8 +110,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and 2 basic arguments and -M" {
   
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
  
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2 
@@ -131,8 +131,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and 2 basic arguments and -h" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
  
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -155,8 +155,8 @@ teardown() {
 @test "CHM_test.sh with fake fail matlab and 2 basic arguments" {
   
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_FAIL "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_FAIL "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
  
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -176,8 +176,8 @@ teardown() {
 @test "CHM_test.sh with basic arguments and -s" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -197,8 +197,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and block size argument" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -217,8 +217,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and block size and overlap argument" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -239,8 +239,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and single valid value for block size" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -259,8 +259,8 @@ teardown() {
 @test "CHM_test.sh with fake successful matlab and single valid value for overlap size" {
 
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -280,8 +280,8 @@ teardown() {
 @test "CHM_test.sh with overlap argument but no block size argument" {
  
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -301,8 +301,8 @@ teardown() {
 @test "CHM_test.sh with tile argument but no block size argument" {
 
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -397,8 +397,8 @@ teardown() {
 #
 @test "CHM_test.sh with valid overlap size 0x2" {
   # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -419,8 +419,8 @@ teardown() {
 @test "CHM_test.sh with valid overlap size 2x0" {
 
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -441,8 +441,8 @@ teardown() {
 @test "CHM_test.sh with valid overlap size 0x0 and -h" {
 
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -496,8 +496,8 @@ teardown() {
 #
 @test "CHM_test.sh valid tile -t 0,0" {
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -515,8 +515,8 @@ teardown() {
 #
 @test "CHM_test.sh valid tile -t -1,-1 -o 3x7" {
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
@@ -535,8 +535,8 @@ teardown() {
 #
 @test "CHM_test.sh multiple valid tiles with repeat -t 1,1 -t 2,3 -t 1,1 -h" {
     # put fake CHM_test in $THE_TMP
-  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
-  chmod a+x "$THE_TMP/$CHM_TEST_BLOCKS_NAME" 1>&2
+  /bin/cp $FAKE_SUCCESS "$THE_TMP/$CHM_TEST_NAME" 1>&2
+  chmod a+x "$THE_TMP/$CHM_TEST_NAME" 1>&2
 
   # setup fake matlab
   /bin/mkdir -p "$THE_TMP/bin/glnxa64" 1>&2
