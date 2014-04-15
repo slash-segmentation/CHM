@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 
 setup() {
-  CHM_TEST="${BATS_TEST_DIRNAME}/../../algorithm/CHM_test.sh"
-  export THE_TMP="${BATS_TMPDIR}/"`uuidgen`
+  CHM_TEST="${BATS_TEST_DIRNAME}/../../CHM_test.sh"
+  export THE_TMP="${BATS_TMPDIR}/chm_test."`uuidgen`
   /bin/mkdir -p $THE_TMP
 
   export TWOHONDO_DIR="${BATS_TEST_DIRNAME}/200x190train"
