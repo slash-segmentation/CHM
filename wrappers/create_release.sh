@@ -21,8 +21,8 @@ rm -rf chm
 
 echo ""
 echo "* Creating 'compiled' version..."
-mkdir ./chm
 matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('cd ./compiled;compile_exec;');";
+mkdir ./chm
 cp ./compiled/CHM_test* ./chm
 cp ./compiled/CHM_train* ./chm
 cp ../LICENSE.txt ./chm
