@@ -1,10 +1,10 @@
 #!/bin/bash
 
 VERSION=2.1 # update manually
-BUILD_NUM=`git rev-list HEAD --count` # number of commits
+BUILD_NUM=`git log --pretty=format:'' | wc -l`  ## `git rev-list HEAD --count` # number of commits
 VERSION=$VERSION.$BUILD_NUM
 
-if [[ -d ./chm ]]; then echo "Temporary directory 'chm' exists, remove it before trying again." 1>&2; exit(1); fi;
+if [[ -d ./chm ]]; then echo "Temporary directory 'chm' exists, remove it before trying again." 1>&2; exit 1; fi;
 
 echo "Creating release v$VERSION... (hopefully you did a git pull before this)"
 
