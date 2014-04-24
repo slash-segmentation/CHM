@@ -7,7 +7,7 @@ setup() {
 
 teardown() {
   cd $curdir
-  stty sane >/dev/null 2>&1 # restore terminal settings
+  #  stty sane >/dev/null 2>&1 # restore terminal settings
 
 }
 #
