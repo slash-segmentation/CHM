@@ -66,8 +66,8 @@ teardown() {
   # verify the comparison ran without error
   [ "$status" -eq 0 ]
 
-  # verify that no more then 0 pixels have different intensities
-  [ "${lines[0]}" -lt 1 ]
+  # verify that no more then 150 pixels have different intensities
+  [ "${lines[0]}" -lt 150 ]
 
   # no run CHM again this time with no -h
   run $CHM_TEST $ONEHONDO_TINYIMAGE $THE_TMP -m "$THE_TMP/result" -s -b 100x95 -t 1,1 -o 0x0 
@@ -85,7 +85,7 @@ teardown() {
   # verify the comparison ran without error
   [ "$status" -eq 0 ]
 
-  # verify that no more then 0 pixels have different intensities
-  [ "${lines[0]}" -lt 1 ]
+  # verify that no more then 150 pixels have different intensities
+  [ "${lines[0]}" -lt 150 ]
 }
 
