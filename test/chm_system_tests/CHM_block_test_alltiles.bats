@@ -44,9 +44,9 @@ teardown() {
 
   # verify the comparison ran without error
   [ "$status" -eq 0 ] 
-
-  # verify that 0 pixels have different intensities
-  [ "${lines[0]}" -eq 0 ]
+  echo "$output:${lines[0]}:" 1>&2
+  # verify that 4 pixels have different intensities
+  [ "${lines[0]}" -lt 4 ]
 }
 
 #
@@ -79,8 +79,8 @@ teardown() {
 
   # verify the comparison ran without error
   [ "$status" -eq 0 ]
-
-  # verify that 0 pixels have different intensities
-  [ "${lines[0]}" -eq 0 ]
+  echo "$output:${lines[0]}:" 1>&2
+  # verify that 4 pixels have different intensities
+  [ "${lines[0]}" -lt 4 ]
 }
 
