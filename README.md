@@ -45,7 +45,7 @@ The first thing you need to run in `CHM_train.sh`. In the most basic usage it
 takes a set of training data images (grayscale) and a set of training label
 images (0=no label, 1=labeled). These file sets are specified as a comma
 seperated list of the following:
- * path to a folder            - all PNGs in that folder
+ * path to a folder            - all PNGs and TIFFs in that folder
  * path to a file              - only that file
  * path with numerical pattern - get all files matching the pattern
    pattern must have #s in it and end with a semicolon and number range
@@ -54,7 +54,7 @@ seperated list of the following:
    Note: the semicolon needs to be escaped or in quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
    pattern has * in it which means any number of any characters
-   example: `in/*.tif` does all TIFF images in that directory  
+   example: `in/lbl_*.tif` does all TIFF images starting with lbl_ in "in"
    Note: the asterisk needs to be escaped or in quotes in some shells
 
 

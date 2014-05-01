@@ -12,7 +12,7 @@ labels. They are matched up in the order they are given. If using a folder or
 wildcard input the order may not be completely predictable, but most systems
 will put these in lexographic order. The files can be specified in multiple
 ways. It needs to be one of the these or a comma-separated list of these:
- * path to a folder            - all PNGs in that folder
+ * path to a folder            - all PNGs and TIFFs in that folder
  * path to a file              - only that file 
  * path with numerical pattern - get all files matching the pattern
      pattern must have #s in it and end with a semicolon and number range
@@ -21,7 +21,7 @@ ways. It needs to be one of the these or a comma-separated list of these:
      note: the semicolon needs to be escaped or in double quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
      pattern has * in it which means any number of any characters
-     example: in/*.tif does all TIFF images in that directory
+     example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
      note: the asterisk needs to be escaped or in double quotes in some shells
 
 Optional Arguments:
