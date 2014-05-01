@@ -19,15 +19,15 @@ elseif ischar(x) && isvector(x);
     type = exist(x, 'file');
     if type == 7;
         % is a directory, grab all PNGs and TIFFs there
-        pngs  = dir(fullfile(x, '*.png'));
-        tifs  = dir(fullfile(x, '*.tif'));
-        tiffs = dir(fullfile(x, '*.tiffs'));
-        n = length(pngs)+length(tifs)+length(tiffs);
-        output = cell(1,n);
-        if n == 0; disp(['No PNG or TIFF files found in "' x '"']); return; end;
-        for i = 1:length(pngs);  output{i} = fullfile(x, pngs(i).name);  end;
-        for i = 1:length(tifs);  output{i} = fullfile(x, tifs(i).name);  end;
-        for i = 1:length(tiffs); output{i} = fullfile(x, tiffs(i).name); end;
+        files = dir(x);
+        output = {};
+        for i = 1:length(files);
+            f = files(i).name;
+            [~, ~, ext] = fileparts(f);
+            ext = lower(ext);
+            if ext == '.png' || ext == '.tif' || ext == '.tiff'; output = [output,fullfile(x,f)]; end;
+        end;
+        if length(output) == 0; disp(['No PNG or TIFF files found in "' x '"']); end;
     elseif type == 2;
         % is a single file
         output = {x};
