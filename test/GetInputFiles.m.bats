@@ -93,6 +93,27 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+#
+# GetInputFiles.m(/dirofPNG)  -- multiple PNG (alternate case)
+#
+@test "GetInputFiles(''/dirwith2PNG'')" {
+
+  # Verify matlab is in the users path via which command
+  run which matlab
+
+  if [ "$status" -eq 1 ] ; then
+    skip "matlab not in path"
+  fi
+
+  touch "$THE_TMP/1.PNG"
+  touch "$THE_TMP/2.PNG"
+
+  run matlab -nodisplay -singleCompThread -nojvm -r "run_from_shell('out=GetInputFiles(''$THE_TMP'');disp(strjoin(out));');"
+  echo "$output" 1>&2
+
+  [[ "${lines[*]: -3:1}" == *"$THE_TMP/1.PNG $THE_TMP/2.PNG" ]]
+  [ "$status" -eq 0 ]
+}
 
 #
 # GetInputFiles.m(/diroftif)  -- 1 tif
@@ -162,7 +183,7 @@ teardown() {
 #
 # GetInputFiles.m(/diroftiff)  -- multiple tiff
 #
-@test "GetInputFiles(''/dirwith2tif'')" {
+@test "GetInputFiles(''/dirwith2tiff'')" {
 
   # Verify matlab is in the users path via which command
   run which matlab
