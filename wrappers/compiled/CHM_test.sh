@@ -2,7 +2,7 @@
 
 usage()
 {
-    echo "CHM Image Testing Phase Script.
+    echo "CHM Image Testing Phase Script.  @@VERSION@@
     
 $0 <input_files> <output_folder> <optional arguments>
   input_files     The input files to use. See below for the specification.

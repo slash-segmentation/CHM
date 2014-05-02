@@ -14,6 +14,7 @@ setup() {
   chmod a+x $FAKE_NPROC
   curdir=`pwd`
   cd $THE_TMP
+  export CHM_TRAIN_PROG_NAME="CHM Image Training Phase Script.  @@VERSION@@"
 }
 
 teardown() {
@@ -28,7 +29,7 @@ teardown() {
   run $CHM_TRAIN
   echo "$output" 1>&2
   [ "$status" -eq 1 ] 
-  [ "${lines[0]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[0]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[1]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
@@ -39,7 +40,7 @@ teardown() {
   run $CHM_TRAIN "$THE_TMP"
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[0]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[1]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
@@ -51,7 +52,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid argument." ]
-  [ "${lines[1]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[1]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[2]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
@@ -64,7 +65,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
   [ "${lines[1]}" = "Model folder could not be created." ]
-  [ "${lines[2]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[2]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[3]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
@@ -76,7 +77,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid number of training stages." ]
-  [ "${lines[1]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[1]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[2]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
@@ -88,7 +89,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid number of training levels." ]
-  [ "${lines[1]}" = "CHM Image Training Phase Script." ]
+  [ "${lines[1]}" = "$CHM_TRAIN_PROG_NAME" ]
   [ "${lines[2]}" = "$CHM_TRAIN <inputs> <labels> <optional arguments>" ]
 }
 
