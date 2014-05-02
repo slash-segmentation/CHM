@@ -1,7 +1,14 @@
 #!/usr/bin/env bats
 
 setup() {
-  CHM_TEST="${BATS_TEST_DIRNAME}/../../CHM_test.sh"
+
+  if [ -n "$CHM_ALT_BIN_DIR" ] ; then
+    CHM_TEST="$CHM_ALT_BIN_DIR/CHM_test.sh"
+  else
+    CHM_TEST="${BATS_TEST_DIRNAME}/../../CHM_test.sh"
+  fi
+  echo "Running tests on $CHM_TEST" 1>&2
+
   export THE_TMP="${BATS_TMPDIR}/chm_test."`uuidgen`
   /bin/mkdir -p $THE_TMP
 

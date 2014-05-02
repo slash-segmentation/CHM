@@ -1,8 +1,15 @@
 #!/usr/bin/env bats
 
 setup() {
-  CHM_TEST="${BATS_TEST_DIRNAME}/../../algorithm/CHM_test.sh"
-  CHM_TRAIN="${BATS_TEST_DIRNAME}/../../algorithm/CHM_train.sh"
+  if [ -n "$CHM_ALT_BIN_DIR" ] ; then
+    CHM_TEST="$CHM_ALT_BIN_DIR/CHM_test.sh"
+    CHM_TRAIN="$CHM_ALT_BIN_DIR/CHM_train.sh"
+  else
+    CHM_TEST="${BATS_TEST_DIRNAME}/../../algorithm/CHM_test.sh"
+    CHM_TRAIN="${BATS_TEST_DIRNAME}/../../algorithm/CHM_train.sh"
+  fi
+  echo "Running tests on $CHM_TEST" 1>&2
+
   export THE_TMP="${BATS_TMPDIR}/chm_train."`uuidgen`
   /bin/mkdir -p $THE_TMP
 
