@@ -46,14 +46,14 @@ else
     hist_eq = ParseArgument(hist_eq);
 end
 
-param_vars = whos('-file', fullfile(savingpath, 'param.mat'))
+param_vars = whos('-file', fullfile(savingpath, 'param.mat'));
 param = load(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage');
 if ischar(blocksize) && strcmpi(blocksize, 'auto')
     if ~ismember('TrainingSize', {param_vars.name}); error('''auto'' was specified for blocksize but model does not contain the training image size'); end;
     pts = load(fullfile(savingpath, 'param.mat'), 'TrainingSize');
     blocksize = pts.TrainingSize;
 end
-my_imread = @imread
+my_imread = @imread;
 if hist_eq
     if ismember('hgram', {param_vars.name})
         pts = load(fullfile(savingpath, 'param.mat'), 'hgram');
