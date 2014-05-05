@@ -9,6 +9,7 @@ setup() {
   export FAKE_SUCCESS="${BATS_TEST_DIRNAME}/bin/fakesuccess/success.sh"
   export FAKE_FAIL="${BATS_TEST_DIRNAME}/bin/fakefail/fail.sh"
   export CHM_TEST_NAME="CHM_test"
+  export CHM_PROG_NAME_LINE="CHM Image Testing Phase Script.  @@VERSION@@"
 }
 
 teardown() {
@@ -21,7 +22,7 @@ teardown() {
   run $CHM_TEST
 
   [ "$status" -eq 1 ] 
-  [ "${lines[0]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[0]}" = "$CHM_PROG_NAME_LINE" ]
   [ "${lines[2]}" = "$CHM_TEST <input_files> <output_folder> <optional arguments>" ]
 }
 
@@ -32,7 +33,7 @@ teardown() {
   run $CHM_TEST foo
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[0]}" = "$CHM_PROG_NAME_LINE" ]
   [ "${lines[2]}" = "$CHM_TEST <input_files> <output_folder> <optional arguments>" ]
 }
 
@@ -50,7 +51,7 @@ teardown() {
   [ "$status" -eq 1 ] 
 
   [ "${lines[0]}" = "Output directory already exists as a file." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
   run rm -f $fakeFile
 
   [ "$status" -eq 0 ]
@@ -70,7 +71,7 @@ teardown() {
   [ "$status" -eq 1 ]
 
   [ "${lines[0]}" = "Model folder is not a directory." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
   run rm -f $fakeFile
 
   [ "$status" -eq 0 ]
@@ -87,7 +88,7 @@ teardown() {
   # this is a little weird.  Looking at CHM_test.sh code I'd expect -invalidarg, but
   # we are getting ? character.
   [ "${lines[0]}" = "Invalid argument: ?." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 #
@@ -100,7 +101,7 @@ teardown() {
   # this is a little weird.  Looking at CHM_test.sh code I'd expect -invalidarg, but
   # we are getting ? character.
   [ "${lines[0]}" = "MATLAB folder is not a directory." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 
@@ -323,7 +324,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x-1
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: 10x-1. Expecting single number or WxH." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 #
@@ -333,7 +334,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b -1x300
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: -1x300. Expecting single number or WxH." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 
@@ -344,7 +345,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x0
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: 10x0. Neither dimension can be 0." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 #
@@ -354,7 +355,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 0x20
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: 0x20. Neither dimension can be 0." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 #
@@ -364,7 +365,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 0x0
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: 0x0. Neither dimension can be 0." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 }
 
 #
@@ -375,7 +376,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: -1x2. Expecting single number or WxH." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 
 }
 
@@ -387,7 +388,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid size: 2x-1. Expecting single number or WxH." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 
 }
 
@@ -463,7 +464,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid position: 4. Expecting COL,ROW." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 
 }
 
@@ -475,7 +476,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid position: 4x4. Expecting COL,ROW." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 
 }
 
@@ -487,7 +488,7 @@ teardown() {
 
   [ "$status" -eq 1 ]
   [ "${lines[0]}" = "Invalid position: foo. Expecting COL,ROW." ]
-  [ "${lines[1]}" = "CHM Image Testing Phase Script." ]
+  [ "${lines[1]}" = "$CHM_PROG_NAME_LINE" ]
 
 }
 

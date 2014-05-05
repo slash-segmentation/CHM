@@ -2,7 +2,7 @@
 
 usage()
 {
-  echo "CHM Image Training Phase Script.
+  echo "CHM Image Training Phase Script.  @@VERSION@@
 
 $0 <inputs> <labels> <optional arguments>
   inputs          The raw image files to use.

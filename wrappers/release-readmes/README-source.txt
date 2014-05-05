@@ -1,5 +1,9 @@
 Cascaded Hierarchical Model Automatic Segmentation Algorithm
 ============================================================
+
+@@VERSION@@
+
+
 This is an algorithm designed for automatic segmention of images, including
 natural scene processing and cellular structures in electron microscopy data.
 

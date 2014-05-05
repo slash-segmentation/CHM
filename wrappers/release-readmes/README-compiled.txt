@@ -1,5 +1,8 @@
 Cascaded Hierarchical Model Automatic Segmentation Algorithm
 ============================================================
+
+@@VERSION@@
+
 This is an algorithm designed for automatic segmention of images, including
 natural scene processing and cellular structures in electron microscopy data.
 
@@ -17,9 +20,9 @@ arguments must be at the end.
 
 Prerequisites
 -------------
-You will need to install the MATLAB Compiler Runtime R2013a (v8.1) from
+You will need to install the MATLAB Compiler Runtime @@MATLAB_RELEASE_VERSION@@ (v@@MATLAB_MCR_VERSION@@) from
 Mathworks (http://www.mathworks.com/products/compiler/mcr/) on a Linux
-64-bit machine. You can also use MATLAB 2013a with the Image Processing
+64-bit machine. You can also use MATLAB @@MATLAB_RELEASE_VERSION@@ with the Image Processing
 Toolbox installed (without needing a license). Then make sure the 'matlab'
 command is on your PATH (basically `which matlab` works on the command-line).
 
