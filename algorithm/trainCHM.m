@@ -88,7 +88,7 @@ save(fullfile(savingpath, ['MODEL_level' num2str(level) '_stage' num2str(stage) 
 % Write the outputs
 fprintf('Generating outputs ... stage %d level %d \n',stage,level);
 str = fullfile(savingpath, ['output_level' num2str(level) '_stage' num2str(stage)]);
-if exist(str,'file')~=7; mkdir(str); end
+if ~FileExists(str,true); mkdir(str); end
 
 if stage==1 || level~=0
     parfor i = 1:ntr

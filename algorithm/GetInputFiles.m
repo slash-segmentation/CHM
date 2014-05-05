@@ -7,8 +7,8 @@ function output = GetInputFiles(x);
 %  * path with numerical pattern - get all files matching the pattern (pattern must have #s in it and end with a ;5-15 or other numbers, the #s are replaced by the values at the end with leading zeros as necessary)
 %  * path with wildcard pattern  - get all files matching the pattern (* in the pattern means any number of any characters)
 if iscellstr(x);
-    output = cellfun(@(f) exist(f, 'file'), x);
-    bad    = x(output~=2);
+    output = cellfun(@(f) FileExists(f), x);
+    bad    = x(~output);
     if length(bad) ~= 0;
         for i = 1:length(bad); disp(['No such file "' bad{i} '"']); end;
         output = x(output==2);
@@ -16,10 +16,7 @@ if iscellstr(x);
         output = x(:);
     end;
 elseif ischar(x) && isvector(x);
-    [d,f,e] = fileparts(x);
-    if strcmp(d, ''); type = exist(fullfile('.', x), 'file'); # Workaround for a bug in MATLAB when `file` is 'input' or some other built-in names
-    else; type = exist(x, 'file'); end;
-    if type == 7;
+    if FileExists(x, true);
         % is a directory, grab all PNGs and TIFFs there
         files = dir(x);
         output = {};
@@ -29,10 +26,10 @@ elseif ischar(x) && isvector(x);
             if any(strcmp(lower(ext), {'.png', '.tif', '.tiff'})); output = [output,fullfile(x,f)]; end;
         end;
         if length(output) == 0; disp(['No PNG or TIFF files found in "' x '"']); end;
-    elseif type == 2;
+    elseif FileExists(x, false);
         % is a single file
         output = {x};
-    else % if type == 0;
+    else % if not a file or folder
         % does not exist, maybe it is a multiple listing, numerical pattern, or wildcard pattern
         output = get_files_multiple_listing(x); if iscellstr(output); output = unique(output); return; end;
         output = get_files_numerical(x);        if iscellstr(output); output = unique(output); return; end;
@@ -72,7 +69,7 @@ function output = get_files_numerical(x);
     n = 0;
     for i = lower:upper;
         f = sprintf(pattern, i);
-        if exist(f, 'file') ~= 2;
+        if ~FileExists(f);
             disp(['No such file "' f '"']);
         else;
             n = n + 1;

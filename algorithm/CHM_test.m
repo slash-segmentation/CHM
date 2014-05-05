@@ -16,8 +16,8 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %   hist_eq is either true or false if the testing data should be histogram-equalized to the training data or not.
 %       By default it is true if the model includes the histogram to equalize to.
 %
-% input_files is a comma-seperated list of the following:
-%   path to a folder            - all PNGs in that folder
+% input_files is either a cell-string or a single character string of comma-seperated lists of the following:
+%   path to a folder            - all PNGs and TIFFs in that folder
 %   path to a file              - only that file 
 %   path with numerical pattern - get all files matching the pattern
 %       pattern must have #s in it and end with a semicolon and number range
@@ -25,7 +25,7 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       example: in/####.png;5-15 would do in/0005.png through in/0015.png
 %   path with wildcard pattern  - get all files matching the pattern
 %       pattern has * in it which means any number of any characters
-%       example: in/*.tif does all TIFF images in that directory
+%       example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
 
 if nargin < 2 || nargin > 7; error('CHM_test must have 2 to 7 input arguments'); end
 if nargin < 3; blocksize = 'auto'; end

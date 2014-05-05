@@ -10,8 +10,8 @@ function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart)
 %   Nlevel is the number of levels to train with, must be >=1
 %   restart is if the model should be able to restart a previous model
 %
-% traingpath and labelpath are comma-seperated lists of the following:
-%   path to a folder            - all PNGs in that folder
+% traingpath and labelpath are either cell-strings or single character strings of comma-seperated lists of the following:
+%   path to a folder            - all PNGs and TIFFs in that folder
 %   path to a file              - only that file 
 %   path with numerical pattern - get all files matching the pattern
 %       pattern must have #s in it and end with a semicolon and number range
@@ -19,7 +19,7 @@ function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart)
 %       example: in/####.png;5-15 would do in/0005.png through in/0015.png
 %   path with wildcard pattern  - get all files matching the pattern
 %       pattern has * in it which means any number of any characters
-%       example: in/*.tif does all TIFF images in that directory
+%       example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
 
 if nargin < 2 || nargin > 6; error('CHM_train must have 2 to 6 input arguments'); end
 if nargin < 3; savingpath = fullfile('.', 'temp'); end
@@ -41,9 +41,9 @@ end
 files_tr = GetInputFiles(trainpath);
 files_la = GetInputFiles(labelpath);
 if numel(files_tr) < 1 || numel(files_tr) ~= numel(files_la); error('You must provide at least 1 image set and equal numbers of training and label images'); end;
-if exist(savingpath,'file')~=7; mkdir(savingpath); end
+if ~FileExists(savingpath,true); mkdir(savingpath); end
 
-if restart && exist(fullfile(savingpath,'param.mat'),'file') == 2
+if restart && FileExists(fullfile(savingpath,'param.mat'))
     param = load(fullfile(savingpath, 'param.mat'), 'Nfeatcontext', 'Nlevel', 'Nstage', 'TrainingSize');
     if GetImageSize(files_tr{1}) ~= param.TrainingSize; error('Cannot restart since training data is a different size'); end;
     % Remove all stages/levels that would be invalid if Nlevel/Nstage change
@@ -63,10 +63,10 @@ if restart && exist(fullfile(savingpath,'param.mat'),'file') == 2
             base_name = ['level' num2str(Nlevel_start) '_stage' num2str(Nstage_start)];
             model_file = fullfile(savingpath, ['MODEL_' base_name '.mat']);
             output_dir = fullfile(savingpath, ['output_' base_name]);
-            if exist(model_file,'file') ~= 2 || exist(output_dir,'file') ~= 7; done = 1; break; end;
+            if ~FileExists(model_file) || ~FileExists(output_dir,true); done = 1; break; end;
             for i = 1:length(files_tr)
                 [~,filename,~] = fileparts(files_tr{i});
-                if exist(fullfile(output_dir,[filename '.mat']),'file') ~= 2; done = 1; break; end;
+                if ~FileExists(fullfile(output_dir,[filename '.mat'])); done = 1; break; end;
             end
             if done; break; end;
         end
