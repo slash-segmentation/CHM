@@ -16,7 +16,9 @@ if iscellstr(x);
         output = x(:);
     end;
 elseif ischar(x) && isvector(x);
-    type = exist(x, 'file');
+    [d,f,e] = fileparts(x);
+    if strcmp(d, ''); type = exist(fullfile('.', x), 'file'); # Workaround for a bug in MATLAB when `file` is 'input' or some other built-in names
+    else; type = exist(x, 'file'); end;
     if type == 7;
         % is a directory, grab all PNGs and TIFFs there
         files = dir(x);
