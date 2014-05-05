@@ -69,6 +69,7 @@ files_out = GetOutputFiles(outputpath, files_te);
 
 if numel(bordersize) == 1; brd = [bordersize bordersize]; elseif numel(bordersize) == 2; brd = bordersize(:)'; else; error('bordersize argument to CHM_test must have 1 or 2 elements'); end
 if numel(blocksize)  == 1; bs  = [blocksize  blocksize ]; elseif numel(blocksize)  == 2; bs  = blocksize (:)'; else;  error('blocksize argument to CHM_test must have 1 or 2 elements'); end
+if any(bs <= 2*brd); error(sprintf('The block size (%dx%d) must be larger than twice the overlap size (%dx%d).', bs(1), bs(2), brd(1), brd(2))); end
 bs = bs-2*brd;
 if ndims(tiles_to_proc) == 2 && size(tiles_to_proc, 2) == 2 && size(tiles_to_proc, 1) ~= 0
     locs_to_proc = repmat(bs, [size(tiles_to_proc, 1) 1]).*(tiles_to_proc-1)+1;
