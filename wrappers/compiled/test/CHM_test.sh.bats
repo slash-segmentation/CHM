@@ -122,7 +122,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -M "$THE_TMP"
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "blah $THE_TMP ''auto'' [50 50] ./temp/ [] true" ]
+  [ "${lines[0]}" = "blah $THE_TMP auto [50 50] ./temp/ [] true" ]
 }
 
 #
@@ -144,7 +144,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -M "$THE_TMP" -h
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "blah $THE_TMP ''auto'' [50 50] ./temp/ [] false" ]
+  [ "${lines[0]}" = "blah $THE_TMP auto [50 50] ./temp/ [] false" ]
 
 }
 
@@ -166,7 +166,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -M "$THE_TMP"
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "blah $THE_TMP ''auto'' [50 50] ./temp/ [] true" ]
+  [ "${lines[0]}" = "blah $THE_TMP auto [50 50] ./temp/ [] true" ]
 
 }
 
@@ -291,7 +291,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -o 3x1 -M "$THE_TMP"
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" == "blah $THE_TMP ''auto'' [1 3] ./temp/ [] true" ]
+  [ "${lines[0]}" == "blah $THE_TMP auto [1 3] ./temp/ [] true" ]
 
 }
 
@@ -312,7 +312,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -t 3,1 -M "$THE_TMP"
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" == "blah $THE_TMP ''auto'' [50 50] ./temp/ [1 3] true" ]
+  [ "${lines[0]}" == "blah $THE_TMP auto [50 50] ./temp/ [1 3] true" ]
 
 }
 
