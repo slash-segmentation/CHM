@@ -30,25 +30,27 @@ lambda = 0;
 level = 1;
 stage = 1;
 
+
+has_name = false;
+has_validation = false;
+
 if nargin < 2
     error('At least two input arguments are required');
 elseif nargin==2
     xtrain = varargin{1};
     ytrain = varargin{2};
+elseif nargin==3
+    xtrain = varargin{1};
+    ytrain = varargin{2};    
+    options = varargin{3};
+    name = fieldnames(options);
+    has_name = true;
 elseif nargin==4
     xtrain = varargin{1};
     ytrain = varargin{2};    
     xvalid = varargin{3};
     yvalid = varargin{4};
-elseif nargin > 5
-    error('Too many input arguments');
-end
-
-if nargin==3
-    xtrain = varargin{1};
-    ytrain = varargin{2};    
-    options = varargin{3};
-    name = fieldnames(options);
+    has_validation = true;
 elseif nargin==5;
     xtrain = varargin{1};
     ytrain = varargin{2};    
@@ -56,10 +58,13 @@ elseif nargin==5;
     yvalid = varargin{4};    
     options = varargin{5};
     name = fieldnames(options);
+    has_name = true;
+    has_validation = true;
+elseif nargin > 5
+    error('Too many input arguments');
 end
 
-
-if exist('name','var')
+if has_name
     for i = 1:length(name)
         switch name{i}
             case 'epsilon'
@@ -81,7 +86,7 @@ if exist('name','var')
             case 'stage'
                 stage = options.stage;
             otherwise
-                warning(['Undefined option' name{i} '...skipping']);
+                warning(['Undefined option ' name{i} '...skipping']);
         end
     end
 end
@@ -99,7 +104,7 @@ if level==0
 end
 
 
-if (exist('xvalid','var') && cv)
+if (has_validation && cv)
     cv = 0;
 elseif cv
     fprintf('Using 10 percent of data for validation\n');
@@ -112,7 +117,7 @@ elseif cv
 end
  
 
-if lambda~=0 && exist('xvalid','var')
+if lambda~=0 && has_validation
     warning('Both cross validation and regularization is active... turning off the regularizer');
     lambda = 0;
 end
@@ -146,7 +151,7 @@ discriminants = [discriminants;-sum(discriminants.*centroids,1)];
 % discriminants = randn(size(xtrain,1)+1,nDiscriminantPerGroup*nGroup); %uncomment for random initialization
 
 xtrain = [xtrain;ones(1,n)];
-if exist('xvalid','var')
+if has_validation
     xvalid = [xvalid;ones(1,length(yvalid))];
 end
 

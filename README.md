@@ -19,7 +19,7 @@ Basic Usage
 The two main entry points are `CHM_train.sh` and `CHM_test.sh`. The raw MATLAB
 and compiled versions work very similarly. It is recommend for most people to
 use these scripts as they simplify many of the options. However in some cases
-the use of the MATLAB functions `CHM_test` and `CHM_train` mya be desirable and
+the use of the MATLAB functions `CHM_test` and `CHM_train` may be desirable and
 are fairly similar. All optional arguments must be at the end.
 
 
@@ -91,7 +91,7 @@ The output model is by default stored in ./temp. The only files required to
 save are the .mat files in the root directory (the subdirectories contain
 actual temporary files).
 
-To change the model directory use by either CHM_train or CHM_test you can use
+To change the model directory used by either CHM_train or CHM_test you can use
 the `-m` argument.
 
 
@@ -108,11 +108,11 @@ help significantly. See the HistogramEqualize tool in wrappers/image-proc.
 
 During training you can also change the number of stages and levels of training
 that are performed using the `-S` and `-L` arguments respectively (they default
-to 2 and 4). It currently seems unlikely that values larger than this will be
-necessary, but in some cases smaller values provide better results than
+to 2 and 4). It currently seems unlikely that values larger than this will ever
+be necessary, but in some cases smaller values provide better results than
 larger values (smaller values also run faster).
 
-During testing there is less adjustments you can make for quality and the
+During testing there are less adjustments you can make for quality and the
 defaults provided should be good in most cases. First, if you are seeing edge
 effects (either along the edge or in the middle of the image) you have to
 increase the amount of overlap between tiles using the `-o` argument. The
@@ -128,9 +128,9 @@ Training can be sped up by reducing the size of the training data and/or
 reducing the number of stages and levels trained on. This has to be done
 carefully as to not reduce quality. Typically, large structures can have the
 data binned (e.g. we bin by 8 for neucli of cells) which greatly reduces the
-training data size. Additionally, we have been experimenting with lower the
-number of levels, and in many cases it barely effect results and even some
-cases produces better results.
+training data size. Additionally, we have been experimenting with lowering the
+number of levels, and in many cases it barely effect results and sometimes even
+produces better results.
 
 By default (except for compiled version) training will attempt to use all
 physical cores (up to 12) on your machine while "generating outputs". This
@@ -141,13 +141,14 @@ If training goes faster, then testing with that model will go faster as well.
 
 Testing has a lot more room for speed-ups since it can be heavily parallelized.
 First, in the basic usage, testing will attempt to use all physical cores (up
-to 12) for the bulk of each image (note that for the first 3 "tiles" of each
-image it will not be done in parallel).
+to 12) for the bulk of each image (note that the first 3 "tiles" of each image
+will not be done in parallel). It won't run parallel across seperate images
+though (so the beginning and end of each image will not be fuly parallel).
 
-However, it is actually faster to many seperate instances of CHM_test with each
-operating over a portion of the test images. If you do it this way, use the
-`-s` flag to make each CHM_test not parallel itself. You can run these across
-multiple machines at this point.
+However, it is actually faster to run many seperate instances of CHM_test with
+each operating over a portion of the test images. If you do it this way, use
+the `-s` flag to make each CHM_test not parallel itself. You can run these
+across multiple machines at this point.
 
 If you are trying to run CHM_test on a single very large image or have access
 to a cluster, you can divide single images down even further by using -t to
@@ -159,8 +160,8 @@ case. To combine the images after they have been run you can use ImageMagick:
 
 Another way to get some speed up is to reduce the overlap between tiles with
 `-o`. The default is 50 pixels and in many cases 25 is probably sufficient.
-However if this causes edges effects to appear (either at the edges or middle
-of the image) then you went too small.
+However if this causes edges effects to appear (either at the edges or in the
+middle of the image) then you went too small.
 
 The time required for testing is directly poportional to the following formula:
 
