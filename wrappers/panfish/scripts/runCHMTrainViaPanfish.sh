@@ -91,6 +91,12 @@ function checkSingleTask {
     return 3
   fi
 
+  isExitCodeInStdOutFileZero "${jobDir}/$CHM_TRAIN_OUT_DIR_NAME/$STD_OUT_DIR_NAME/${taskId}.${STD_OUT_SUFFIX}"
+
+  if [ $? != 0 ] ; then
+    return 4
+  fi
+
   return 0
 }
 
