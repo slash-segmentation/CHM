@@ -987,3 +987,40 @@ echo "function checkSingleTask {
   [ "$status" -eq 2 ]
 
 }
+
+#
+# isExitCodeInStdOutFileZero() tests
+#
+@test "isExitCodeInStdOutFileZero() tests" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # test no stdout file
+  run isExitCodeInStdOutFileZero "$THE_TMP/foo"
+  [ "$status" -eq 12 ]
+
+  echo "blah" > "$THE_TMP/foo"
+  
+  # test no Exit Code in file
+  run isExitCodeInStdOutFileZero "$THE_TMP/foo"
+  [ "$status" -eq 13 ]
+
+  # test 0 exit code
+  echo "blah" > "$THE_TMP/foo"
+  echo "(task 1079206.1) runCHMTrain.sh End Time: 1411046427 Duration: 52523 Exit Code: 0" >> "$THE_TMP/foo"
+  run isExitCodeInStdOutFileZero "$THE_TMP/foo"
+  [ "$status" -eq 0 ]
+
+  # test non zero exit code ie Exit Code: 255
+  echo "blah" > "$THE_TMP/foo"
+  echo "(task 1079206.1) runCHMTrain.sh End Time: 1411046427 Duration: 52523 Exit Code: 255" >> "$THE_TMP/foo"
+  run isExitCodeInStdOutFileZero "$THE_TMP/foo"
+  [ "$status" -eq 14 ]
+
+  # test empty exit code ie Exit Code: 
+  echo "blah" > "$THE_TMP/foo"
+  echo "(task 1079206.1) runCHMTrain.sh End Time: 1411046427 Duration: 52523 Exit Code: " >> "$THE_TMP/foo"
+  run isExitCodeInStdOutFileZero "$THE_TMP/foo"
+  [ "$status" -eq 14 ]
+}

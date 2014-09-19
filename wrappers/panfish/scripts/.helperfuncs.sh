@@ -952,3 +952,33 @@ function getNextIteration {
   fi
   return 1
 }
+
+#
+# isExitCodeInStdOutFileZero
+# This function looks for "Exit Code: " and extracts
+# the value after.
+# If exit is 0, then 0 is returned otherwise 12 if no stderr
+# file, 13 if no Exit Code: line exists. and 14 if the return
+# value is something else
+#
+function isExitCodeInStdOutFileZero {
+  local stdOutFile=$1
+  
+  if [ ! -s "$stdOutFile" ] ; then
+    return 12
+  fi
+
+  grep "Exit Code: " "$stdOutFile" > /dev/null 2>&1
+
+  if [ $? != 0 ] ; then
+    return 13
+  fi
+
+  local eCode=`grep "Exit Code: " "$stdOutFile" | sed "s/^.*: *//"`
+  echo ":${eCode}:" > /home/churas/fuckthis.txt
+  if [ "$eCode" == "0" ] ; then
+    return 0
+  fi
+
+  return 14
+}
