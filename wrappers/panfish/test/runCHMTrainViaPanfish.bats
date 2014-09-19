@@ -93,6 +93,8 @@ teardown(){
   # test success
   mkdir -p "$THE_TMP/$CHM_TRAIN_OUT_DIR_NAME/$CHM_TRAIN_TRAINEDMODEL_OUT_DIR_NAME"
   echo "hi" > "$THE_TMP/$CHM_TRAIN_OUT_DIR_NAME/$CHM_TRAIN_TRAINEDMODEL_OUT_DIR_NAME/param.mat"
+  echo "blah" > "$THE_TMP/$CHM_TRAIN_OUT_DIR_NAME/$STD_OUT_DIR_NAME/1.stdout"
+  echo "(task 1079206.1) runCHMTrain.sh End Time: 1411046427 Duration: 52523 Exit Code: 0" >> "$THE_TMP/$CHM_TRAIN_OUT_DIR_NAME/$STD_OUT_DIR_NAME/1.stdout"
   run checkSingleTask "$RUN_CHM_TRAIN_SH" "$THE_TMP" "1"
   [ "$status" -eq 0 ]
 }
