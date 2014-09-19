@@ -35,6 +35,11 @@ Optional Arguments:
                    seems necessary.  (Default: 50 pixels)
   -T tiles_per_job Sets the number of tiles to be processed per job.  
                    If left unset value defaults to 1.
+  -h               Don't histogram-equalize the testing images to the training
+                   image histogram (if provided in the model). This option
+                   should only be used if the testing data has already been
+                   equalized.
+
 "
   exit 1
 }
@@ -240,7 +245,7 @@ function createCHMTestConfig {
     for (( y=0 ; y < ${#tileSets[@]} ; y++ )) ; do
       echo "${cntr}${CONFIG_DELIM}${z}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}${modelDir}" >> "$configFile"
-      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]} -h" >> "$configFile"
+      echo "${cntr}${CONFIG_DELIM}${chmOpts} ${tileSets[$y]}" >> "$configFile"
       outputFile="${OUT_DIR_NAME}/${imageName}.${IMAGE_TILE_DIR_SUFFIX}/${cntr}.${imageSuffix}" >> "$configFile"
       echo "${cntr}${CONFIG_DELIM}$outputFile" >> "$configFile"
       let cntr++
@@ -432,11 +437,15 @@ declare -i OVERLAP_W=0
 declare -i OVERLAP_H=0
 declare MODEL_FOLDER=""
 declare IMAGE_FOLDER=""
+declare HIST_FLAG=""
 declare -i TILES_PER_JOB=1
 shift 2
 
-while getopts ":m:b:o:i:T:" o; do
+while getopts ":hm:b:o:i:T:" o; do
   case "${o}" in
+    h)
+      HIST_FLAG="-h"
+      ;;
     m)
       getFullPath "${OPTARG}"
       MODEL_FOLDER="$GETFULLPATHRET"
@@ -503,7 +512,7 @@ if [ "$MODE" == "$CREATE_PRETRAIN_MODE" ] ; then
     jobFailed "CHM bin dir $CHM_BIN_DIR does not exist"
   fi
 
-  runCreatePreTrainedMode "$OUTPUT_DIR" "$IMAGE_FOLDER" "$OVERLAP $BLOCK" "$MODEL_FOLDER" $BLOCK_W $BLOCK_H $OVERLAP_W $OVERLAP_H $TILES_PER_JOB
+  runCreatePreTrainedMode "$OUTPUT_DIR" "$IMAGE_FOLDER" "$OVERLAP $BLOCK $HIST_FLAG" "$MODEL_FOLDER" $BLOCK_W $BLOCK_H $OVERLAP_W $OVERLAP_H $TILES_PER_JOB
   declare createPreTrainExit=$?
 
   if [ $createPreTrainExit -eq 0 ] ; then
