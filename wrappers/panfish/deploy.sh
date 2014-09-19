@@ -104,6 +104,12 @@ if [ "$DEPLOY_ENV" == "prod" ] ; then
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
 
+if [ "$DEPLOY_ENV" == "megashark" ] ; then
+   HOST="megashark.crbs.ucsd.edu"
+   DEPLOY_BASE_DIR="/home/churas/cws/bin"
+   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
+fi
+
 if [ "$HOST" == "NOTSET" ] ; then
   echo "Please setup $DEPLOY_ENV in this script $0"
   exit 1
