@@ -975,7 +975,6 @@ function isExitCodeInStdOutFileZero {
   fi
 
   local eCode=`grep "Exit Code: " "$stdOutFile" | sed "s/^.*: *//"`
-  echo ":${eCode}:" > /home/churas/fuckthis.txt
   if [ "$eCode" == "0" ] ; then
     return 0
   fi
