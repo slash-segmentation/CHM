@@ -110,6 +110,12 @@ if [ "$DEPLOY_ENV" == "megashark" ] ; then
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
 
+if [ "$DEPLOY_ENV" == "vizwall" ] ; then
+   HOST="churas@137.110.119.214"
+   DEPLOY_BASE_DIR="/home/churas/panfish/cws_vizwall/cws/bin"
+   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
+fi
+
 if [ "$HOST" == "NOTSET" ] ; then
   echo "Please setup $DEPLOY_ENV in this script $0"
   exit 1
