@@ -106,7 +106,7 @@ fi
 
 if [ "$DEPLOY_ENV" == "megashark" ] ; then
    HOST="megashark.crbs.ucsd.edu"
-   DEPLOY_BASE_DIR="/home/churas/cws/bin"
+   DEPLOY_BASE_DIR="/sharktopus/megashark/cws/bin"
    SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 fi
 
