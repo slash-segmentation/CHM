@@ -10,7 +10,14 @@ setup() {
   /bin/cp -a ${BATS_TEST_DIRNAME}/../../../algorithm "$THE_TMP/CHM" 1>&2
   /bin/cp -a ${BATS_TEST_DIRNAME}/../scripts/.helperfuncs.sh "$THE_TMP/." 1>&2
   export TESTIMAGE_DIR="${BATS_TEST_DIRNAME}/createchmjob"
-  export TESTIMAGE="${TESTIMAGE_DIR}/600by400.png"
+
+  # the sed command is due to pathing issues when
+  # bats . is run on this directory bats will add a ./
+  # and that messes up the image path checks cause they
+  # are cleaned up.
+  # bats test or bats ../test or bats <test file> does not 
+  # exhibit this behavior
+  export TESTIMAGE=`echo ${TESTIMAGE_DIR}/600by400.png | sed "s/\/\.\//\//"`
   export CREATECHM="$THE_TMP/createCHMJob.sh"
   chmod a+x $CREATECHM
   export HELPERFUNCS="$THE_TMP/.helperfuncs.sh"

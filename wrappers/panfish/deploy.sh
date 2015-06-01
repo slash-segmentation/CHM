@@ -1,11 +1,18 @@
 #!/bin/bash
 
-if [ $# -ne 1 ] ; then
-   echo "$0 <environment (should be prefix to properties file and .templates dir under properties/ directory>"
+if [ $# -ne 3 ] ; then
+   echo "$0 <remote deploy host> <remote base dir> <properties file>"
+   echo ""
+   echo "This script packages and deploys panfishCHM to <remote deploy host>"
+   echo "using ssh/scp commands installing the package to <remote base dir>"
+   echo "directory. The <properties file> is copied over as "
+   echo "panfishCHM.properties file"
    exit 1
 fi
+HOST=$1
+DEPLOY_BASE_DIR=$2
+PROPERTIES_FILE=$3
 
-DEPLOY_ENV=$1
 
 # we are going to assume panfish Makefile.pl is in the parent directory to where the script
 # is located.
@@ -62,11 +69,8 @@ if [ $? != 0 ] ; then
 fi
 
 # copy over config file into temp directory
-
-PROPERTIES_FILE="properties/${DEPLOY_ENV}.properties"
-
 if [ ! -s "$PROPERTIES_FILE" ] ; then
-   echo "$DEPLOY_ENV is missing $PANFISHCHM_DIR/$PROPERTIES_FILE file"
+   echo "$PROPERTIES_FILE properties file not found"
    exit 1
 fi
 
@@ -78,48 +82,7 @@ if [ $? != 0 ] ; then
   exit 1
 fi
 
-
-
-HOST="NOTSET"
-SCP_ARG="NOTSET"
-
-if [ "$DEPLOY_ENV" == "local" ] ; then
-  /bin/mv $TMPINSTALLDIR panfishCHM
-  if [ $? != 0 ] ; then
-    echo "Error running /bin/mv $TMPINSTALLDIR panfishCHM"
-    exit 1
-  fi   
-  exit 0
-fi
-
-if [ "$DEPLOY_ENV" == "coleslaw" ] ; then
-   HOST="churas@localhost"
-   DEPLOY_BASE_DIR="/home/churas/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
-if [ "$DEPLOY_ENV" == "prod" ] ; then
-   HOST="tomcat@cylume.camera.calit2.net"
-   DEPLOY_BASE_DIR="/home/validation/camera/release/ncmir/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
-if [ "$DEPLOY_ENV" == "megashark" ] ; then
-   HOST="megashark.crbs.ucsd.edu"
-   DEPLOY_BASE_DIR="/sharktopus/megashark/cws/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
-if [ "$DEPLOY_ENV" == "vizwall" ] ; then
-   HOST="churas@137.110.119.214"
-   DEPLOY_BASE_DIR="/home/churas/panfish/cws_vizwall/cws/bin"
-   SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
-fi
-
-if [ "$HOST" == "NOTSET" ] ; then
-  echo "Please setup $DEPLOY_ENV in this script $0"
-  exit 1
-fi
+SCP_ARG="${HOST}:${DEPLOY_BASE_DIR}/."
 
 # copy up new version set folder name to date timestamp
 scp -r $TMPINSTALLDIR $SCP_ARG
