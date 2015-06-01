@@ -145,6 +145,16 @@ function parseProperties {
   CHUMBINARY="${PANFISH_BIN_DIR}panfishchum"
   LANDBINARY="${PANFISH_BIN_DIR}panfishland"
   PANFISHSTATBINARY="${PANFISH_BIN_DIR}panfishstat"
+
+  IMAGE_MAGICK_BIN_DIR=`egrep "^image.magick.bin.dir" $theConfig | $SED_CMD "s/^.*= *//"`
+
+  if [ -n "$IMAGE_MAGICK_BIN_DIR" ] ; then
+    IDENTIFY_CMD="$IMAGE_MAGICK_BIN_DIR/identify"
+    CONVERT_CMD="$IMAGE_MAGICK_BIN_DIR/convert"   
+  fi
+
+  IMAGE_MAGICK_CONVERT_OPTS=`egrep "^image.magick.convert.opts" $theConfig | $SED_CMD "s/^image.magick.convert.opts *= *//"`
+
   return 0
 }
 

@@ -116,7 +116,7 @@ declare -r finalImage="$SCRIPT_DIR/$OUTPUT_IMAGE"
 #       this will allow the script to catch KILL requests etc.. and to track memory
 #       usage etc.
 
-declare cmd="$CONVERT_CMD $inputImage $convertOpts $finalImage"
+declare cmd="$CONVERT_CMD ${IMAGE_MAGICK_CONVERT_OPTS} $inputImage $convertOpts $finalImage"
 
 logMessage "Running $cmd"
 

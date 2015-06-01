@@ -298,6 +298,7 @@ CONVERT_CMD=convert
 UUIDGEN_CMD=\"/bin/echo 1\"
   function parseProperties {
    MATLAB_DIR=$THE_TMP
+   IMAGE_MAGICK_CONVERT_OPTS="\"-limit 2gb -define registry:temporary-path=/data\""
    return 0
   }
   function getMergeTilesJobParametersForTaskFromConfig {
@@ -325,8 +326,8 @@ UUIDGEN_CMD=\"/bin/echo 1\"
   [ "${lines[0]}" == "runMergeTiles" ]
   [ "${lines[1]}" == "$THE_TMP 1" ]
   [ "${lines[2]}" == "Found 3 tiles" ]
-  [[ "${lines[3]}" == "Running convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/"* ]]
-  [ "${lines[4]}" == "convert /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/mergetiles.1/foo.png" ]
+  [[ "${lines[3]}" == "Running convert -limit 2gb -define registry:temporary-path=/data /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/"* ]]
+  [ "${lines[4]}" == "convert -limit 2gb -define registry:temporary-path=/data /$THE_TMP/tiles/1.png -compose plus /$THE_TMP/tiles/2.png -composite /$THE_TMP/tiles/3.png -composite /tmp/mergetiles.1/foo.png" ]
   [ "${lines[5]}" == "No /tmp/mergetiles.1/foo.png found to copy" ]
   [ "${lines[6]}" == "runMergeTiles 0 2" ]
 }

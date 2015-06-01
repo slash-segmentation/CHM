@@ -35,6 +35,8 @@ teardown(){
 
   echo "panfish.bin.dir=/xx" > "$THE_TMP/panfishCHM.properties"
   echo "matlab.dir=/matlab" >> "$THE_TMP/panfishCHM.properties"
+  echo "image.magick.bin.dir=/foo" >> "$THE_TMP/panfishCHM.properties"
+  echo "image.magick.convert.opts=-limit 4gb -define registry:temporary-path=/data/tmp" >> "$THE_TMP/panfishCHM.properties"
   echo "batch.and.walltime.args=batch" >> "$THE_TMP/panfishCHM.properties"
   echo "cluster.list=foo.q" >> "$THE_TMP/panfishCHM.properties"
   echo "chm.bin.dir=/bin/chm" >> "$THE_TMP/panfishCHM.properties"
@@ -45,6 +47,8 @@ teardown(){
   echo "chum.job.options=cjo" >> "$THE_TMP/panfishCHM.properties"
   echo "chum.image.options=-b --deletebefore -x *.*" >> "$THE_TMP/panfishCHM.properties"
   echo "chum.model.options=--exclude *.foo" >> "$THE_TMP/panfishCHM.properties"
+
+ 
   # test with valid complete config
   parseProperties "$THE_TMP" "$THE_TMP/s"
   
@@ -66,7 +70,39 @@ teardown(){
   [ "$CHUMBINARY" == "/xxpanfishchum" ]
   [ "$LANDBINARY" == "/xxpanfishland" ]
   [ "$PANFISHSTATBINARY" == "/xxpanfishstat" ]
+  [ "$IMAGE_MAGICK_BIN_DIR" == "/foo" ] 
+  [ "$IMAGE_MAGICK_CONVERT_OPTS" == "-limit 4gb -define registry:temporary-path=/data/tmp" ] 
+  [ "$IDENTIFY_CMD" == "/foo/identify" ] 
+  [ "$CONVERT_CMD" == "/foo/convert" ]
 }
+
+#
+# Test parse Properties with image magick opts unset
+#
+@test "parseProperties() tests with image magick opts unset" {
+
+  # source helperfuncs.sh to we can call the function
+  . $HELPERFUNCS
+
+  # test where no properties file is found
+  run parseProperties "$THE_TMP" "$THE_TMP/s"
+
+  [ "$status" -eq 1 ]
+  [ "${lines[0]}" == "  Config $THE_TMP/panfishCHM.properties not found" ]
+
+  echo "image.magick.bin.dir=" > "$THE_TMP/panfishCHM.properties"
+  echo "image.magick.convert.opts=" >> "$THE_TMP/panfishCHM.properties"
+
+
+  # test with valid complete config
+  parseProperties "$THE_TMP" "$THE_TMP/s"
+
+  [ "$IMAGE_MAGICK_BIN_DIR" == "" ]
+  [ "$IMAGE_MAGICK_CONVERT_OPTS" == "" ]
+  [ "$IDENTIFY_CMD" == "identify" ]
+  [ "$CONVERT_CMD" == "convert" ]
+}
+
 
 #
 # parseWidthHeightParameter() with various values

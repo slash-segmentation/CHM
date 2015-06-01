@@ -143,7 +143,7 @@ if [ ${#fileList[@]} -eq 1 ] ; then
   $CP_CMD "${fileList[0]}" "$finalImage"
   convertExitCode=$?
 else
-  declare cmd="$CONVERT_CMD ${fileList[0]} -compose plus"
+  declare cmd="$CONVERT_CMD ${IMAGE_MAGICK_CONVERT_OPTS} ${fileList[0]} -compose plus"
 
   for i in "${fileList[@]:1:${#fileList[@]}}" ; do
     cmd="${cmd} $i -composite"
