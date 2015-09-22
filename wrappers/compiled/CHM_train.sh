@@ -21,7 +21,7 @@ ways. It needs to be one of the these or a comma-separated list of these:
      note: the semicolon needs to be escaped or in double quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
      pattern has * in it which means any number of any characters
-     example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
+     example: in/lbl_*.tif does all TIFF images starting with lbl_ in 'in'
      note: the asterisk needs to be escaped or in double quotes in some shells
 
 Optional Arguments:
@@ -36,7 +36,7 @@ Optional Arguments:
                   will be made using 'which'. It must be the same version used
                   to compile the scripts.
   -r              Restart a failed training attempt. This will restart just
-                  after the last copmleted stage/level. You must give the same
+                  after the last completed stage/level. You must give the same
                   parameters (data, labels, ...) as before for the model to
                   make sense." 1>&2;
   exit 1;

@@ -48,7 +48,7 @@ these or a comma-separated list of these:
      note: the semicolon needs to be escaped or in double quotes in some shells
  * path with wildcard pattern  - get all files matching the pattern
      pattern has * in it which means any number of any characters
-     example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
+     example: in/lbl_*.tif does all TIFF images starting with lbl_ in 'in'
      note: the asterisk needs to be escaped or in double quotes in some shells" 1>&2;
   exit 1;
 }
