@@ -1,6 +1,6 @@
 function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc,hist_eq)
 % CHM_test   CHM Image Testing Phase Script
-%   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=[0 0]], [savingpath='./temp'], [tiles_to_proc=[]], [hist_eq=true])
+%   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=50], [savingpath='./temp'], [tiles_to_proc=[]], [hist_eq=true])
 %
 %   input_files is a set of data files to test, see below for details.
 %   outputpath is the folder to save the generated images to.
@@ -9,8 +9,8 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       By default this reads the information from the param.mat file.
 %   bordersize is the amount of overlap between blocks to discard.
 %       By default a 50x50, but 25-75px overlap is recommended (will depend on whats being segmented).
-%   savingpath is the folder to save the trained model to (along with temporary files)
-%       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
+%   savingpath is the folder where the trained model is saved
+%       It is required to have MODEL_level#_stage#.mat and param.mat files in that folder.
 %   tiles_to_proc is a list of tiles to process.
 %       By default all tiles are processed.
 %   hist_eq is either true or false if the testing data should be histogram-equalized to the training data or not.

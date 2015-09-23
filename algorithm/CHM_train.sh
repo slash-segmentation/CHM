@@ -35,8 +35,8 @@ Optional Arguments:
                   after the last completed stage/level. You must give the same
                   parameters (data, labels, ...) as before for the model to
                   make sense.
-  -s              Single-thread / non-parallel. Normally one small step of this
-                  is done in parallel using all available physical cores." 1>&2;
+  -s              Single-thread / non-parallel. Without this some parts can be
+                  run in parallel, but not many." 1>&2;
   exit 1;
 }
 
