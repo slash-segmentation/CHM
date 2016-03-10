@@ -69,7 +69,7 @@ def __run_threads(func, total, min_size=1, nthreads=1):
 ##### OPTIMIZATIONS #####
 # Reduce padding:
 #   HoG  (+1 due to the algorithm)
-#   Sift (+3? has lots of correlate1d's)
+#   SIFT (+3? has lots of correlate1d's)
 #
 # Could further optimize reflective padding by not actually adding padding but instead use the
 # intrinsic padding abilities of the various scipy ndimage functions (no way to turn off their

@@ -40,15 +40,6 @@ cdef ndarray __get_out(ndarray out, intp N, intp H, intp W):
     elif not PyArray_ISBEHAVED(out) or PyArray_TYPE(out) != NPY_DOUBLE or PyArray_NDIM(out) != 3 or \
          PyArray_DIM(out, 0) != N or PyArray_DIM(out, 1) != H or PyArray_DIM(out, 2) != W or \
          PyArray_STRIDE(out, 1) != <intp>(W*sizeof(double)) or PyArray_STRIDE(out, 2) != sizeof(double):
-        print(not PyArray_ISBEHAVED(out))
-        print(PyArray_TYPE(out) != NPY_DOUBLE, PyArray_TYPE(out), NPY_DOUBLE)
-        print(PyArray_NDIM(out) != 3,          PyArray_NDIM(out))
-        print(PyArray_DIM(out, 0) != N, PyArray_DIM(out, 0), N)
-        print(PyArray_DIM(out, 1) != H, PyArray_DIM(out, 1), H)
-        print(PyArray_DIM(out, 2) != W, PyArray_DIM(out, 2), W)
-        print(PyArray_STRIDE(out, 1) != <intp>(W*sizeof(double)), PyArray_STRIDE(out, 1), <intp>(W*sizeof(double)))
-        print(PyArray_STRIDE(out, 2) != sizeof(double), PyArray_STRIDE(out, 2), sizeof(double))
-        print()
         raise ValueError('Invalid output array')
     return out
 

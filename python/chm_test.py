@@ -88,7 +88,7 @@ def __chm_test_usage(err=None):
         print()
     print("""CHM Image Testing Phase.  %s
     
-%s <input_files> <output_folder> <optional arguments>
+%s <input_file> <output_file> <optional arguments>
   input_file    The input file to read.
   output_file   The output file to save.
 	
@@ -99,9 +99,9 @@ Optional Arguments:
                 the same size as the training images (which is believed to be
                 optimal). Old models do not include the size of the training
                 images and then 1024x1024 is used if not given.
-  -T tile_pos   Specifies that only the given tiles be processed by CHM while
+  -T C,R        Specifies that only the given tiles be processed by CHM while
                 all others simply output black. Each tile is given as C,R (e.g.
-                2,1 would be the tile in the second column and first row). Can
+                2,1 would be the tile in the third column and second row). Can
                 process multiple tiles by using multiple -T arguments. The tiles
                 are defined by multiples of tile_size. A tile position out of
                 range will be ignored. If not included then all tiles will be
@@ -488,7 +488,7 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
             ims[level], regions[level] = get_image_region(im, max_pad, (pad, pad, pad + H, pad + W))
         
         #del im_full, max_pad_full, region_full
-        # TODO: All this extra padding and copies of images leads to about +6.3MB additional memory
+        # OPT: All this extra padding and copies of images leads to about +6.3MB additional memory
         # usage over just the original padded image (for 1000x1000 tiles and Nlevel=4). If the
         # levels were copied, some additional memory could be saved (3.2MB, and may result in
         # faster-to-access images at the expense of an additional one-time copy operation).
