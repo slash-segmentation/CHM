@@ -205,13 +205,13 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     # Figure out which tiles to process
     max_tile_x, max_tile_y = (im.shape[1]+tilesize[1]-1)//tilesize[1], (im.shape[0]+tilesize[0]-1)//tilesize[0]
     if tiles is None:
-        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2)) # TODO: are x and y swapped?
+        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2))
     else:
         tiles = array(tiles, dtype=intp)
         if tiles.ndim != 2 or tiles.shape[1] != 2: raise ValueError('Invalid tile coordinates shape')
         if ignore_bad_tiles:
             tiles = tiles[(tiles >= 0).all(axis=1) & ((tiles[:,0] <= max_tile_x) & (tiles[:,1] <= max_tile_y))]
-        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any(): # TODO: are x and y swapped?
+        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any():
             raise ValueError('Invalid tile coordinates')
      
     # Get ntasks and nthreads
