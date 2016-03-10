@@ -120,12 +120,15 @@ function output=ProcessBlock(block_struct, savingpath, param)
     
     brd = block_struct.border;
     
-    %fprintf('Processing block at [%4d %4d] of size [%3d %3d] with border [%3d %3d] out of [%4d %4d]\n', ...
-    %    block_struct.location(1), block_struct.location(2), size(block_struct.data,1)-2*brd(1), size(block_struct.data,2)-2*brd(2), brd(1), brd(2), block_struct.imageSize(1), block_struct.imageSize(2));
+    fprintf('Processing block at [%4d %4d] of size [%3d %3d] with border [%3d %3d] out of [%4d %4d]\n', ...
+        block_struct.location(1), block_struct.location(2), size(block_struct.data,1)-2*brd(1), size(block_struct.data,2)-2*brd(2), brd(1), brd(2), block_struct.imageSize(1), block_struct.imageSize(2));
     
     % Process block
     output = testCHM(block_struct.data, savingpath, param);
-    
+    %output = block_struct.data / 255.0;
+    %tile_pos = (block_struct.location - 1) ./ (size(output)-2*brd) + 1;
+    %imwrite(output, sprintf('block_%d_%d.png', tile_pos(1), tile_pos(2)));
+
     % Remove border and partial padding
     sz = brd + 1 + min([block_struct.imageSize-block_struct.location;size(output)-2*brd-1]);
     output = uint8(output(brd(1)+1:sz(1), brd(2)+1:sz(2))*255);
