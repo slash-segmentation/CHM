@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 """
 CHM Image Testing
 Runs CHM testing phase on an image. Can also be run as a command line program with arguments.
