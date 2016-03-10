@@ -1,0 +1,4 @@
+HoG.h
+HoG.cpp
+HoG-orig.cpp
+npy_helper.pxi

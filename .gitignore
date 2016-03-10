@@ -1,5 +1,7 @@
 algorithm/*.mat
 algorithm/FilterStuff/*.mat
 *.pyc
+*.pyxbldc
+python/*.so
 *.o
 *.log
