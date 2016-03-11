@@ -187,7 +187,7 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
             warn('tilesize was not given and model does not contain the training image size, using 1024x1024')
             tilesize = (1024, 1024)
         else:
-            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel()) # TODO: is this reversed?
+            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel())
     if isinstance(tilesize, Sequence) and len(tilesize) == 2:
         tilesize = (int(tilesize[1]), int(tilesize[0]))
     else:
