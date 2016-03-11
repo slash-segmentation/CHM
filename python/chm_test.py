@@ -520,7 +520,7 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
             #pylint: disable=cell-var-from-loop
             
             # Get the output image shape for this level
-            sh = (region[2]-region[0], region[3]-region[1])
+            sh = im.shape if region is None else (region[2]-region[0], region[3]-region[1])
 
             # Get how many additional context features we will be adding and how to calculate them
             if stage == 1 or level != 0:
