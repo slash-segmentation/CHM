@@ -35,7 +35,7 @@ Optional Arguments:
                   equalized.
   -s              Single-thread / non-parallel. Without this each block is
                   done in parallel using all available physical cores after an
-				  initial few tiles are down by them selves (for each image)." 1>&2;
+                  initial few tiles are down by them selves (for each image).
 
 Input Files Specification
 The input files can be specified in multiple ways. It needs to be one of the
