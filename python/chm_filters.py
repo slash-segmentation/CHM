@@ -69,7 +69,7 @@ def __run_threads(func, total, min_size=1, nthreads=1):
 ##### OPTIMIZATIONS #####
 # Reduce padding:
 #   HoG  (+1 due to the algorithm)
-#   SIFT (+3? has lots of correlate1d's)
+#   Sift (+3? has lots of correlate1d's)
 #
 # Could further optimize reflective padding by not actually adding padding but instead use the
 # intrinsic padding abilities of the various scipy ndimage functions (no way to turn off their
@@ -148,7 +148,7 @@ def ConstructEdgeFilt(im, out=None, region=None, nthreads=1):
     # CHANGED: no longer returns optional raw data
     from numpy import sqrt
     from __chm_filters import correlate_xy
-    im, region = get_image_region(im, 6, region)
+    im, region = get_image_region(im, 6, region, 'constant')
     imx = correlate_xy(im, __edge_filter[0], __edge_filter[1], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
     imx *= imx
     imy = correlate_xy(im, __edge_filter[1], __edge_filter[0], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
