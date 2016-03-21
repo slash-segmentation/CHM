@@ -177,7 +177,7 @@ __edge_filter = __separate_filter(__d2dgauss(7, 1.0))
 def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
     # This now uses FFTs instead of real-space convolutions as this is >10x faster and just as accurate
     # Have the real-space ones in a separate document for reviewing and comparing
-    # NOTE: rfft2/irfft2 are not thread safe before NP 1.9, so this cannot be multi-threaded on older versions, even with different images!
+    # NOTE: rfft2/irfft2 are not thread safe before NP 1.9, so this cannot be multi-threaded when using older versions, even with different images!
     from numpy import empty, sqrt, copyto
     from numpy.fft import rfft2, irfft2
     from scipy.signal.signaltools import _next_regular # finds the next regular/Hamming number (all prime factors are 2, 3, and 5) - needed to make fft functions fast
@@ -197,14 +197,21 @@ def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
     
     for i,(GF1,GF2) in enumerate(__gabor_filters):
         start = len(GF1) // 2 + 18
-        GF1 = rfft2(GF1, s=im_fft_sh); GF1 *= im_fft # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
-        GF2 = rfft2(GF2, s=im_fft_sh); GF2 *= im_fft # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+
+        GF1 = rfft2(GF1, s=im_fft_sh)  # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+        GF1 *= im_fft
         GF1 = irfft2(GF1, s=im_fft_sh) # INTERMEDIATE: im.shape + (?,?)
-        GF2 = irfft2(GF2, s=im_fft_sh) # INTERMEDIATE: im.shape + (?,?)
-        copyto(tmp1, GF1[slice(start, H + start), slice(start, W + start)])
-        copyto(tmp2, GF2[slice(start, H + start), slice(start, W + start)])
+        copyto(tmp1, GF1[start:H+start, start:W+start])
+        __round_u8_steps(tmp1)
         tmp1 *= tmp1
+        
+        GF2 = rfft2(GF2, s=im_fft_sh)  # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+        GF2 *= im_fft
+        GF2 = irfft2(GF2, s=im_fft_sh) # INTERMEDIATE: im.shape + (?,?)
+        copyto(tmp2, GF2[start:H+start, start:W+start])
+        __round_u8_steps(tmp2)        
         tmp2 *= tmp2
+        
         tmp1 += tmp2
         sqrt(tmp1, out=out[i])
         
@@ -236,7 +243,8 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
 
     fft_im, fft_gf, ifft = __get_fftw_plans(im.shape, nthreads)
     ifft_out = ifft.get_output_array()
-    N = 1 / (ifft_out.shape[0] * ifft_out.shape[1]) # scaling factor
+    N1 = 1 / (ifft_out.shape[0] * ifft_out.shape[0]) # scaling factors
+    N2 = 1 / (ifft_out.shape[1] * ifft_out.shape[1])
     
     im = __fftw(fft_im, im)
     
@@ -247,17 +255,20 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
         GF1 *= im
         ifft.execute()
         copyto(IF1, ifft_out[start:H+start, start:W+start])
+        IF1 *= N1
+        __round_u8_steps(IF1)
         IF1 *= IF1
 
         GF2 = __fftw(fft_gf, GF2)
         GF2 *= im
         ifft.execute()
         copyto(IF2, ifft_out[start:H+start, start:W+start])
+        IF2 *= N2
+        __round_u8_steps(IF2)
         IF2 *= IF2
 
         IF1 += IF2
         sqrt(IF1, out=IF1)
-        IF1 *= N
         
     return out
 
@@ -308,6 +319,18 @@ except ImportError:
     from warnings import warn
     warn('Unable to import pyfftw, using the NumPy FFT functions to calculate the Gabor filters. They are much slower.')
 
+def __round_u8_steps(arr):
+    """
+    Clips the data between 0.0 to 1.0 then rounds the data to steps of 1/255. This is to match the
+    behavior of MATLAB's imfilter being run on uint8 data. All of this is done in-place on the data
+    in the array.
+    """
+    from numpy import clip
+    clip(arr, 0.0, 1.0, out=arr)
+    arr *= 255.0
+    arr.round(out=arr)
+    arr /= 255.0
+
 def __gabor_fn(sigma,theta,lmbda,psi,gamma):
     """
     sigma: Gaussian envelope
@@ -316,7 +339,7 @@ def __gabor_fn(sigma,theta,lmbda,psi,gamma):
     psi: phase
     gamma: aspect ratio
     """
-    from numpy import ceil, ogrid, sin, cos, exp, pi
+    from numpy import ceil, ogrid, sin, cos, exp, pi, negative
 
     # Bounding box
     imax = int(ceil(max(1,3*sigma)))
@@ -337,6 +360,7 @@ def __gabor_fn(sigma,theta,lmbda,psi,gamma):
     x_theta *= (-1.0 / (2*sigma*sigma))
     exp(x_theta, out=x_theta)
     x_theta *= ang
+    if psi != 0: negative(x_theta, x_theta) # TODO: this is a HACK to make the Fourier transform versions work
     x_theta.flags.writeable = False
     return x_theta
 
