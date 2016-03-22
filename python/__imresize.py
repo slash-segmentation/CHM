@@ -2,7 +2,7 @@
 The core imresize functions in pure Python. These are only used when the Cython versions could not
 be accessed. They are much slower than the Cython versions.
 
-Jeffrey Bush, 2015, NCMIR, UCSD
+Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
 from __future__ import division

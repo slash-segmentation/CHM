@@ -1,14 +1,18 @@
-// CHANGES:
+// HOG - Histogram of oriented gradients features calculator
+// Written by Jeffrey Bush, 2015-2016, NCMIR, UCSD
+// Adapted from the code in HOG_orig.cpp with the following changes:
 //  * Assumes that the image is always grayscale
 //  * Params are hard-coded at compile time
+//  * Uses doubles everywhere instead of float intermediates
 //  * Does not require C++
-//  * Much less memory allocated
+//  * Much less memory is allocated
 //  * Less looping in the second half
-//  * Arrays are now used in C order instead of Fortran order
+//  * Arrays are now used in C order instead of Fortran order (although a compile-time setting can switch this)
 //  * Can divide initialization and running
+// So overall, faster, more accurate, and less memory intensive.
 
 #define _USE_MATH_DEFINES
-#include "HoG.h"
+#include "HOG.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -36,19 +40,19 @@
 #define H_INDEX(y,x,b) (((y)*hist2 + (x))*NB_BINS + (b))
 //#endif
 
-ssize_t HoG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n)
+ssize_t HOG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n)
 {
 	ssize_t N;
-	ssize_t HN = HoG_init(w, h, &N);
+	ssize_t HN = HOG_init(w, h, &N);
     if (n < N) { return -1; }
 	dbl_ptr_ar H = (dbl_ptr_ar)malloc(HN*sizeof(double));
 	if (H == NULL) { return -2; }
-	HoG_run(pixels, w, h, out, H);
+	HOG_run(pixels, w, h, out, H);
 	free(H);
 	return N;
 }
 
-ssize_t HoG_init(const ssize_t w, const ssize_t h, ssize_t *n)
+ssize_t HOG_init(const ssize_t w, const ssize_t h, ssize_t *n)
 {
     const ssize_t hist1 = 2+(ssize_t)ceil(h*CWIDTH_INV - 0.5);
     const ssize_t hist2 = 2+(ssize_t)ceil(w*CWIDTH_INV - 0.5);
@@ -56,7 +60,7 @@ ssize_t HoG_init(const ssize_t w, const ssize_t h, ssize_t *n)
 	return hist1*hist2*NB_BINS;
 }
 
-void HoG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H)
+void HOG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H)
 {
     const ssize_t hist1 = 2+(ssize_t)ceil(h*CWIDTH_INV - 0.5);
     const ssize_t hist2 = 2+(ssize_t)ceil(w*CWIDTH_INV - 0.5);

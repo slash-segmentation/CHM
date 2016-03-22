@@ -1,13 +1,15 @@
 #!python
 #cython: boundscheck=False, wraparound=False, initializedcheck=False, cdivision=True
 #distutils: language=c++
-#distutils: sources=HoG.cpp HoG-orig.cpp
+#distutils: sources=HOG.cpp HOG-orig.cpp
 
 """
-CHM Filters written in Cython or C. This includes Haar, HoG, parts of SIFT, and optimized
-correlation functions. Haar and HoG were originally in MEX (MATLAB's Cython-like system)
-and C++. SIFT was originally in MATLAB but the last step was converted to Cython because
-it was slow. The correlations are adapated from scipy's ndimage correlate1d.
+CHM Filters written in Cython or C++. This includes Haar, HOG, parts of SIFT,
+ConstructNeighborhoods, and optimized correlation functions. Haar and HOG were originally in MEX
+(MATLAB's Cython-like system) and C++. SIFT was originally in MATLAB but the last step was
+converted to Cython because it was slow. ConstructNeighborhoods was converted because it was so
+heavily used and benefited from the multi-threading. The correlations are adapated from
+scipy.ndimage.correlate1d.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -16,10 +18,6 @@ from __future__ import division
 from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
-
-# When True uses Capsules intead of CObjects
-# This should only be set to True in Python 3.2+ when SciPy switches over to using Capsules for function wrappers
-DEF USE_PYCAPSULES = False
 
 include "npy_helper.pxi"
 
@@ -32,7 +30,17 @@ from cython.parallel cimport prange, parallel, threadid
 from cython cimport view
 from openmp cimport *
 
+
+########## Utilities ##########
+
 cdef ndarray __get_out(ndarray out, intp N, intp H, intp W):
+    """
+    Checks the output array to make sure it is an NxHxW double array that is behaved with the last
+    two strides being element-sized strides.
+    
+    If out is None then a new array is created and returned. If it is not None and doesn't meet the
+    requirements, a ValueError is raised.
+    """
     cdef intp[3] dims
     if out is None:
         dims[0] = N; dims[1] = H; dims[2] = W
@@ -44,6 +52,13 @@ cdef ndarray __get_out(ndarray out, intp N, intp H, intp W):
     return out
 
 cdef ndarray __get_out_2d(ndarray out, intp H, intp W):
+    """
+    Checks the output array to make sure it is an HxW double array that is behaved with the last
+    strides being element-sized.
+    
+    If out is None then a new array is created and returned. If it is not None and doesn't meet the
+    requirements, a ValueError is raised.
+    """
     cdef intp[2] dims
     if out is None:
         dims[0] = H; dims[1] = W
@@ -54,7 +69,12 @@ cdef ndarray __get_out_2d(ndarray out, intp H, intp W):
     return out
 
 cdef inline int __get_nthreads(int nthreads, intp max_threads) nogil:
-    # equivilent to max(min(nthreads, max_threads, omp_get_max_threads()), 1)
+    """
+    Gets the number of threads to run on, given the argument input, the max that should be run
+    (to make sure each thread does sufficient work), and the number of threads given by OpenMP.
+    
+    Equivilent to max(min(nthreads, max_threads, omp_get_max_threads()), 1)
+    """
     if nthreads > max_threads: nthreads = <int>max_threads
     if nthreads > omp_get_max_threads(): nthreads = omp_get_max_threads()
     return 1 if nthreads < 1 else nthreads
@@ -63,10 +83,10 @@ cdef inline int __get_nthreads(int nthreads, intp max_threads) nogil:
 ########## Neighborhood Calculator ##########
 
 def ConstructNeighborhoods(ndarray im, ndarray offsets, ndarray out=None, tuple region=None, int nthreads=1):
-    # CHANGE: permanently now like ConstructNeighborhoods(padReflect(im, *), ____Neighborhood(*), 0)
-    # CHANGE: region is handled in such a way that the image is never padded, but instead reflection is handled directly
-    # CHANGE: converted to Cython so that it could be multi-threaded and faster
-
+    """
+    Computes the neighborhood features of the image. See the Python wrapper in chm_filters for more
+    more information. Here the offsets must be of intp type.
+    """
     # TODO: all DOUBLE_PTR_R and DOUBLE_PTR_CR should be aligned (A) but doing so causes illegal argument core dumps...
 
     # Check image and offsets
@@ -103,10 +123,6 @@ def ConstructNeighborhoods(ndarray im, ndarray offsets, ndarray out=None, tuple 
     for i in xrange(pre_y-1, -1, -1):             irp[0] = im_p+i*im_stride; irp += 1 # reflected start
     for i in xrange(off_y, mid_y):                irp[0] = im_p+i*im_stride; irp += 1
     for i in xrange(mid_y-1, mid_y-post_y-1, -1): irp[0] = im_p+i*im_stride; irp += 1 # reflected end
-
-    #irp = <const char**>PyArray_DATA(im_rows)
-    #for i in xrange(n_rows):
-    #    print("%08x" % <intp>irp[i])
 
     # Get pointers
     cdef const DOUBLE_PTR_CR* im_rows_p = (<const DOUBLE_PTR_CR*>PyArray_DATA(im_rows)) + T_rad
@@ -148,25 +164,20 @@ def correlate_xy(ndarray im, ndarray weights_x, ndarray weights_y, ndarray out=N
     Equivilent to:
         scipy.ndimage.correlate(im, weights_x[:,None].dot(weights_y[None,:]), output=out)
     With the following differences:
-        * edges are dropped instead of being reflected, constant, ... (so the output is equal to
-          out[r:-r,r:-r])
-        * im must be a 2D double, behaved, C-contiguous, with the final stride being equal to the
-          size of a double
-        * weights must be a 1D double vector with the final stride being equal to the size of a
-          double
+        * edges are dropped so the output is equal to out[r:-r,r:-r]
+        * im must be a 2D double, behaved, with a final dimension that is C-contiguous
+        * weights must be a 1D double vector with a double-sized final stride
         * this supports multi-threading (although defaults to a single thread)
         * partial in-place operation
     
     The out argument can be one of the following:
-        * None, in which case a single array is allocated and used as both the termporary and final
-          output
+        * None, a single array is allocated and used as both the temporary and final output
         * an array that is the width of the input but the height of the output, in which case it is
           used for the temporary and output (no major allocations)
               Note that if the output provided is a view of the input, an additional allocation and
               copy will be made, making it slower than the following two options (which don't have
               the extra copy even when the output is a view of the input)
-        * an array that is exactly the output size, in which case an array is allocated for the
-          temporary
+        * an array that is the output size, in which case an array is allocated for the temporary
         * the special value INPLACE in which case an array is allocated for the temporary but the
           final output is to the input
     """
@@ -227,11 +238,12 @@ def correlate_x(ndarray im, ndarray weights, ndarray out=None, int nthreads=1):
     Run cross correlation in 1D along the "x" axis (axis=1) of a 2D image. Equivilent to:
         scipy.ndimage.correlate1d(im, weights, axis=1, output=out)
     With the following differences:
-        * edges are dropped instead of being reflected, constant, ... (so the output is equal to out[:,r:-r])
-        * im must be a 2D double, behaved, C-contiguous, with the final stride being equal to the size of a double
-        * weights must be a 1D double vector with the final stride being equal to the size of a double
+        * edges are dropped so the output is equal to out[:,r:-r]
+        * im must be a 2D double, behaved, with a final dimension that is C-contiguous
+        * weights must be a 1D double vector with a double-sized final stride
         * this supports multi-threading (although defaults to a single thread)
-        * this supports in-place operation so out can be a view of im (e.g. out=im[:, r:-r] or out=im[:, :-2*r] or out=INPLACE)
+        * this supports in-place operation so out can be a view of im (e.g. out=im[:, r:-r] or
+          out=im[:, :-2*r] or out=INPLACE)
     """
 
     cdef intp i, j, k
@@ -322,12 +334,13 @@ def correlate_y(ndarray im, ndarray weights, ndarray out=None, int nthreads=1):
     Run cross correlation in 1D along the "y" axis (axis=0) of a 2D image. Equivilent to:
         scipy.ndimage.correlate1d(im, weights, axis=0, output=out)
     With the following differences:
-        * edges are dropped instead of being reflected, constant, ... (so the output is equal to out[r:-r,:])
-        * im must be a 2D double, behaved, C-contiguous, with the final stride being equal to the size of a double
-        * weights must be a 1D double vector with the final stride being equal to the size of a double
+        * edges are dropped so the output is equal to out[r:-r,:]
+        * im must be a 2D double, behaved, with a final dimension that is C-contiguous
+        * weights must be a 1D double vector with a double-sized final stride
         * this supports multi-threading (although defaults to a single thread)
-    Note: unlike with correlate_x, when operating in-place an internal buffer is allocated for the size of the image
-    and the data has to be copied from it to the output, so nothing is saved by working in-place.
+    Note: unlike with correlate_x, when operating in-place an internal buffer is allocated for the
+    size of the image and the data has to be copied from it to the output, so nothing is saved by
+    working in-place.
     """
 
     from numpy import may_share_memory
@@ -423,8 +436,6 @@ cdef void correlate_y_any(intp H, intp W, char* out, intp out_stride, const doub
 
 ########## Haar Features Calculator ##########
 
-DEF EPS = 0.00001
-
 def cc_cmp_II(ndarray im not None):
     """
     cc_cmp_II
@@ -432,7 +443,9 @@ def cc_cmp_II(ndarray im not None):
     Michael Villamizar
     mvillami@iri.upc.edu
     2009
-    Recoded and converted to Cython by Jeffrey Bush 2015
+    Recoded and converted to Cython by Jeffrey Bush 2015-2016.
+    Requires im to be a 2-dimensional, behaved, with the last dimension being C-contiguous.
+    Returns a newly allocated array.
 
     input:
         <- Input Image
@@ -440,40 +453,36 @@ def cc_cmp_II(ndarray im not None):
         -> Integral Image (II)
     """
 
-    if not PyArray_ISBEHAVED_RO(im) or PyArray_TYPE(im) != NPY_DOUBLE or PyArray_NDIM(im) != 2: raise ValueError("Invalid im")
-    cdef intp H = PyArray_DIM(im, 0), W = PyArray_DIM(im, 1)
-    cdef ndarray[npy_double, ndim=2, mode='c'] II_arr = PyArray_EMPTY(2, PyArray_SHAPE(im), NPY_DOUBLE, False)
-    cdef flatiter _itr = PyArray_IterNew(im)
-    cdef PyArrayIterObject* itr = <PyArrayIterObject*>_itr
+    if not PyArray_ISBEHAVED_RO(im) or PyArray_TYPE(im) != NPY_DOUBLE or PyArray_NDIM(im) != 2 or PyArray_STRIDE(im, 1) != sizeof(double): raise ValueError("Invalid im")
+    cdef intp H = PyArray_DIM(im, 0), W = PyArray_DIM(im, 1), stride = PyArray_STRIDE(im, 0) // sizeof(double)
+    cdef ndarray II_arr = PyArray_EMPTY(2, PyArray_SHAPE(im), NPY_DOUBLE, False)
+    cdef DOUBLE_PTR_AR IM = <DOUBLE_PTR_AR>PyArray_DATA(im)
     cdef DOUBLE_PTR_AR II = <DOUBLE_PTR_AR>PyArray_DATA(II_arr)
     cdef DOUBLE_PTR_AR II_last = II
 
-    cdef double last = 0.0
+    cdef double last
     cdef intp i, j
     with nogil:
-        II[0] = (<DOUBLE_PTR_CAR>PyArray_ITER_DATA(itr))[0]
-        PyArray_ITER_NEXT(itr)
+        II[0] = last = IM[0]
         for j in xrange(1, W):
-            II[j] = last = (<DOUBLE_PTR_CAR>PyArray_ITER_DATA(itr))[0] + last
-            PyArray_ITER_NEXT(itr)
+            II[j] = last = IM[j] + last
         for i in xrange(1, H):
+            IM += stride
             II += W
-            II[0] = last = (<DOUBLE_PTR_CAR>PyArray_ITER_DATA(itr))[0] + II_last[0]
-            PyArray_ITER_NEXT(itr)
+            II[0] = last = IM[0] + II_last[0]
             for j in xrange(1, W):
-                II[j] = last = (<DOUBLE_PTR_CAR>PyArray_ITER_DATA(itr))[0] + last + II_last[j] - II_last[j-1]
-                PyArray_ITER_NEXT(itr)
+                II[j] = last = IM[j] - II_last[j-1] + last + II_last[j]
             II_last += W
     return II_arr
 
-def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads=1):
+def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads=1, bint compat=True):
     """
     cc_Haar_features
     This function computes the Haar-like features in X and Y
     Michael Villamizar
     mvillami@iri.upc.edu
     2009
-    Recoded, multithreaded, and converted to Cython by Jeffrey Bush 2015
+    Recoded, multithreaded, and converted to Cython by Jeffrey Bush 2015-2016.
     
     input:
         <- Integral Image (II)
@@ -491,13 +500,16 @@ def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads
     cdef DOUBLE_PTR_AR X = <DOUBLE_PTR_AR>PyArray_DATA(out)             # Haar X output
     cdef DOUBLE_PTR_AR Y = X + PyArray_STRIDE(out, 0) // sizeof(double) # Haar Y output
     cdef DOUBLE_PTR_CAR II_p = <DOUBLE_PTR_CAR>PyArray_DATA(II)
-
+    cdef cc_Haar_features_func cc_Haar_features
+    if compat: cc_Haar_features = __cc_Haar_features_compat
+    else:      cc_Haar_features = __cc_Haar_features
+    
     # Variables used in parallel block
     cdef intp i, a, b
     cdef double inc
     
     with nogil:
-        if nthreads == 1: __cc_Haar_features(II_p, H, W, S, X, Y)
+        if nthreads == 1: cc_Haar_features(II_p, H, W, S, X, Y)
         else:
             with parallel(num_threads=nthreads):
                 nthreads = omp_get_num_threads() # in case there is a difference...
@@ -505,10 +517,15 @@ def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads
                 i = threadid()
                 a = <intp>floor(inc*i)
                 b = H if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
-                __cc_Haar_features(II_p+a*II_W, b-a, W, S, X+a*W, Y+a*W)
+                cc_Haar_features(II_p+a*II_W, b-a, W, S, X+a*W, Y+a*W)
     return out
 
+ctypedef void (*cc_Haar_features_func)(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_PTR_AR X, DOUBLE_PTR_AR Y) nogil
+
 cdef void __cc_Haar_features(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_PTR_AR X, DOUBLE_PTR_AR Y) nogil:
+    # Non-compat version doesn't add the arbitary EPS to the area for division (since the area can never be 0, it is pointless)
+    # Also the math for X and Y is done in a slightly different order and more efficient (but this causes some minor drift)
+    # Overall, this speeds it up by ~25%, the error is ~1e-8 which is less than the EPS value, so overall pretty good
     cdef intp i, j, C = S//2
     cdef DOUBLE_PTR_CAR T = II         # top
     cdef DOUBLE_PTR_CAR M = II+C*(W+S) # middle
@@ -518,9 +535,33 @@ cdef void __cc_Haar_features(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_P
         for j in xrange(0, W):
             area = B[S] + T[0] - T[S] - B[0]
             if area > 0:
+                area = 1/area
+                X[0] = (B[S] - T[S] - T[0] + B[0] + 2*(T[C] - B[C]))*area
+                Y[0] = (B[S] - B[0] - T[0] + T[S] + 2*(M[0] - M[S]))*area
+            else:
+                X[0] = 0
+                Y[0] = 0
+            X += 1; Y += 1
+            T += 1; M += 1; B += 1
+        T += S; M += S; B += S
+
+DEF EPS = 0.00001
+cdef void __cc_Haar_features_compat(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_PTR_AR X, DOUBLE_PTR_AR Y) nogil:
+    cdef intp i, j, C = S//2, WS = W+S
+    cdef DOUBLE_PTR_CAR T = II         # top
+    cdef DOUBLE_PTR_CAR M = II+C*(W+S) # middle
+    cdef DOUBLE_PTR_CAR B = II+S*(W+S) # bottom
+    cdef double area
+    for i in xrange(0, H):
+        for j in xrange(0, W):
+            area = B[S] + T[0] - T[S] - B[0]
+            if area > 0:
+                # NOTE: to be truly compatible, don't pre-compute the division
+                # Pre-computing the division doesn't cause any drift (even error ~1e-17) and cuts
+                # the time down significantly (~25%) so we keep it
                 area = 1/(area+EPS)
-                X[0] = (B[S] + B[0] - T[S] - T[0] + 2*(T[C] - B[C]))*area
-                Y[0] = (B[S] - B[0] + T[S] - T[0] + 2*(M[0] - M[S]))*area
+                X[0] = ((B[S] + T[C] - T[S] - B[C]) - (B[C] + T[0] - T[C] - B[0]))*area #/(area+EPS)
+                Y[0] = ((B[S] + M[0] - M[S] - B[0]) - (M[S] + T[0] - T[S] - M[0]))*area #/(area+EPS)
             else:
                 X[0] = 0
                 Y[0] = 0
@@ -529,40 +570,39 @@ cdef void __cc_Haar_features(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_P
         T += S; M += S; B += S
 
 
-########## HoG Features Calculator ##########
+########## HOG Features Calculator ##########
 
-cdef extern from "HoG.h" nogil:
-    cdef intp HoG_init(const intp w, const intp h, const intp *n)
-    cdef void HoG_run(const double *pixels, const intp w, const intp h, double *out, double *H)
-    cdef intp _HoG "HoG" (const double *pixels, const intp w, const intp h, double *out, const intp n)
-    cdef void _HoG_orig "HoG_orig" (double *pixels, double *params, int *img_size, double *dth_des, bint grayscale)
+cdef extern from "HOG.h" nogil:
+    cdef intp HOG_init(const intp w, const intp h, const intp *n)
+    cdef void HOG_run(const double *pixels, const intp w, const intp h, double *out, double *H)
+    cdef intp _HOG "HOG" (const double *pixels, const intp w, const intp h, double *out, const intp n)
+    cdef void _HOG_orig "HOG_orig" (double *pixels, double *params, int *img_size, double *dth_des, bint grayscale)
     
-def HoG(ndarray[npy_double, ndim=2, mode='c'] pixels not None, ndarray[npy_double, ndim=1, mode='c'] out not None):
+def HOG(ndarray[npy_double, ndim=2, mode='c'] pixels not None, ndarray[npy_double, ndim=1, mode='c'] out not None):
     """
-    Implements the HoG filter. Does not support changing the parameters directly (they are compiled in).
-    Additionally RGB images are not supported. Instead of allocating the memory for the results, you must
-    pass in the output array. The destination array must be a 1-D double array and have at least as many
-    elements as are needed for the output. This function returns the number of elements stored in the
-    array.
+    Implements the HOG filter for a single block. Does not support changing the parameters directly
+    (they are compiled in). Additionally RGB images are not supported. Instead of allocating the
+    memory for the results, you must pass in the output array. The destination array must be a 1-D
+    double array and have at least as many elements as are needed for the output. This function
+    returns the number of elements stored in the array.
     """
-    # CHANGED: the interface is completely changed: no optional params [hard-coded to defaults] and takes the output data array
-    # CHANGED: no longer accepts RGB images
-    # CHANGED: a much faster method is to bypass this and use ConstructHOG
+    # NOTE: a much faster method is to bypass this and use ConstructHOG
     if not PyArray_ISBEHAVED_RO(pixels): raise ValueError("Invalid im")
     if not PyArray_ISBEHAVED(out): raise ValueError("Invalid out")
     cdef intp n
-    with nogil: n = _HoG(<DOUBLE_PTR_CAR>PyArray_DATA(pixels), PyArray_DIM(pixels, 1), PyArray_DIM(pixels, 0),
+    with nogil: n = _HOG(<DOUBLE_PTR_CAR>PyArray_DATA(pixels), PyArray_DIM(pixels, 1), PyArray_DIM(pixels, 0),
                          <DOUBLE_PTR_AR>PyArray_DATA(out), PyArray_DIM(out, 0))
     if n == -1: raise ValueError("Output array too small")
     if n == -2: raise MemoryError()
     return n
 
-def HoG_orig(ndarray pixels not None, params = [9, 8.0, 2, False, 0.2]):
+def HOG_orig(ndarray pixels not None, params = [9, 8.0, 2, False, 0.2]):
     """
-    Implements HoG filter as per the original MEX file. Supports all features of the original and
-    uses an almost unmodified C++ source file for it (just compile-time warnings suppression added).
-    It prefers Fortran-ordered double arrays. It is 3-4 times slower than the newer version and is
-    less accurate due to using 32-bit floats for intermediate calculations.
+    Implements HOG filter for a single block as per the original MEX file. Supports all features of
+    the original and uses an almost unmodified C++ source file for it (just compile-time warnings
+    suppression added and changing the function name). It prefers Fortran-ordered double arrays. It
+    is 3-4 times slower than the newer version and is less accurate due to using 32-bit floats for
+    intermediate calculations.
     """
     cdef double _params[5]
     _params[0] = float(params[0])
@@ -591,7 +631,7 @@ def HoG_orig(ndarray pixels not None, params = [9, 8.0, 2, False, 0.2]):
     
     cdef ndarray[npy_double, ndim=1] dth_des = PyArray_EMPTY(1, &n, NPY_DOUBLE, True)
     with nogil:
-        _HoG_orig(<double*>PyArray_DATA(pixels), _params, img_size, <double*>PyArray_DATA(dth_des), grayscale)
+        _HOG_orig(<double*>PyArray_DATA(pixels), _params, img_size, <double*>PyArray_DATA(dth_des), grayscale)
     return dth_des
 
 ##### Highly optimized version for entire image #####
@@ -656,7 +696,7 @@ cdef bint __generic_filter(double[:, :] input,
 def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int nthreads=1):
     """
     The entire ConstructHOG function in Cython. Uses a modified scipy.ndimge.filters.generic_filter
-    for calling the HoG function. Some other optimizations are using a single memory alocation for
+    for calling the HOG function. Some other optimizations are using a single memory alocation for
     temporary data storage, giving generic_filter a C function instead of a Python function, and is
     multi-threaded.
     """
@@ -664,7 +704,7 @@ def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int n
     if not PyArray_ISBEHAVED_RO(im) or PyArray_TYPE(im) != NPY_DOUBLE or PyArray_NDIM(im) != 2: raise ValueError("Invalid im")
     cdef intp filt_width_1 = filt_width - 1
     cdef intp n, H = PyArray_DIM(im, 0) - filt_width_1, W = PyArray_DIM(im, 1) - filt_width_1
-    cdef intp tmp_n = HoG_init(filt_width, filt_width, &n)
+    cdef intp tmp_n = HOG_init(filt_width, filt_width, &n)
     out = __get_out(out, n, H, W)
     nthreads = __get_nthreads(nthreads, H // 64) # make sure each thread is doing at least 64 rows
 
@@ -690,7 +730,7 @@ def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int n
     
     with nogil:
         if nthreads == 1:
-            success = __generic_filter(im_mv, <filter_func>&HoG_run, tmp, filt_width, out_mv)
+            success = __generic_filter(im_mv, <filter_func>&HOG_run, tmp, filt_width, out_mv)
         else:
             # This uses OpenMP to do the multi-processing
             with parallel(num_threads=nthreads):
@@ -699,7 +739,7 @@ def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int n
                 i = threadid()
                 a = <intp>floor(inc*i)
                 b = H if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
-                if not __generic_filter(im_mv[a:b+filt_width_1,:], <filter_func>&HoG_run, tmp + i*tmp_n, filt_width, out_mv[:,a:b,:]):
+                if not __generic_filter(im_mv[a:b+filt_width_1,:], <filter_func>&HOG_run, tmp + i*tmp_n, filt_width, out_mv[:,a:b,:]):
                     success_p[0] = False
 
         ## This can be done without OpenMP as well but instead with Python threads, with very little penalty
@@ -710,7 +750,7 @@ def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int n
         #    cdef double[:, :] im = im_mv[a:b+filt_width_1,:]
         #    cdef double[:,:,::view.contiguous] out = out_mv[:,a:b,:]
         #    with nogil:
-        #        if not generic_filter_x(im, <filter_func>&HoG_run, tmp + i*tmp_n, filt_width, out):
+        #        if not generic_filter_x(im, <filter_func>&HOG_run, tmp + i*tmp_n, filt_width, out):
         #            success = False
         #threads = [None] * nthreads
         #for i in xrange(nthreads):
@@ -722,96 +762,6 @@ def ConstructHOG(ndarray im not None, int filt_width=15, ndarray out=None, int n
    
     if not success: raise MemoryError()
     return out
-
-### Older version of ConstructHOG that used SciPy's generic_filter (which is not multi-threaded)
-##cdef struct __wrapper_data:
-##    intp filter_width # width/height of the filter
-##    intp out_size # the amount of data generated per HoG run
-##    intp out_pos  # the current linear pixel position
-##    double** out  # an array of pointers to where the outputs are stored
-##                  # accessed like out[i][j] where i is in [0,out_size) and j is out_pos
-##                  # the outer array needs to be freed, the inner arrays are pointers into a NumPy array
-##    double* out_buf # output buffer for run, size of out_size, must be freed
-##    double* tmp_buf # temporary buffer given to run, must be freed
-##
-##cdef int __wrapper(const double* buf, intp filter_size, double* retval, __wrapper_data* data) nogil:
-##    #assert filter_size == data.filter_width * data.filter_width
-##    HoG_run(buf, data.filter_width, data.filter_width, data.out_buf, data.tmp_buf)
-##    cdef intp i
-##    for i in xrange(data.out_size):
-##        data.out[i][data.out_pos] = data.out_buf[i]
-##    data.out_pos += 1
-##    #retval[0] = 0.0 # already set to 0 by default
-##    return 1 # return zero if it has failed, if returning 0 can also set a Python error
-##
-##IF USE_PYCAPSULES:
-##    cdef void __wrapper_destructor(object capsule):
-##        free(PyCapsule_GetContext(capsule))
-##
-##    def __wrapper_func(__wrapper_data* data):
-##        cdef object capsule = PyCapsule_New(<void*>&__wrapper, "HoG-Filter-Wrapper", &__wrapper_destructor)
-##        PyCapsule_SetContext(capsule, data)
-##        return capsule
-##    
-##ELSE:
-##    cdef void __wrapper_destructor(void* func, void* _data):
-##        cdef __wrapper_data* data = <__wrapper_data*>_data
-##        free(data.tmp_buf)
-##        free(data.out_buf)
-##        free(data.out)
-##        free(data)
-##
-##    cdef object __wrapper_func(__wrapper_data* data):
-##        return PyCObject_FromVoidPtrAndDesc(<void*>&__wrapper, data, &__wrapper_destructor)
-##        
-##def ConstructHOG(ndarray im, intp filt_width, ndarray[npy_double, ndim=3] out=None):
-##    """
-##    The entire ConstructHOG function in Cython. Uses scipy.ndimge.filters.generic_filter for calling
-##    the HoG function. Some other optimizations are using a single memory alocation for temporary
-##    data storage and a giving generic_filter a C function instead of a Python function.
-##    """
-##    from scipy.ndimage.filters import generic_filter
-##
-##    cdef __wrapper_data* data = <__wrapper_data*>malloc(sizeof(__wrapper_data))
-##    if data is NULL: raise MemoryError()
-##    data.filter_width = filt_width
-##    data.out_pos = 0
-##    data.out = NULL
-##    data.out_buf = NULL
-##    data.tmp_buf = NULL
-##    cdef object func = __wrapper_func(data)
-##
-##    cdef intp n, i, H = PyArray_DIM(im, 0), W = PyArray_DIM(im, 1)
-##    data.tmp_buf = <double*>malloc(HoG_init(filt_width, filt_width, &n) * sizeof(double))
-##    data.out_buf = <double*>malloc(n * sizeof(double))
-##    data.out     = <double**>malloc(n * sizeof(double*))
-##    if data.tmp_buf is NULL or data.out_buf is NULL or data.out is NULL: raise MemoryError()
-##    data.out_size = n
-##
-##    cdef intp dims[3]
-##    if out is None:
-##        dims[0] = n; dims[1] = H; dims[2] = W
-##        out = PyArray_EMPTY(3, dims, NPY_DOUBLE, False)
-##    elif PyArray_DIM(out, 0) != n or PyArray_DIM(out, 1) != H or PyArray_DIM(out, 2) != W or \
-##         PyArray_STRIDE(out, 1) != PyArray_DIM(out, 2)*sizeof(double) or PyArray_STRIDE(out, 2) != sizeof(double):
-##        # Out must be a n x h x w matrix with the last two axes being C contiguous
-##        raise ValueError('Invalid output array')
-##    #cdef double* out_p = <double*>PyArray_DATA(out)
-##    #cdef intp npix = H*W
-##    for i in xrange(data.out_size): data.out[i] = <double*>PyArray_GETPTR1(out, i)
-##
-##    # Make a dummy output array where every value in the array maps to a single value
-##    # This means it doesn't require allocation, doesn't really require memory, and hopefully is
-##    # slightly faster because we don't need to be jumping around in memory ever
-##    # We can do this because we don't need the output generated by generic_filter.
-##    cdef double out_dummy_val
-##    cdef ndarray out_dummy = PyArray_SimpleNewFromData(2, PyArray_SHAPE(im), NPY_DOUBLE, &out_dummy_val)
-##    PyArray_STRIDES(out_dummy)[0] = 0
-##    PyArray_STRIDES(out_dummy)[1] = 0
-##
-##    generic_filter(im, func, size=(filt_width,filt_width), output=out_dummy) #, mode='constant')
-##    
-##    return out
 
 
 ########## SIFT Calculator Pieces ##########
@@ -868,6 +818,7 @@ def sift_normalize(double[:,::1] sift_arr not None, int nthreads=1):
         norm = 0
         for i in xrange(nfeat): norm += sift_arr[i,j] * sift_arr[i,j]
         if norm <= 1: continue
+        # TODO: don't precompute division? (here and below)
         norm = 1/sqrt(norm)
         for i in xrange(nfeat): 
             sift_arr[i,j] *= norm

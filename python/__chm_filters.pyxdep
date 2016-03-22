@@ -1,4 +1,4 @@
-HoG.h
-HoG.cpp
-HoG-orig.cpp
+HOG.h
+HOG.cpp
+HOG-orig.cpp
 npy_helper.pxi

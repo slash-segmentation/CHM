@@ -5,7 +5,7 @@
 """
 The core imresize functions in Cython.
 
-Jeffrey Bush, 2015, NCMIR, UCSD
+Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
 # TODO: there seems to be a Cython bug in that sometimes a cdef function statement with an argument

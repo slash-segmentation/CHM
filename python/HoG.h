@@ -1,3 +1,6 @@
+// HOG - Histogram of oriented gradients features calculator
+// Written by Jeffrey Bush, 2015-2016, NCMIR, UCSD
+
 #ifdef _MSC_VER
 #ifndef HAVE_SSIZE_T
 #include <BaseTsd.h>
@@ -38,7 +41,7 @@ extern "C" {
 #endif
 
 /**
- * HoG filtering.
+ * HOG filtering.
  *   image is in pixels of w and h, must be C order
  *   out is where data is saved, it is n pixels long
  *   returns:
@@ -46,29 +49,29 @@ extern "C" {
  *     -2 if temporary memory can't be allocated
  *     otherwise it returns the number of values written to out
  *
- * This essentially calls HoG_init then Hog_run.
+ * This essentially calls HOG_init then Hog_run.
  */
-ssize_t HoG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n);
+ssize_t HOG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n);
 
 /**
- * Checks and initilization for HoG filtering.
+ * Checks and initilization for HOG filtering.
  *   the image size is given in w/h
  *   the total room needed in the output is given in n (in number of pixels)
  *   returns the number of pixels needed in the temporary buffer
  */
-ssize_t HoG_init(const ssize_t w, const ssize_t h, ssize_t *n);
+ssize_t HOG_init(const ssize_t w, const ssize_t h, ssize_t *n);
 
 /**
- * The core code for the HoG filtering.
+ * The core code for the HOG filtering.
  *   image is in pixels of w and h, must be C order
- *   out is where data is saved, it must be at least n pixels long (the n from HoG_init)
- *   H is a temporary buffer with the number of elements returned by HoG_init
+ *   out is where data is saved, it must be at least n pixels long (the n from HOG_init)
+ *   H is a temporary buffer with the number of elements returned by HOG_init
  */
-void HoG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H);
+void HOG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H);
 
 
-/** The original, nearly unmodified, HoG code. */
-void HoG_orig(double *pixels, double *params, int *img_size, double *dth_des, unsigned int grayscale);
+/** The original, nearly unmodified, HOG code. */
+void HOG_orig(double *pixels, double *params, int *img_size, double *dth_des, unsigned int grayscale);
 
 #ifdef __cplusplus
 }

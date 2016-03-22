@@ -17,18 +17,27 @@ def im2double(im):
     """Converts an image to doubles from 0.0 to 1.0 if not already a floating-point type."""
     from numpy import float64, iinfo
     k, t, im = im.dtype.kind, im.dtype.type, im.astype(float64, copy=False)
-    if k == 'u': im *= 1.0 / iinfo(t).max
+    # NOTE: The divisions here could be pre-calculated for ~60% faster code but this is always the
+    # first step and the errors will propogate (although minor, max at ~1.11e-16 or 1/2 EPS and
+    # averaging ~5e-18). This will only add a milisecond or two per 1000x1000 block.
+    # TODO: If I ever extend "compat" mode to this function, it would be a good candidate.
+    if k == 'u': im /= iinfo(t).max
     elif k == 'i':
         ii = iinfo(t)
         im -= ii.min
-        im *= 1.0 / (ii.max - ii.min)
+        im /= ii.max - ii.min
     elif k not in 'fb': raise ValueError('Unknown image format')
     return im
 
 
 ########## Resizing Image ##########
 def MyUpSample(im, L):
-    # supports both 2d and 3d upsampling
+    """
+    Increases the image size by 2**L. So if L == 0, image is returned unchanged, if L == 1 the
+    image is doubled, and so forth. The upsampling is done with no interpolation (nearest neighbor).
+
+    Supports both 2d and 3d upsampling.
+    """
     from numpy.lib.stride_tricks import as_strided
     if L == 0: return im
     N = 2**L
@@ -40,7 +49,14 @@ def MyUpSample(im, L):
     #return repeat(repeat(im, N, axis=0), N, axis=1)
 
 def MyDownSample(im, L):
-    # supports both 2d and 3d downsampling
+    """
+    Decreases the image size by 2**L. So if L == 0, image is returned unchanged, if L == 1 the
+    image is halved, and so forth. The downsampling uses bicubic iterpolation. If the image size is
+    not a multiple of 2**L then extra rows/columns are added to make it so by replicating the edge
+    pixels.
+
+    Supports both 2d and 3d downsampling.
+    """
     from numpy import pad
     #from numpy import vstack, hstack
     from imresize import imresize_fast # built exactly for our needs

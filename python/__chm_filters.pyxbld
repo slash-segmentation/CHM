@@ -17,7 +17,7 @@ linker_opt = {
 
 def make_ext(modname, pyxfilename):
     return Extension(name=modname,
-	                 sources=[str(pyxfilename),'HoG.cpp','HoG-orig.cpp'],
+	                 sources=[str(pyxfilename),'HOG.cpp','HOG-orig.cpp'],
 					 extra_compile_args=compiler_opt.get(compiler_name, []),
 					 extra_link_args=linker_opt.get(compiler_name, []),
 					 language="c++")

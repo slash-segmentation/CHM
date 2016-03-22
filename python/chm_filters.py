@@ -6,12 +6,15 @@ there are from the MATLAB versions - mostly not returning unused return values o
 values in. General changes not listed for each filter since they apply to all filters:
   * generate (features,H,W) arrays instead of (features,H*W)
   * take an optional "out" argument to store the results in instead of allocating it themselves,
-    all uses of them use this out argument; they do support keeping it None for allocation though
+    while all uses of them use this out argument; they do support keeping it None for allocation
   * take an optional "region" argument that describes the region of the image to process (as a
     sequence of top, left, bottom, right) that allows a filter to use the neighboring pixel data
     instead of padding an image; if None then padding is added if necessary
-  * take an option nthreads argument to set the number of threads (defaulting to single threaded),
-    although some functions aren't multi-threaded so won't benefit
+  * take an optional "nthreads" argument to set the number of threads (defaulting to single
+    threaded), although some functions aren't multi-threaded so won't benefit
+  * take an optional "compat" argument which defaults to True and causes the methods to return
+    results compatible with the original MATLAB code at the expense of accuracy or speed, set to
+    False to get the results that actually should be produced
   * some filters accepted color or non-float64 images, now all inputs must be float64 2D arrays
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
@@ -46,6 +49,18 @@ def __separate_filter(f):
     scale = sqrt(s[0])
     return u[:,0]*scale, v[0,:]*scale
 
+def __round_u8_steps(arr):
+    """
+    Clips the data between 0.0 to 1.0 then rounds the data to steps of 1/255. This is to match the
+    behavior of MATLAB's imfilter being run on uint8 data. All of this is done in-place on the data
+    in the array.
+    """
+    from numpy import clip
+    clip(arr, 0.0, 1.0, out=arr)
+    arr *= 255.0
+    arr.round(out=arr)
+    arr /= 255.0
+
 def __run_threads(func, total, min_size=1, nthreads=1):
     """
     Runs a bunch of threads, over "total" items, chunking the items. The function is given a
@@ -68,8 +83,8 @@ def __run_threads(func, total, min_size=1, nthreads=1):
 
 ##### OPTIMIZATIONS #####
 # Reduce padding:
-#   HoG  (+1 due to the algorithm)
-#   Sift (+3? has lots of correlate1d's)
+#   HOG  (+1 due to the algorithm)
+#   SIFT (+3? has lots of correlate1d's)
 #
 # Could further optimize reflective padding by not actually adding padding but instead use the
 # intrinsic padding abilities of the various scipy ndimage functions (no way to turn off their
@@ -81,14 +96,16 @@ def __run_threads(func, total, min_size=1, nthreads=1):
 # Some filters however operate pixel-at-once (all features are done for a single pixel)
 # The following are pixel-at-once:
 #   Haar (although only 2 features so not really a problem)
-#   HoG  (36 features, a bit more of a problem)
+#   HOG  (36 features, a bit more of a problem)
 #   SIFT (at least during the final normalization step and has 128 features!)
 
 ########## Cumulative Filter ##########
-#@profile
-def Filterbank(im, out=None, region=None, nthreads=1):
-    # Like other filters this supports out, region, and nthreads
-    # It pre-computes the regioned-image and output
+def Filterbank(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Runs all filters on the image. It supports out and region which is uses to pre-compute/allocate
+    the regioned-image and output. It also supports nthreads and compat which are simply passed
+    along to the other filters.
+    """
     from chm_utils import im2double
 
     # Pad/region the image
@@ -104,15 +121,20 @@ def Filterbank(im, out=None, region=None, nthreads=1):
     # Run the filters
     nf_start = 0
     for f,_,nf in __filters:
-        f(im, out=out[nf_start:nf_start+nf], region=region, nthreads=nthreads)
+        f(im, out=out[nf_start:nf_start+nf], region=region, nthreads=nthreads, compat=compat)
         nf_start += nf
     
     return out
 
-def MaxFilterPadding():    return max(f[1] for f in __filters)
-def TotalFilterFeatures(): return sum(f[2] for f in __filters)
+def MaxFilterPadding():
+    """Returns the maximum amount of padding used by any filter."""
+    return max(f[1] for f in __filters)
+def TotalFilterFeatures():
+    """Returns the total number of features used by all filters."""
+    return sum(f[2] for f in __filters)
 
 def __get_filters():
+    """Gets all of the filter functions along with their padding and number of features."""
     GP = max(len(GF[0]) // 2 for GF in __gabor_filters) # max Gabor padding
     SP = (__sift.patch_sz // 2) - 1                     # SIFT padding (at least in part)
     return [   # filter, padding needed, features produced
@@ -121,34 +143,85 @@ def __get_filters():
         (ConstructEdgeFilt,            6,  49),
         (ConstructNeighborhoodsGabor, GP, 180), # GP = 18
         (ConstructSift,               SP, 128), # SP = 7
-        (lambda im,out=None,region=None,nthreads=1:
-         ConstructNeighborhoods(im, StencilNeighborhood(10), out=out, region=region, nthreads=nthreads), 10, 81),
+        (lambda im,out=None,region=None,nthreads=1,compat=True:
+         ConstructNeighborhoods(im, StencilNeighborhood(10), out=out, region=region, nthreads=nthreads, compat=compat), 10, 81),
     ]
 __filters = delayed(__get_filters, list)
 
 ########## Harr Filter ##########
-# Note: implemented in Cython
-def ConstructHaar(im, out=None, region=None, nthreads=1):
+def ConstructHaar(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes the Haar-like features of the image. This produces Viola and Jones's 2-rectangle
+    features (x and y directional features). It uses their method of computing the integral image
+    first and then using fast lookups to get the features.
+
+    The compat flag causes slower computations but reduces the drift errors compared to the MATLAB
+    output. Additionally, with compat set to False there is no longer an arbitrary value added to
+    the area before division (which is unnecessary due to the area never being 0) so it is more
+    accurate.
+
+    Uses a padding of 8. Implemented in Cython. Uses intermediate memory of O(im.size). While
+    technically it is multi-threaded, it doesn't really help much.
+    """
+    # OPT: if the following line allocates a new im, the cc_cmp_II could be made to operate in-place (preliminary testing shows ~10% speed increase)
     im, region = get_image_region(im, 8, region)
     ii = __chm_filters.cc_cmp_II(im) # INTERMEDIATE: im.shape + (16,16)
-    return __chm_filters.cc_Haar_features(ii, 16, out=out, nthreads=nthreads)
+    return __chm_filters.cc_Haar_features(ii, 16, out, nthreads, compat)
 
 
-########## HoG Filter ##########
-# Note: implemented in Cython and C
-#@profile
-def ConstructHOG(im, out=None, region=None, nthreads=1):
-    # OPT: the HoG calculator could be sped up slightly by not zero-padding each region
+########## HOG Filter ##########
+def ConstructHOG(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes the HOG (histogram of oriented gradients) features of the image. This produces 7
+    features.
+
+    Note that the original used float32 values for many intermediate values so the outputs from
+    this function are understandably off by up to 1e-7.
+
+    Uses a padding of 7. Implemented in Cython/C++. Uses minimal intermediate memory. The compat
+    flag is ignored.
+    """
+    # OPT: the HOG calculator could be sped up slightly by not zero-padding each block it processes
+    # TODO: there is a pre-computed division in the C code, should it be kept?
     im, region = get_image_region(im, 7, region)
     return __chm_filters.ConstructHOG(im, 15, out=out, nthreads=nthreads)
 
 
 ########## Edge Detection Filter ##########
-def ConstructEdgeFilt(im, out=None, region=None, nthreads=1):
+def ConstructEdgeFilt(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes the edge features of the image. This calculates the Sobel gradient magnitude then
+    returns neighboring offsets in a 7x7 block.
+
+    The compat flag causes a padding of 0s to be used when needed instead of reflection. This is not
+    a good approach since a transition from 0s to the image data will be an edge. Also it takes
+    extra effort and memory to do so because the Filterbank method adds reflection padding
+    inherently, so we have to detect that and correct it.
+
+    Uses a padding of 6. Uses O(2*im.size).
+    """
     # CHANGED: no longer returns optional raw data
     from numpy import sqrt
     from __chm_filters import correlate_xy
-    im, region = get_image_region(im, 6, region, 'constant')
+    if compat:
+        if region is None: need_zs = (False,)
+        else:
+            mp = MaxFilterPadding()
+            T, L, B, R = region #pylint: disable=unpacking-non-sequence
+            need_zs = T == mp, L == mp, B == im.shape[0] - mp, R == im.shape[1] - mp
+        if any(need_zs):
+            pT, pL, pB, pR = ((3 if z else 6) for z in need_zs)
+            im = im[T-pT:B+pB, L-pL:R+pR].copy()
+            if need_zs[0]: im[ :3,  : ] = 0
+            if need_zs[2]: im[-3:,  : ] = 0
+            if need_zs[1]: im[ : ,  :3] = 0
+            if need_zs[3]: im[ : , -3:] = 0
+            region = (pT, pL, (B-T) + pT, (R-L) + pL)
+        else:
+            im, region = get_image_region(im, 3, region, 'constant')
+    else:
+        im, region = get_image_region(im, 6, region)
+    # OPT: if out exists, could one of these intermediates be avoided?
     imx = correlate_xy(im, __edge_filter[0], __edge_filter[1], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
     imx *= imx
     imy = correlate_xy(im, __edge_filter[1], __edge_filter[0], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
@@ -168,20 +241,51 @@ def __d2dgauss(n, sigma):
     h.flags.writeable = False
     return h
 def __gauss(x,std): from numpy import exp, sqrt, pi; return exp(-x*x/(2*std*std)) / (std*sqrt(2*pi))
-def __dgauss(x,std): return x * __gauss(x,std) / (std*std) # first order derivative of gauss function # CHANGED: removed - sign to create correlation kernel instead of convolution kernel
+def __dgauss(x,std):
+    # CHANGED: removed - sign to create correlation kernel instead of convolution kernel
+    # first order derivative of gauss function
+    return x * __gauss(x,std) / (std*std)
 __edge_filter = __separate_filter(__d2dgauss(7, 1.0))
 
 
 ########## Gabor Filters ##########
-#@profile
-def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
-    # This now uses FFTs instead of real-space convolutions as this is >10x faster and just as accurate
-    # Have the real-space ones in a separate document for reviewing and comparing
-    # NOTE: rfft2/irfft2 are not thread safe before NP 1.9, so this cannot be multi-threaded when using older versions, even with different images!
+def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes several different Gabor filters on the image producing using all combinations of the
+    following parameters to create the kernel:
+      sigma:      2, 3, 4, 5, 6
+      lambdaFact: 2, 2.25, 2.5   (lambaFact = lamba / sigma)
+      orient:     pi/6, pi/3, pi/2, 2pi/3, 5pi/6, pi, 7pi/6, 4pi/3, 3pi/2, 5pi/3, 11pi/6, 2pi
+      gamma:      1
+    Kernels uses a phase of 0 and pi/2 are computed, and combined using the L2 norm into a single
+    feature, resulting in a total of 180 features.
+
+    The original MATLAB code used real-space transforms while this one uses FFTs which makes it >10x
+    faster (since the large FFT for the image itself can be calculated just once) and is just as
+    accurate.
+
+    There are two versions of this function, one using the NumPy fft functions and the other using
+    FFTW if that library is available. The FFTW version is faster and multi-threaded while the
+    NumPy one cannot be used multi-threaded due to a bug in all NumPy version before v1.9.
+    (currently the NumPy one is being used)
+
+    Uses O(8.5*im.size) intermediate memory.
+
+    Compatibility notes:
+    The original MATLAB code has a serious bug in it that it uses the imfilter function with a uint8
+    input which causes the filter output to be clipped to 0-255 and rounded to an integer. This is a
+    major problem as the Gabor filters have negative values (all of which are lost) and can produce
+    results above the input range, along with the losing lots of resolution in the data (from ~16
+    significant digits to ~3). So, when compat is True (the default), the data is put through the
+    same simplification process. When it is False, then much better results are produced.
+    """
+    # NOTE: I (Jeff Bush) have the real-space ones in a separate document for reviewing and comparing
+    # It does not have compatibility added (but that would be easy to add)
     from numpy import empty, sqrt, copyto
     from numpy.fft import rfft2, irfft2
     from scipy.signal.signaltools import _next_regular # finds the next regular/Hamming number (all prime factors are 2, 3, and 5) - needed to make fft functions fast
 
+    u8round = __round_u8_steps if compat else lambda x:None
     im, region = get_image_region(im, 18, region)
 
     H,W = im.shape
@@ -190,7 +294,7 @@ def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
         out = empty((len(__gabor_filters), H, W), dtype=im.dtype)
     
     im_fft_sh = tuple(_next_regular(x) for x in im.shape)
-    im_fft = rfft2(im, s=im_fft_sh) # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+    im_fft = rfft2(im, s=im_fft_sh) # INTERMEDIATE: 2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)
 
     tmp1 = empty(out.shape[1:], dtype=im.dtype) # INTERMEDIATE: im.shape
     tmp2 = empty(out.shape[1:], dtype=im.dtype) # INTERMEDIATE: im.shape
@@ -198,18 +302,18 @@ def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
     for i,(GF1,GF2) in enumerate(__gabor_filters):
         start = len(GF1) // 2 + 18
 
-        GF1 = rfft2(GF1, s=im_fft_sh)  # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+        GF1 = rfft2(GF1, s=im_fft_sh)  # INTERMEDIATE: 2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)
         GF1 *= im_fft
         GF1 = irfft2(GF1, s=im_fft_sh) # INTERMEDIATE: im.shape + (?,?)
         copyto(tmp1, GF1[start:H+start, start:W+start])
-        __round_u8_steps(tmp1)
+        u8round(tmp1)
         tmp1 *= tmp1
         
-        GF2 = rfft2(GF2, s=im_fft_sh)  # INTERMEDIATE: (im.shape[0],(im.shape[1]+1)//2) + (?,?)
+        GF2 = rfft2(GF2, s=im_fft_sh)  # INTERMEDIATE: 2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)
         GF2 *= im_fft
         GF2 = irfft2(GF2, s=im_fft_sh) # INTERMEDIATE: im.shape + (?,?)
         copyto(tmp2, GF2[start:H+start, start:W+start])
-        __round_u8_steps(tmp2)        
+        u8round(tmp2)        
         tmp2 *= tmp2
         
         tmp1 += tmp2
@@ -217,13 +321,40 @@ def ConstructNeighborhoodsGabor(im, out=None, region=None, nthreads=1):
         
     return out
 
-def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
+def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes several different Gabor filters on the image producing using all combinations of the
+    following parameters to create the kernel:
+      sigma:      2, 3, 4, 5, 6
+      lambdaFact: 2, 2.25, 2.5   (lambaFact = lamba / sigma)
+      orient:     pi/6, pi/3, pi/2, 2pi/3, 5pi/6, pi, 7pi/6, 4pi/3, 3pi/2, 5pi/3, 11pi/6, 2pi
+      gamma:      1
+    Kernels uses a phase of 0 and pi/2 are computed, and combined using the L2 norm into a single
+    feature, resulting in a total of 180 features.
+
+    The original MATLAB code used real-space transforms while this one uses FFTs which makes it >10x
+    faster (since the large FFT for the image itself can be calculated just once) and is just as
+    accurate.
+
+    There are two versions of this function, one using the NumPy fft functions and the other using
+    FFTW if that library is available. The FFTW ones are faster and are multi-threaded while the
+    NumPy ones cannot be used multi-threaded due to a bug in all NumPy version before v1.9.
+    (currently the FFTW one is being used)
+
+    Uses O(im.size) intermediate memory plus O(3*im.size) permanent memory for each different image
+    size and number of threads given to this function.
+
+    Compatibility notes:
+    The original MATLAB code has a serious bug in it that it uses the imfilter function with a uint8
+    input which causes the filter output to be clipped to 0-255 and rounded to an integer. This is a
+    major problem as the Gabor filters have negative values (all of which are lost) and can produce
+    results above the input range, along with the losing lots of resolution in the data (from ~16
+    significant digits to ~3). So, when compat is True (the default), the data is put through the
+    same simplification process. When it is False, then much better results are produced.
+    """
     # OPT: it would possibly be better to not multi-thread the FFTs (except the whole-image one) and
     # instead multi-thread the loop itself
-    
-    # This version using a much faster FFT library: FFTW. The code is otherwise the same as in
-    # ConstructNeighborhoodsGabor. This will use multi-threads as well. This is in general twice as
-    # fast in single-threaded mode, and gets better with more threads on larger images.
+    # OPT: if plans were not cached, how much of a slow down does it cause? worth the 24+ MB?
     from itertools import izip
     from numpy import empty, sqrt, copyto
 
@@ -232,6 +363,7 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
     #        2*[(im.shape[0],im.shape[1]//2+1) + (?,?/2)] (complex)
     # INTERMEDIATES: im.shape
     
+    u8round = __round_u8_steps if compat else lambda x:None
     im, region = get_image_region(im, 18, region)
     
     H, W = sh = im.shape[0] - 36, im.shape[1] - 36 # post-filtering shape
@@ -243,6 +375,7 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
 
     fft_im, fft_gf, ifft = __get_fftw_plans(im.shape, nthreads)
     ifft_out = ifft.get_output_array()
+    # TODO: don't precompute division?
     N1 = 1 / (ifft_out.shape[0] * ifft_out.shape[0]) # scaling factors
     N2 = 1 / (ifft_out.shape[1] * ifft_out.shape[1])
     
@@ -256,7 +389,7 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
         ifft.execute()
         copyto(IF1, ifft_out[start:H+start, start:W+start])
         IF1 *= N1
-        __round_u8_steps(IF1)
+        u8round(IF1)
         IF1 *= IF1
 
         GF2 = __fftw(fft_gf, GF2)
@@ -264,7 +397,7 @@ def ConstructNeighborhoodsGabor_FFTW(im, out=None, region=None, nthreads=1):
         ifft.execute()
         copyto(IF2, ifft_out[start:H+start, start:W+start])
         IF2 *= N2
-        __round_u8_steps(IF2)
+        u8round(IF2)
         IF2 *= IF2
 
         IF1 += IF2
@@ -319,18 +452,6 @@ except ImportError:
     from warnings import warn
     warn('Unable to import pyfftw, using the NumPy FFT functions to calculate the Gabor filters. They are much slower.')
 
-def __round_u8_steps(arr):
-    """
-    Clips the data between 0.0 to 1.0 then rounds the data to steps of 1/255. This is to match the
-    behavior of MATLAB's imfilter being run on uint8 data. All of this is done in-place on the data
-    in the array.
-    """
-    from numpy import clip
-    clip(arr, 0.0, 1.0, out=arr)
-    arr *= 255.0
-    arr.round(out=arr)
-    arr /= 255.0
-
 def __gabor_fn(sigma,theta,lmbda,psi,gamma):
     """
     sigma: Gaussian envelope
@@ -357,7 +478,7 @@ def __gabor_fn(sigma,theta,lmbda,psi,gamma):
     y_theta *= gamma
     y_theta *= y_theta
     x_theta += y_theta
-    x_theta *= (-1.0 / (2*sigma*sigma))
+    x_theta /= -2*sigma*sigma
     exp(x_theta, out=x_theta)
     x_theta *= ang
     if psi != 0: negative(x_theta, x_theta) # TODO: this is a HACK to make the Fourier transform versions work
@@ -378,21 +499,22 @@ __gabor_filters = delayed(__get_gabor_filters, list) # ~2MB, ~30ms
 
 
 ########## SIFT Filter ##########
-#@profile
 # Note: partially implemented in Cython
-def ConstructSift(im, out=None, region=None, nthreads=1):
+def ConstructSift(im, out=None, region=None, nthreads=1, compat=True):
     from scipy.ndimage.filters import correlate1d
     half_patch_sz = (__sift.patch_sz // 2) - 1
     im, region = get_image_region(im, half_patch_sz, region, 'constant') # OPT: +3? for multiple correlate1d's
     gauss_filter = __sift.gauss_filter
     im = correlate1d(im, gauss_filter, 0, mode='nearest') # INTERMEDIATE: im.shape
-    im = correlate1d(im, gauss_filter, 1, mode='nearest')
+    im = correlate1d(im, gauss_filter, 1, mode='nearest') # TODO: TEMPORARY: im.shape
+    if compat: __round_u8_steps(im)
     return __dense_sift(im, out=out, nthreads=nthreads)
 
-def ConstructSift_OPT(im, out=None, region=None, nthreads=1):
+def ConstructSift_OPT(im, out=None, region=None, nthreads=1, compat=True):
     gauss_filter, padding = __sift.gauss_filter, __sift.padding_sz
     im, region = get_image_region(im, padding, region, 'constant')
     im = __chm_filters.correlate_xy(im, gauss_filter, gauss_filter, nthreads=nthreads) # INTERMEDIATE: im.shape
+    if compat: __round_u8_steps(im)
     return __dense_sift_OPT(im, out=out, nthreads=nthreads)
 
 def __gen_gauss(sigma):
@@ -416,9 +538,9 @@ def __fspecial_gauss(shape, sigma):
     """
     # CHANGED: unlike MATLAB's fspecial('gaussian', ...) this does not accept a tuple for shape/sigma
     from numpy import ogrid, exp, finfo
-    n = (shape-1)/2.
+    n = (shape-1)/2
     y,x = ogrid[-n:n+1,-n:n+1]
-    h = exp(-(x*x+y*y)/(2.*sigma*sigma))
+    h = exp(-(x*x+y*y)/(2*sigma*sigma))
     h[h < finfo(h.dtype).eps*h.max()] = 0
     sumh = h.sum()
     if sumh != 0: h /= sumh
@@ -467,6 +589,7 @@ def __dense_sift(im, out, nthreads):
     from numpy import empty, empty_like, sqrt, arctan2, cos, sin
     from scipy.ndimage.filters import correlate1d
 
+    # TODO: don't precompute division?
     im *= 1/im.max() # can modify im here since it is always the padded image
 
     H, W = im.shape
@@ -526,6 +649,7 @@ def __dense_sift_OPT(im, out, nthreads):
     from numpy import empty, sqrt, arctan2, cos, sin
     from __chm_filters import correlate_xy
 
+    # TODO: don't precompute division?
     im *= 1/im.max() # can modify im here since it is always the padded image
 
     # vertical and horizontal edges
@@ -583,45 +707,26 @@ def __dense_sift_OPT(im, out, nthreads):
 
 
 ########## Neighborhood Construction ##########
-# Note: implemented in Cython
-def ConstructNeighborhoods(im, offsets, out=None, region=None, nthreads=1):
-    # CHANGE: permanently now like ConstructNeighborhoods(padReflect(im, *), ____Neighborhood(*), 0)
-    # CHANGE: region is handled in such a way that the image is never padded, but instead reflection is handled directly
-    # CHANGE: converted to Cython so that it could be multi-threaded and faster
+def ConstructNeighborhoods(im, offsets, out=None, region=None, nthreads=1, compat=True):
+    """
+    Computes the neighborhood features of the image. Basically, offsets is a 2xN array where each
+    column is a relative offset from each pixel. A feature is generated for each relative set of
+    coordinates (so the number of features if the number of columns in the offsets).
+
+    The offsets can be generated using SquareNeighborhood or StencilNeighborhood.
+
+    The original function was always used with an image that had a padding that reflected the
+    foreground image, so that is now permanently integrated into this function and now takes the
+    original, un-padded, image. The padding used is the max offset given.
+
+    This function uses the region information in a special way so that no physical padding is ever
+    added, instead handling reflections as needed directly. Implemented in Cython for speed and
+    multi-threading support. Uses very minimal intermediate memory. The compat flag is ignored.
+    """
     from numpy import intp
     if offsets.dtype != intp and offsets.dtype.kind == 'i' and offsets.dtype.itemsize == intp(0).itemsize:
         offsets = offsets.view(intp)
     return __chm_filters.ConstructNeighborhoods(im, offsets, out=out, region=region, nthreads=nthreads)
-
-    # Final Python method - just places all the various offsets via copies - 11.6x faster than original method
-    #radius = abs(offsets).max()
-    #padsize = 2*radius
-    #im, region = get_image_region(im, radius, region)
-    #H, W, dims = im.shape[0] - padsize, im.shape[1] - padsize, offsets.shape[1]
-    #offsets = offsets + radius
-    #if out is None:
-    #    from numpy import empty
-    #    out = empty((dims, H, W), dtype=im.dtype)
-    #for i in xrange(dims):
-    #    x,y = offsets[:,i]
-    #    out[i,:,:] = im[y:y+H,x:x+W]
-    #return out
-    
-    # Original method, was kinda slow (81.2ms for 81x25760 output)
-    #from numpy import arange, tile, repeat
-    #npix = W * H
-    #pos_x = tile(offsets[0,:,None], (1,npix)); pos_x += tile(repeat(arange(W), H), (dims,1)); pos_x += radius
-    #pos_y = tile(offsets[1,:,None], (1,npix)); pos_y += tile(       arange(H),     (dims,W)); pos_y += radius
-    #return im[pos_y, pos_x]
-
-    # As strided method (although in reverse order), worked fine (25.5ms for 160x161x81 output)
-    #from numpy.lib.stride_tricks import as_strided
-    #from numpy import arange
-    #pos_x = offset[0,None,None,:] + radius + arange(W)[:,None,None]
-    #pos_x = as_strided(pos_x, (H, W, dims), (0, pos_x.strides[1], pos_x.itemsize))
-    #pos_y = offset[1,None,None,:] + radius + arange(H)[:,None,None]
-    #pos_y = as_strided(pos_y, (H, W, dims), (pos_y.strides[0], 0, pos_y.itemsize))
-    #return im[pos_y, pos_x]
 
 def __memoize(f):
     """
@@ -645,6 +750,7 @@ def __memoize(f):
 
 @__memoize
 def SquareNeighborhood(radius):
+    """A square neighborhood with every value of size radius*2+1 on each side"""
     from numpy import indices, intp
     diam = 2*radius + 1
     return (indices((diam, diam)) - radius).reshape((2, -1)).astype(intp, copy=False).view(intp) # last two are to make sure it is intp dtype - numpy bug needs both to overcome!
@@ -657,6 +763,7 @@ def SquareFootprint(radius):
 
 @__memoize
 def StencilNeighborhood(radius):
+    """A neighborhood of size radius*2+1 on each side with the X and + parts fille out."""
     from numpy import ogrid, array, where, intp
     r,c = ogrid[-radius:radius+1,-radius:radius+1]
     return array(where((abs(r)==abs(c)) + (r*c==0))[::-1], dtype=intp) - radius
@@ -666,34 +773,3 @@ def StencilFootprint(radius):
     from numpy import ogrid
     r,c = ogrid[-radius:radius+1,-radius:radius+1]
     return ((abs(r)==abs(c)) + (r*c==0))
-
-
-############ Pad Image ##########
-##def padReflect(im, r):
-##    # CHANGED: no longer zero-pads images that are smaller than r (or returns optional zero-padded image)
-##    # NOTE: most uses of this were passing to ConstructNeighboorhood and it has been integrated into
-##    # that function. All other uses have been changed to just call numpy's pad function.
-##    from numpy import pad
-##    return pad(im, r, mode=str('symmetric'))
-##    #"""
-##    #function [impad] = padReflect(im,r)
-##    #
-##    #Pad an image with a border of size r, and reflect the image into the border.
-##    #
-##    #David R. Martin <dmartin@eecs.berkeley.edu>
-##    #March 2003
-##    #"""
-##    #from numpy import empty, vstack, hstack, flipud, fliplr
-##    #if r > im.shape[0]: im = vstack((im, zeros(r - im.shape[0], im.shape[1])))
-##    #if r > im.shape[1]: im = hstack((im, zeros(im.shape[0], r - im.shape[1])))
-##    #impad = empty((im.shape[0]+2*r, im.shape[1]+2*r))
-##    #impad[r:-r,r:-r] = im # middle
-##    #impad[:r,r:-r] = flipud(im[:r,:]) # top
-##    #impad[-r:,r:-r] = flipud(im[-r:,:]) # bottom
-##    #impad[r:-r,:r] = fliplr(im[:,:r]) # left
-##    #impad[r:-r,-r:] = fliplr(im[:,-r:]) # right
-##    #impad[:r,:r] = flipud(fliplr(im[:r,:r])) # top-left
-##    #impad[:r,-r:] = flipud(fliplr(im[:r,-r:])) # top-right
-##    #impad[-r:,:r] = flipud(fliplr(im[-r:,:r])) # bottom-left
-##    #impad[-r:,-r:] = flipud(fliplr(im[-r:,-r:])) # bottom-right
-##    #return impad

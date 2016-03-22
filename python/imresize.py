@@ -1,6 +1,8 @@
 """
 imresize function that mostly emulates MATLAB's imresize function. Additionally a 'fast' variant is
 provided that always halves the image size with bicubic and and antialiasing.
+
+Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
 from __future__ import division
@@ -33,12 +35,12 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None):
         tuple/list of 2 ints for output_size (supporting None for calculated dims)
 
     method is one of:
-        nearest/box
-        bilinear/triangle
-        bicubic/cubic (default)
-        lanczos2
-        lanczos3
-        or tuple/list of a kernel function and a kernel width
+        'nearest' or 'box'
+        'bilinear' or 'triangle'
+        'bicubic' or 'cubic' (default)
+        'lanczos2'
+        'lanczos3'
+        tuple/list of a kernel function and a kernel width
 
     antialiasing defaults to True except for nearest which is False (box is True as well)
 
@@ -193,7 +195,7 @@ def imresize_fast(im):
     """
     Like imresize but with the following assumptions:
         scale is always (0.5, 0.5)
-        method is always bicubic
+        method is always 'bicubic'
         antialiasing is always on
     But it does support everything else (2/3-D images, logical/integral/floating point types)
     """

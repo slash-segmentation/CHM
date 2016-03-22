@@ -1,4 +1,7 @@
-#include "HoG.h"
+// Original HOG code
+// Essentially unmodified (except the addition of warning suppression and function name).
+
+#include "HOG.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -17,7 +20,7 @@ using namespace std;
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #endif
 
-void HoG_orig(double *pixels, double *params, int *img_size, double *dth_des, unsigned int grayscale){
+void HOG_orig(double *pixels, double *params, int *img_size, double *dth_des, unsigned int grayscale){
     
     const float pi = 3.1415926536;
     
