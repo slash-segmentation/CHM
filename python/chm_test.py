@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 """
 CHM Image Testing
 Runs CHM testing phase on an image. Can also be run as a command line program with arguments.
@@ -16,6 +17,7 @@ __all__ = ["CHM_test", # operates over an entire slice by breaking it into tiles
 def __chm_test_main():
     import sys, os.path
     from getopt import getopt, GetoptError
+    from pysegtools.general.utils import make_dir
     from scipy.misc import imread, imsave # TODO: use pysegtools instead (already required to use it for MATLAB file reading, so why not?)
 
     from numpy import uint8, uint16, uint32, float32, float64, iinfo
@@ -44,34 +46,48 @@ def __chm_test_main():
     for o, a in opts:
         if o == "-m":
             model_dir = a
-            if not os.path.isdir(model_dir): __chm_test_usage("Model folder is not a directory.")
+            if not os.path.isdir(model_dir): __chm_test_usage("model folder is not a directory")
         elif o == "-t":
             try:
                 if 'x' in a: W,H = [int(x,10) for x in a.split('x', 1)]
                 else:        W = H = int(a,10)
-            except ValueError: __chm_test_usage("tile_size must be a positive integer or two positive integers seperated by an x.")
-            if W <= 0 or H <= 0: __chm_test_usage("tile_size must be a positive integer or two positive integers seperated by an x.")
+            except ValueError: __chm_test_usage("tile_size must be a positive integer or two positive integers seperated by an x")
+            if W <= 0 or H <= 0: __chm_test_usage("tile_size must be a positive integer or two positive integers seperated by an x")
             tile_size = W,H
         elif o == "-T":
             try: C,R = [int(x,10) for x in a.split(',', 1)]
-            except ValueError: __chm_test_usage("tile position must be two positive integers seperated by a comma.")
-            if C < 0 or R < 0: __chm_test_usage("tile position must be two positive integers seperated by a comma.")
+            except ValueError: __chm_test_usage("tile position must be two positive integers seperated by a comma")
+            if C < 0 or R < 0: __chm_test_usage("tile position must be two positive integers seperated by a comma")
             tiles.append((C,R))
         elif o == "-n":
             try: ntasks = int(a, 10)
-            except ValueError: __chm_test_usage("ntasks must be a positive integer.")
-            if ntasks <= 0: __chm_test_usage("ntasks must be apositive integer.")
+            except ValueError: __chm_test_usage("ntasks must be a positive integer")
+            if ntasks <= 0: __chm_test_usage("ntasks must be apositive integer")
         elif o == "-N":
             try: nthreads = int(a, 10)
-            except ValueError: __chm_test_usage("nthreads must be a positive integer.")
-            if nthreads <= 0: __chm_test_usage("nthreads must be apositive integer.")
+            except ValueError: __chm_test_usage("nthreads must be a positive integer")
+            if nthreads <= 0: __chm_test_usage("nthreads must be apositive integer")
         elif o == "-H": hist_eq  = True
         elif o == "-d":
             a = a.lower()
-            if a not in dt_trans: __chm_test_usage("data type must be one of u8, u16, u32, f32, or f64.")
+            if a not in dt_trans: __chm_test_usage("data type must be one of u8, u16, u32, f32, or f64")
             dt = dt_trans[a]
         else: __chm_test_usage("Invalid argument %s." % o)
     if len(tiles) == 0: tiles = None
+
+    # Correct the output path
+    if output == '': output == '.'
+    output_ended_with_slash = output[-1] == '/'
+    output = os.path.abspath(output)
+    if output_ended_with_slash:
+        if not make_dir(output): __chm_test_usage("could not create output directory")
+    if os.path.isdir(output):
+        if os.path.samefile(os.path.dirname(im_path), output):
+            __chm_test_usage("if the output is to a directory it cannot be the directory the source image is in")
+        output = os.path.join(output, os.path.basename(im_path))
+    else:
+        if len(os.path.splitext(output)[1]) < 2: output += os.path.splitext(im_path)[1]
+        if not make_dir(os.path.dirname(output)): __chm_test_usage("could not create output directory")
 
     # Process input and save to an output
     im = imread(im_path)
@@ -87,7 +103,7 @@ def __chm_test_usage(err=None):
         print()
     print("""CHM Image Testing Phase.  %s
     
-%s <input_files> <output_folder> <optional arguments>
+%s <input_file> <output_file> <optional arguments>
   input_file    The input file to read.
   output_file   The output file to save.
 	
@@ -98,9 +114,9 @@ Optional Arguments:
                 the same size as the training images (which is believed to be
                 optimal). Old models do not include the size of the training
                 images and then 1024x1024 is used if not given.
-  -T tile_pos   Specifies that only the given tiles be processed by CHM while
+  -T C,R        Specifies that only the given tiles be processed by CHM while
                 all others simply output black. Each tile is given as C,R (e.g.
-                2,1 would be the tile in the second column and first row). Can
+                2,1 would be the tile in the third column and second row). Can
                 process multiple tiles by using multiple -T arguments. The tiles
                 are defined by multiples of tile_size. A tile position out of
                 range will be ignored. If not included then all tiles will be
@@ -115,13 +131,13 @@ Optional Arguments:
                 memory (up to 7.5 GB for 1000x1000 at Nlevel=4) while each
                 additional thread per task does not really increase memory
                 usage, however running two tasks in parallel each with 1 thread
-                each is faster than giving a single task two threads.
+                is faster than giving a single task two threads.
                 default is to run twice as many tasks as can fit in memory
                 (since the max memory is only used for a short period of time)
                 and divide the rest of the CPUs among the tasks
                 if only one value is given the other is calculated using it
   -d type       set the output type of the data, one of u8 (default), u16, u32,
-                f32, or f64"""
+                f32, or f64; the output image type must support the data type"""
           % (__version__, sys.argv[0]), file=sys.stderr)
     sys.exit(1)
 
@@ -168,8 +184,7 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     from collections import Sequence
     from psutil import cpu_count, virtual_memory
     from ctypes import c_double, memmove
-    from multiprocessing import Process, Value, Queue
-    from multiprocessing.sharedctypes import RawArray
+    from multiprocessing import Process, RawArray, Value, Queue
     from numpy import float64, intp, iinfo, frombuffer, indices, array
     from pysegtools.general.matlab import openmat, mat_nice
     from chm_utils import MyDownSample
@@ -186,7 +201,7 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
             warn('tilesize was not given and model does not contain the training image size, using 1024x1024')
             tilesize = (1024, 1024)
         else:
-            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel()) # TODO: is this reversed?
+            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel())
     if isinstance(tilesize, Sequence) and len(tilesize) == 2:
         tilesize = (int(tilesize[1]), int(tilesize[0]))
     else:
@@ -204,13 +219,13 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     # Figure out which tiles to process
     max_tile_x, max_tile_y = (im.shape[1]+tilesize[1]-1)//tilesize[1], (im.shape[0]+tilesize[0]-1)//tilesize[0]
     if tiles is None:
-        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2)) # TODO: are x and y swapped?
+        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2))
     else:
         tiles = array(tiles, dtype=intp)
         if tiles.ndim != 2 or tiles.shape[1] != 2: raise ValueError('Invalid tile coordinates shape')
         if ignore_bad_tiles:
             tiles = tiles[(tiles >= 0).all(axis=1) & ((tiles[:,0] <= max_tile_x) & (tiles[:,1] <= max_tile_y))]
-        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any(): # TODO: are x and y swapped?
+        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any():
             raise ValueError('Invalid tile coordinates')
      
     # Get ntasks and nthreads
@@ -237,14 +252,13 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     im_shared = frombuffer(im_shared_mem, dtype=float64).reshape(sh)
     im_shared[:,:] = im[:,:]
     if dt.kind == 'u':
-        im_shared *= 1.0 / iinfo(dt.type).max
+        im_shared /= iinfo(dt.type).max
     elif dt.kind == 'i':
         ii = iinfo(dt.type)
         im_shared -= ii.min
-        im_shared *= 1.0 / (ii.max - ii.min)
+        im_shared /= ii.max - ii.min
     elif dt.kind not in 'fb': raise ValueError('Unknown image format')
-    out_shared_mem = RawArray(c_double, sz)
-    #memset(out_shared_mem, 0, im.nbytes) # already 0s
+    out_shared_mem = RawArray(c_double, sz) # already 0s
     out = frombuffer(out_shared_mem, dtype=float64).reshape(sh)
 
     # Downscale image
@@ -265,8 +279,7 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     def load_model(stage, level):
         with openmat(os.path.join(modelpath, 'MODEL_level%d_stage%d.mat' % (level, stage)), 'r') as mat:
             model = mat_nice(mat['model'])
-        return __conv_to_shared(model['discriminants']), model['discriminants'].shape, \
-               int(model['nGroup']), int(model['nDiscriminantPerGroup'])
+        return __conv_to_shared(model['discriminants']), int(model['nGroup']), int(model['nDiscriminantPerGroup'])
     # create a list of lists, models[stage][level] gives a tuple of discriminants (array), shape of discs, nGroup, nDiscriminantPerGroup
     models = [(([load_model(stage, level) for level in xrange(Nlevel+1)]) if stage != Nstage else [load_model(stage, 0)])
               for stage in xrange(1, Nstage+1)]
@@ -311,17 +324,28 @@ def __run_chm_test_proc(init_args, tiles_queue, completed_tiles, total_tiles, st
     according to clock().
     """
     from Queue import Empty
+
+    from multiprocessing import current_process
+    P = current_process()
+    #print("%d %s - running"%(P.pid, P.name))
+
     CHM_test_tile = __chm_test_proc_init(*init_args)
+    
     try:
+        # TODO: still getting spurious empty()/Empty results on first query
         while not tiles_queue.empty():
-            tile = tiles_queue.get_nowait()
+            tile = tiles_queue.get() # _nowait?
             CHM_test_tile(tile)
             __chm_test_progress(tile, completed_tiles, total_tiles, start_time)
-    except Empty: pass # all items processed - done!
+    except Empty:
+        #print("%d %s - empty exception"%(P.pid, P.name))
+        pass # all items processed - done!
     except: # other exceptions put the tile back on the queue and re-raise the error
         tiles_queue.put_nowait(tile)
         raise
 
+    #print("%d %s - quitting"%(P.pid, P.name))
+    
 def __chm_test_progress(tile, completed_tiles, total_tiles, start_time):
     """
     Display a progress update message for CHM test running. See __run_chm_test_proc for definitions
@@ -350,19 +374,21 @@ def __chm_test_proc_init(im_shared_mems, out_shared_mem, shape, models, tilesize
     from numpy import copyto
 
     Nstage, Nlevel = len(models), len(models[0]) - 1
-    
-    # Get the images, output, and models in shared memory as numpy arrays
+
+    # Get the images and output in shared memory as numpy arrays
     tiles_aligned = isinstance(im_shared_mems, list)
     if tiles_aligned: # tiles aligned, images are already downsampled
         shapes = [shape]
         for _ in xrange(1, Nlevel+1):
             shapes.append(((shapes[-1][0] + 1) // 2, (shapes[-1][1] + 1) // 2))
-        ims = [__conv_from_shared(im, sh) for im,sh in izip(im_shared_mems, shapes)]
+        ims = [__conv_from_shared((im, sh)) for im,sh in izip(im_shared_mems, shapes)]
     else:
-        ims = __conv_from_shared(im_shared_mems, shape)
-    out = __conv_from_shared(out_shared_mem, shape, False)
-    # a list of lists, models[stage][level] gives a tuple of discriminants (array), nGroup, nDiscriminantPerGroup
-    models = [[(__conv_from_shared(d, sh), ng, ndpg) for d, sh, ng, ndpg in stg] for stg in models]
+        ims = __conv_from_shared((im_shared_mems, shape))
+    out = __conv_from_shared((out_shared_mem, shape), readonly=False)
+    
+    # Get the models from shared memory:
+    # models[stage][level] gives a tuple of discriminants (array), nGroup, nDiscriminantPerGroup
+    models = [[(__conv_from_shared(m), ng, ndpg) for m,ng,ndpg in stg] for stg in models]
 
     # Create and return the function for testing individual tiles using all the paramters we have
     TH,TW = tilesize
@@ -380,38 +406,78 @@ def __chm_test_proc_init(im_shared_mems, out_shared_mem, shape, models, tilesize
                 t = t//2
                 l = l//2
                 regions[level] = last = (t,l,b,r)
-            copyto(out[T:B,L:R], testCHM(ims, models, Nlevel, Nstage, regions, nthreads))
+            copyto(out[T:B,L:R], testCHM(ims, models, regions, nthreads))
     else:
         IH,IW = ims.shape
         def __chm_test_tile(tile):
             x,y = tile
             L,T = x*TW, y*TH
             R,B = min(L+TW, IW), min(T+TH, IH)
-            copyto(out[T:B,L:R], testCHM(ims, models, Nlevel, Nstage, (T,L,B,R), nthreads))
+            copyto(out[T:B,L:R], testCHM(ims, models, (T,L,B,R), nthreads))
     return __chm_test_tile
+
+# TODO: make generation of __np_dt_to_ctypes and __ct_dt_to_numpy delayed
+import numpy as np
+import ctypes as ct
+from itertools import izip
+# probably supported through aliases: uint0, float128
+# not supported: void*, string/unicode, any complex, and float16/half 
+__np_dts = [
+    np.bool_,
+    np.byte,  np.short,  np.intc,  np.int_, np.longlong,  np.intp,
+    np.ubyte, np.ushort, np.uintc, np.uint, np.ulonglong, np.uintp,
+    np.int8,  np.int16,  np.int32,  np.int64, np.uint8, np.uint16, np.uint32, np.uint64,
+    np.float_, np.float32, np.float64, np.single, np.double, np.longfloat, np.longdouble,
+    ]
+__ct_dts = [
+    ct.c_bool,
+    ct.c_byte,  ct.c_short,  ct.c_int,  ct.c_long,  ct.c_longlong,  np.ctypeslib.c_intp, # or ct.c_ssize_t
+    ct.c_ubyte, ct.c_ushort, ct.c_uint, ct.c_ulong, ct.c_ulonglong, ct.c_size_t,
+    ct.c_int8, ct.c_int16, ct.c_int32, ct.c_int64, ct.c_uint8, ct.c_uint16, ct.c_uint32, ct.c_uint64,
+    ct.c_double, ct.c_float, ct.c_double, ct.c_float, ct.c_double, ct.c_longdouble, ct.c_longdouble,
+    ]
+__np_dt_to_ctypes = {n:c for n,c in izip(__np_dts, __ct_dts)}
+__ct_dt_to_numpy  = {c:n for c,n in izip(__ct_dts, __np_dts)}
+del np, ct, izip, __np_dts, __ct_dts
 
 def __conv_to_shared(arr):
     """
     Convert a NumPy array of float32 or float64 to a shared memory array of c_float or c_double.
-    Copies the data.
+    Copies the data. Returns a tuple that includes the shared memory, the shape, the data type, and
+    the order for converting back with __conv_from_shared.
     """
-    from ctypes import c_float, c_double, memmove
-    from multiprocessing.sharedctypes import RawArray
-    c_type = c_double if arr.itemsize == 8 else c_float
+    from ctypes import memmove
+    from multiprocessing import RawArray
+    if not arr.flags.forc: raise ValueError('Array must be C or Fortran contiguous')
+    dtype = arr.dtype
+    if dtype.type not in __np_dt_to_ctypes: raise ValueError('Array is not a supported type')
+    c_type = __np_dt_to_ctypes[dtype.type]
     shrd = RawArray(c_type, arr.size)
     memmove(shrd, (c_type*arr.size).from_buffer(arr.data), arr.nbytes)
-    return shrd
+    return shrd, arr.shape, dtype.str, 'C' if arr.flags.c_contiguous else 'F'
 
-def __conv_from_shared(shrd, shape, readonly=True):
+def __conv_from_shared(shrd, readonly=True):
     """
-    The reverse of __conv_to_shared, converting a shared memory block to a NumPy array. The type
-    must be c_float or c_double. The shape must be provided as that information is lost. By default
-    it makes the new array read-only. The data is NOT copied.
+    The reverse of __conv_to_shared, converting a tuple of shared memory block, shape, data type,
+    and order to a NumPy array. By default it makes the new array read-only. The data is NOT copied.
+
+    Note that the object to convert can also be just a shared memory (in which case shape is assumed
+    to be 1D, data type is retrieved from the memory if possible, and order is 'C'). It can also be
+    a tuple with less values in which case the missing ones are assumed as above.
     """
-    #pylint: disable=protected-access
-    from ctypes import c_double
-    from numpy import frombuffer, float32, float64
-    arr = frombuffer(shrd, dtype=(float64 if shrd._type_ is c_double else float32)).reshape(shape)
+    from ctypes import sizeof
+    from numpy import frombuffer
+    shape, dtype, order = None, None, 'C'
+    if isinstance(shrd, tuple):
+        if   len(shrd) == 1: shrd = shrd[0]
+        elif len(shrd) == 2: shrd, shape = shrd
+        elif len(shrd) == 3: shrd, shape, dtype = shrd
+        elif len(shrd) == 4: shrd, shape, dtype, order = shrd
+    if shape is None: shape = len(shrd)
+    if dtype is None:
+        #pylint: disable=protected-access
+        dtype = __ct_dt_to_numpy[shrd._type_]
+    arr = frombuffer(shrd, dtype=dtype).reshape(shape, order=order)
     if readonly: arr.flags.writeable = False
     return arr
 
@@ -439,8 +505,8 @@ def testCHM_max_mem(tilesize, Nlevel):
     except TypeError: pass
     return tilesize*(8*(TotalFilterFeatures()+220+57*(Nlevel+1)) + 100) # the +100 is a fudge-factor
 
-def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
-    # CHANGED: dropped NFeatureContexts argument - this is now calculated
+def testCHM(im, models, region=None, nthreads=1):
+    # CHANGED: dropped Nstage, Nlevel, and NFeatureContexts arguments - these are now calculated
     # CHANGED: besides taking just a single im and processing it, this now accepts several different
     # inputs for optimization:
     #    single im and no region - original behavior - processes entire image, padding as necessary
@@ -456,6 +522,15 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
     from chm_utils import MyDownSample, MyUpSample, get_image_region
     from chm_filters import Filterbank, TotalFilterFeatures, ConstructNeighborhoods, StencilNeighborhood
 
+    models_already_loaded = isinstance(models, list)
+    if not models_already_loaded:
+        from os.path import join
+        from pysegtools.general.matlab import openmat, mat_nice
+        params = openmat(join(models, 'param.mat'), 'r')
+        Nstage, Nlevel = int(params['Nstage'].data[0]), int(params['Nlevel'].data[0])
+    else:
+        Nstage, Nlevel = len(models), len(models[0]) - 1
+    
     # Process the image and region arguments
     # After this we will have a list of images and regions (one for each level)
     if isinstance(im, list):
@@ -480,14 +555,19 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
         # At the highest level, max_pad*(2^Nlevel) pixels away in the original image become part of
         # the padding. For max_pad=18 and Nlevel=4 that is 288 pixels away!
         pad = (1<<Nlevel)*max_pad
+        print("Starting with pad = %d, region = %s, im = %s"%(pad, region, im.shape))
         im, _ = get_image_region(im, pad, region)
+        #print("im now %s"%(im.shape,))
+        #from scipy.misc import imsave
+        #imsave('%d-full.png'%0, im)
         for level in xrange(1, Nlevel+1):
             im = MyDownSample(im, 1)
+            #print("im now %s"%(im.shape,))
+            #imsave('%d-full.png'%level,im)
             pad //= 2; H, W = (H+1)//2, (W+1)//2
             ims[level], regions[level] = get_image_region(im, max_pad, (pad, pad, pad + H, pad + W))
         
-        #del im_full, max_pad_full, region_full
-        # TODO: All this extra padding and copies of images leads to about +6.3MB additional memory
+        # OPT: All this extra padding and copies of images leads to about +6.3MB additional memory
         # usage over just the original padded image (for 1000x1000 tiles and Nlevel=4). If the
         # levels were copied, some additional memory could be saved (3.2MB, and may result in
         # faster-to-access images at the expense of an additional one-time copy operation).
@@ -503,23 +583,24 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
 
     # Cleanup these references since we now have ims and regions
     del im, region
-    
+
+    for level,(im,region) in enumerate(izip(ims, regions)):
+        print(level, im.shape, region)
+        #imsave('%d-padded.png'%level,im)
+        #imsave('%d-cropped.png'%level,get_image_region(im, 0, region)[0])
+
     clabels = [None]*(Nlevel+1)
 
     feature_contexts = StencilNeighborhood(7)
     n_feature_contexts = feature_contexts.shape[1]
     n_filter_features = TotalFilterFeatures()
-    models_already_loaded = isinstance(models, list)
-    if not models_already_loaded:
-        from os.path import join
-        from pysegtools.general.matlab import openmat, mat_nice
 
     for stage in xrange(1, Nstage+1):
         for level,(im,region) in enumerate(izip(ims, regions)):
             #pylint: disable=cell-var-from-loop
             
             # Get the output image shape for this level
-            sh = (region[2]-region[0], region[3]-region[1])
+            sh = im.shape if region is None else (region[2]-region[0], region[3]-region[1])
 
             # Get how many additional context features we will be adding and how to calculate them
             if stage == 1 or level != 0:
@@ -542,7 +623,7 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
             disc_not_sb = discriminants.dtype != float32
             
             # Create the feature vector
-            X = empty((n_filter_features + n_feature_contexts*n_contexts + (1 if disc_not_sb else 0),) + sh)
+            X = empty((n_filter_features + n_feature_contexts*n_contexts + disc_not_sb,) + sh)
             if disc_not_sb: X[-1, ...] = 1
 
             # Calculate filter features
@@ -563,10 +644,11 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
 
             X = X.reshape((X.shape[0], -1))
             clabels[level] = EvaluateAndOrNetMX(X, discriminants, nGroup, nDiscriminantPerGroup).reshape(sh) #, order='F')
-            del X, discriminants
-            
+
             #from numpy import savez_compressed
-            #savez_compressed('out_%d_stage%d.npz' % (level, stage), X=X.reshape(), Y=clabels[level])
+            #savez_compressed('runx/out_%d-%d.npz' % (stage, level), X=X, Y=clabels[level], disc=discriminants)
+
+            del X, discriminants
             
             if stage == Nstage: return clabels[0]
 
@@ -577,7 +659,6 @@ def EvaluateAndOrNetMX(X, discriminants, nGroup, nDiscriminantPerGroup):
     else:
         return genOutput(X, discriminants, nGroup, nDiscriminantPerGroup)
 
-#@profile
 def genOutput(x, discriminants, nGroup, nDiscriminantPerGroup):
     # CHANGED: no longer in "native" code, instead pure Python
     # The only difference between this one and genOutput_SB is that this one handles the extra
@@ -602,7 +683,6 @@ def genOutput(x, discriminants, nGroup, nDiscriminantPerGroup):
     sqrt(to, out=to) # not in genOutput_SB
     return subtract(1.0, to, out=to)
 
-#@profile
 def genOutput_SB(x, discriminants, nGroup, nDiscriminantPerGroup):
     # CHANGED: no longer in "native" code, instead pure Python (my Cython attempt was 100x slower than this)
     # CHANGED: returns float64 instead of float32 array
@@ -627,4 +707,6 @@ def genOutput_SB(x, discriminants, nGroup, nDiscriminantPerGroup):
     return subtract(1.0, to, out=to)
 
 if __name__ == "__main__":
+    from multiprocessing import freeze_support
+    freeze_support()
     __chm_test_main()
