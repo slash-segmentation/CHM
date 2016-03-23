@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 """
 CHM Image Testing
 Runs CHM testing phase on an image. Can also be run as a command line program with arguments.
@@ -88,7 +87,7 @@ def __chm_test_usage(err=None):
         print()
     print("""CHM Image Testing Phase.  %s
     
-%s <input_file> <output_file> <optional arguments>
+%s <input_files> <output_folder> <optional arguments>
   input_file    The input file to read.
   output_file   The output file to save.
 	
@@ -99,9 +98,9 @@ Optional Arguments:
                 the same size as the training images (which is believed to be
                 optimal). Old models do not include the size of the training
                 images and then 1024x1024 is used if not given.
-  -T C,R        Specifies that only the given tiles be processed by CHM while
+  -T tile_pos   Specifies that only the given tiles be processed by CHM while
                 all others simply output black. Each tile is given as C,R (e.g.
-                2,1 would be the tile in the third column and second row). Can
+                2,1 would be the tile in the second column and first row). Can
                 process multiple tiles by using multiple -T arguments. The tiles
                 are defined by multiples of tile_size. A tile position out of
                 range will be ignored. If not included then all tiles will be
@@ -187,7 +186,7 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
             warn('tilesize was not given and model does not contain the training image size, using 1024x1024')
             tilesize = (1024, 1024)
         else:
-            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel())
+            tilesize = tuple(int(x) for x in params['TrainingSize'].data.ravel()) # TODO: is this reversed?
     if isinstance(tilesize, Sequence) and len(tilesize) == 2:
         tilesize = (int(tilesize[1]), int(tilesize[0]))
     else:
@@ -205,13 +204,13 @@ def CHM_test(im, modelpath="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     # Figure out which tiles to process
     max_tile_x, max_tile_y = (im.shape[1]+tilesize[1]-1)//tilesize[1], (im.shape[0]+tilesize[0]-1)//tilesize[0]
     if tiles is None:
-        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2))
+        tiles = indices((max_tile_x, max_tile_y)).T.reshape((-1,2)) # TODO: are x and y swapped?
     else:
         tiles = array(tiles, dtype=intp)
         if tiles.ndim != 2 or tiles.shape[1] != 2: raise ValueError('Invalid tile coordinates shape')
         if ignore_bad_tiles:
             tiles = tiles[(tiles >= 0).all(axis=1) & ((tiles[:,0] <= max_tile_x) & (tiles[:,1] <= max_tile_y))]
-        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any():
+        elif (tiles < 0).any() or (tiles[:,0] > max_tile_x).any() or (tiles[:,1] > max_tile_y).any(): # TODO: are x and y swapped?
             raise ValueError('Invalid tile coordinates')
      
     # Get ntasks and nthreads
@@ -488,7 +487,7 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
             ims[level], regions[level] = get_image_region(im, max_pad, (pad, pad, pad + H, pad + W))
         
         #del im_full, max_pad_full, region_full
-        # OPT: All this extra padding and copies of images leads to about +6.3MB additional memory
+        # TODO: All this extra padding and copies of images leads to about +6.3MB additional memory
         # usage over just the original padded image (for 1000x1000 tiles and Nlevel=4). If the
         # levels were copied, some additional memory could be saved (3.2MB, and may result in
         # faster-to-access images at the expense of an additional one-time copy operation).
@@ -520,7 +519,7 @@ def testCHM(im, models, Nlevel, Nstage, region=None, nthreads=1):
             #pylint: disable=cell-var-from-loop
             
             # Get the output image shape for this level
-            sh = im.shape if region is None else (region[2]-region[0], region[3]-region[1])
+            sh = (region[2]-region[0], region[3]-region[1])
 
             # Get how many additional context features we will be adding and how to calculate them
             if stage == 1 or level != 0:
