@@ -555,7 +555,7 @@ def testCHM(im, models, region=None, nthreads=1):
         # At the highest level, max_pad*(2^Nlevel) pixels away in the original image become part of
         # the padding. For max_pad=18 and Nlevel=4 that is 288 pixels away!
         pad = (1<<Nlevel)*max_pad
-        print("Starting with pad = %d, region = %s, im = %s"%(pad, region, im.shape))
+        #print("Starting with pad = %d, region = %s, im = %s"%(pad, region, im.shape))
         im, _ = get_image_region(im, pad, region)
         #print("im now %s"%(im.shape,))
         #from scipy.misc import imsave
@@ -584,8 +584,8 @@ def testCHM(im, models, region=None, nthreads=1):
     # Cleanup these references since we now have ims and regions
     del im, region
 
-    for level,(im,region) in enumerate(izip(ims, regions)):
-        print(level, im.shape, region)
+    #for level,(im,region) in enumerate(izip(ims, regions)):
+        #print(level, im.shape, region)
         #imsave('%d-padded.png'%level,im)
         #imsave('%d-cropped.png'%level,get_image_region(im, 0, region)[0])
 
