@@ -1,6 +1,6 @@
 """
 imresize function that mostly emulates MATLAB's imresize function. Additionally a 'fast' variant is
-provided that always halves the image size with bicubic and and antialiasing.
+provided that always halves the image size with bicubic and antialiasing.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -17,6 +17,8 @@ from numpy import finfo, float64
 cython.install()
 import __imresize
 
+__all__ = ('imresize', 'imresize_fast')
+
 __methods = delayed(lambda:{
     'nearest' : (box,1), 'bilinear' : (triangle,2), 'bicubic' : (cubic,4),
     'box'     : (box,1), 'triangle' : (triangle,2), 'cubic'   : (cubic,4),
@@ -25,14 +27,14 @@ __methods = delayed(lambda:{
 __eps = delayed(lambda:finfo(float64).eps, float64)
 
 
-def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None):
+def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out=None, nthreads=1):
     """
     Resize an image.
 
     scale_or_output_shape is one of:
         floating-point number for scale
         tuple/list of 2 floating-point numbers for multi-scales
-        tuple/list of 2 ints for output_size (supporting None for calculated dims)
+        tuple/list of 2 ints for output_shape (supporting None for calculated dims)
 
     method is one of:
         'nearest' or 'box'
@@ -51,80 +53,104 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None):
       * 0 or 1 dimensional images, however this can be accomplished with adding length-1 dimensions
         outside the function
     """
-    from numpy import uint8, require, ascontiguousarray
+    from pysegtools.general.utils import prod
+    from numpy import require, empty, ndindex, greater
     
-    if im.dtype.kind not in 'buif' or im.size == 0 or im.ndim < 2: raise ValueError("Invalid image")
-    
-    scale, output_shape = __scale_shape(im, scale_or_output_shape)
+    # Parse arguments scale_or_output_shape, method, and antialiasing
+    sh = im.shape
+    scale, out_shape = __scale_shape(sh, scale_or_output_shape)
     antialiasing = (antialiasing is None and method != 'nearest') or bool(antialiasing)
     kernel, kernel_width = __methods.get(method, method)
 
-    im = require(im, im.dtype, 'A')
-    if not im.flags.forc: im = ascontiguousarray(im)
-    logical = im.dtype.kind == 'b'
-    im = uint8(im)*255 if logical else im
-
+    # Handle the im and out arguments
+    im, out, dt = __im_and_out(im, out, out_shape)
+    
     # Calculate interpolation weights and indices for each dimension.
-    wghts1, inds1 = __contributions(im.shape[0], output_shape[0], scale[0], kernel, kernel_width, antialiasing)
-    wghts2, inds2 = __contributions(im.shape[1], output_shape[1], scale[1], kernel, kernel_width, antialiasing)
-
-    if wghts1 is None and wghts2 is None:
-        im = im[inds1,inds2.T,...]
-    elif scale[0] <= scale[1]:
-        im = __imresize_dim(im, wghts1, inds1, 0)
-        im = __imresize_dim(im, wghts2, inds2, 1)
+    wghts1, inds1 = __contributions(sh[0], out.shape[0], scale[0], kernel, kernel_width, antialiasing)
+    if sh[0] == sh[1] and out.shape[0] == out.shape[1] and scale[0] == scale[1]:
+        wghts2, inds2 = wghts1, inds1
     else:
-        im = __imresize_dim(im, wghts2, inds2, 1)
-        im = __imresize_dim(im, wghts1, inds1, 0)
+        wghts2, inds2 = __contributions(sh[1], out.shape[1], scale[1], kernel, kernel_width, antialiasing)
         
-    return im > 128 if logical else im
+    if wghts1 is None and wghts2 is None:
+        im.take(inds1, 0).take(inds2.T, 1, out)
+    else:
+        wghts, inds = (wghts1, wghts2), (inds1, inds2)
+        imr, t_sh = ((__imresize_01, (out.shape[0], sh[1])) if scale[0] <= scale[1] else
+                     (__imresize_10, (sh[0], out.shape[1])))
+        tmp = empty(t_sh, im.dtype, order='F' if im.flags.fortran else 'C')
+        if len(sh) == 2: imr(im, tmp, out, wghts, inds, nthreads)
+        else:
+            base = slice(None), slice(None)
+            for idx in ndindex(sh[2:]): imr(im[base+idx], tmp, out[base+idx], wghts, inds, nthreads)
+        
+    # Return the output array (possibly converted back to logicals)
+    return greater(out, 128, out.view(dt)) if dt.kind == 'b' else out
 
-def __imresize_dim(im, weights, indices, dim):
-    if weights is None:
-        # nearest neighbor
-        subscripts = [slice(None)] * im.ndim
-        subscripts[dim] = indices
-        return im[subscripts]
+def __imresize_01(im, tmp, out, weights, indices, nthreads):
+    if weights[0] is None: im.take(indices[0], 0, tmp) # nearest neighbor
+    else: _imresize(im, tmp, weights[0], indices[0], nthreads)
+    if weights[1] is None: tmp.T.take(indices[1], 1, out.T) # nearest neighbor
+    else: _imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
 
-    if dim == 1: im = im.swapaxes(1, 0)
-    sh = im.shape[1:]
-    im = im.reshape((im.shape[0], -1))
-    im = __imresize.imresize(im, weights, indices)
-    im = im.reshape((im.shape[0],) + sh)
-    return im.swapaxes(1, 0) if dim == 1 else im
+def __imresize_10(im, tmp, out, weights, indices, nthreads):
+    if weights[1] is None: im.T.take(indices[1], 1, tmp.T) # nearest neighbor
+    else: _imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
+    if weights[0] is None: tmp.take(indices[0], 0, out) # nearest neighbor
+    else: _imresize(tmp, out, weights[0], indices[0], nthreads)
 
-def __scale_shape(im, scale_or_shape):
+def __scale_shape(sh, scale_or_shape):
     from math import ceil
     from numbers import Real, Integral
     from collections import Sequence
     
     if isinstance(scale_or_shape, Real) and scale_or_shape > 0:
         scale = float(scale_or_shape)
-        return (scale, scale), (ceil(scale*im.shape[0]), ceil(scale*im.shape[1]))
+        return (scale, scale), (ceil(scale*sh[0]), ceil(scale*sh[1]))
 
     if isinstance(scale_or_shape, Sequence) and len(scale_or_shape) == 2:
         if all((isinstance(ss, Integral) and ss > 0) or ss is None for ss in scale_or_shape) and any(ss is not None for ss in scale_or_shape):
             shape = tuple(scale_or_shape)
-            if shape[0] is None:
-                shape[0], sz_dim = shape[1] * im.shape[0] / im.shape[1], 1
-            elif shape[1] is None:
-                shape[1], sz_dim = shape[0] * im.shape[1] / im.shape[0], 0
-            else:
-                sz_dim = None
+            if   shape[0] is None: shape[0], sz_dim = shape[1] * sh[0] / sh[1], 1
+            elif shape[1] is None: shape[1], sz_dim = shape[0] * sh[1] / sh[0], 0
+            else: sz_dim = None
             shape = (int(ceil(shape[0])), int(ceil(shape[1])))
 
             if sz_dim is not None:
-                scale = shape[sz_dim] / im.shape[sz_dim]
+                scale = shape[sz_dim] / sh[sz_dim]
                 scale = (scale, scale)
             else:
-                scale = (shape[0]/im.shape[0], shape[1]/im.shape[1])
+                scale = (shape[0]/sh[0], shape[1]/sh[1])
             return scale, shape
         
         elif all(isinstance(ss, Real) and ss > 0 for ss in scale_or_shape):
             scale0, scale1 = float(scale_or_shape[0]), float(scale_or_shape[1])
-            return (scale0, scale1), (ceil(scale0*im.shape[0]), ceil(scale1*im.shape[1]))
+            return (scale0, scale1), (ceil(scale0*sh[0]), ceil(scale1*sh[1]))
     
     raise ValueError("Invalid scale/output_shape")
+
+def __im_and_out(im, out, out_shape):
+    from numpy import require, empty
+
+    # Check image
+    if im.dtype.kind not in 'buif' or im.size == 0 or im.ndim < 2: raise ValueError("Invalid image")
+    im = require(im, None, 'A')
+
+    # Check or allocate output
+    dt = im.dtype
+    out_shape += im.shape[2:]
+    if out is None:
+        out = empty(out_shape, dt, order='F' if im.flags.fortran else 'C')
+    elif out.shape != out_shape or out.dtype != dt:
+        raise ValueError('Invalid output array')
+    
+    # Check logicals
+    if dt.kind == 'b':
+        from numpy import uint8
+        im = im.view(uint8)*255 # unavoidable copy
+        out = out.view(uint8)
+
+    return im, out, dt
 
 def __contributions(in_len, out_len, scale, kernel, kernel_width, antialiasing):
     from numpy import arange, floor, ceil, intp, where, logical_not, delete
@@ -199,23 +225,23 @@ def imresize_fast(im):
         antialiasing is always on
     But it does support everything else (2/3-D images, logical/integral/floating point types)
     """
-    from numpy import uint8, require, ascontiguousarray
-    if im.dtype.kind not in 'buif' or im.size == 0 or im.ndim < 2: raise ValueError("Invalid image")
-    im = require(im, im.dtype, 'A')
-    if not im.flags.forc: im = ascontiguousarray(im)
-    logical = im.dtype.kind == 'b'
-    im = uint8(im)*255 if logical else im
-    im = __imresize_dim_fast(im, 0)
-    im = __imresize_dim_fast(im, 1)
-    return im > 128 if logical else im
-
-def __imresize_dim_fast(im, dim):
-    if dim == 1: im = im.swapaxes(1, 0)
+    from numpy import empty, greater, ndindex
     sh = im.shape
-    im = im.reshape((sh[0], -1))
-    im = __imresize.imresize_fast(im)
-    im = im.reshape((im.shape[0],) + sh[1:])
-    return im.swapaxes(1, 0) if dim == 1 else im 
+    im, out, dt = __im_and_out(im, out, ((sh[0]+1)//2, (sh[1]+1)//2))
+    tmp = empty((out.shape[0], sh[1]), im.dtype, order='F' if im.flags.fortran else 'C')
+    if im.ndim == 2:
+        __imresize._imresize_fast(im,    tmp,   nthreads)
+        __imresize._imresize_fast(tmp.T, out.T, nthreads)
+    else:
+        # NOTE: this just cycles through all the channels and does each one indendently
+        # A faster method sometimes is to reshape the final dimension down and run it all at once
+        # However, if this forces a copy, then it isn't so good afterall
+        # If I find a good way to do this here, also should modify the non-fast version as well
+        base = slice(None), slice(None)
+        for idx in ndindex(sh[2:]):
+            __imresize._imresize_fast(im[base+idx], tmp,             nthreads)
+            __imresize._imresize_fast(tmp.T,        out[base+idx].T, nthreads)
+    return greater(out, 128, out.view(dt)) if dt.kind == 'b' else out
 
 
 ########## Filters ##########

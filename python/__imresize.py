@@ -2,6 +2,8 @@
 The core imresize functions in pure Python. These are only used when the Cython versions could not
 be accessed. They are much slower than the Cython versions.
 
+These have not been tested with the out argument and do nothing with the nthreads argument.
+
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
@@ -21,10 +23,9 @@ class __min_max_class(dict):
         return ret
 __get_min_max = __min_max_class().__getitem__
 
-def imresize(im, weights, indices):
+def imresize(im, out, weights, indices, nthreads):
     from numpy import empty, float64
     from itertools import izip
-    out = empty((weights.shape[0], im.shape[1]), dtype=im.dtype)
     if im.dtype.type == float64:
         for w,i,o in izip(weights, indices, out):
             w.dot(im[i,:], out=o)
@@ -37,7 +38,6 @@ def imresize(im, weights, indices):
         tmp = empty(im.shape[1])
         for w,i,o in izip(weights, indices, out):
             w.dot(im[i,:], out=tmp).clip(mn, mx, out=tmp).round(out=o)
-    return out
 
 __bicubic_weights = delayed(lambda:array([-0.01171875, -0.03515625, 0.11328125, 0.43359375, 0.43359375, 0.11328125, -0.03515625, -0.01171875]), ndarray)
 __fast_inds = delayed(lambda:array([[0, 0, 0, 0, 1, 2, 3, 4],
@@ -45,12 +45,11 @@ __fast_inds = delayed(lambda:array([[0, 0, 0, 0, 1, 2, 3, 4],
                                     [-5, -4, -3, -2, -1, -1, -1, -1],
                                     [-7, -6, -5, -4, -3, -2, -1, -1]]), ndarray)
 
-def imresize_fast(im, weights=__bicubic_weights, indices=__fast_inds):
+def imresize_fast(im, out, nthreads, weights=__bicubic_weights, indices=__fast_inds):
     from numpy import empty, float64
     from itertools import izip
     Rin = im.shape[0]
     Rout = (Rin+1) // 2
-    out = empty((Rout, im.shape[1]), dtype=im.dtype)
     indices = indices[:Rout].copy()
     indices[2:,:] += (Rin + (Rin % 2))
     indices.clip(0, Rin - 1, out=indices)
@@ -73,4 +72,3 @@ def imresize_fast(im, weights=__bicubic_weights, indices=__fast_inds):
             weights.dot(im[i,:], out=tmp).clip(mn, mx, out=tmp).round(out=o)
         for i,o in enumerate(out[2:-2]):
             weights.dot(im[1+2*i:9+2*i,:], out=tmp).clip(mn, mx, out=tmp).round(out=o)
-    return out
