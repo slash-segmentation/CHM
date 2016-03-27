@@ -53,8 +53,7 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
       * 0 or 1 dimensional images, however this can be accomplished with adding length-1 dimensions
         outside the function
     """
-    from pysegtools.general.utils import prod
-    from numpy import require, empty, ndindex, greater
+    from numpy import empty, ndindex, greater
     
     # Parse arguments scale_or_output_shape, method, and antialiasing
     sh = im.shape
@@ -89,15 +88,15 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
 
 def __imresize_01(im, tmp, out, weights, indices, nthreads):
     if weights[0] is None: im.take(indices[0], 0, tmp) # nearest neighbor
-    else: _imresize(im, tmp, weights[0], indices[0], nthreads)
+    else: __imresize._imresize(im, tmp, weights[0], indices[0], nthreads)
     if weights[1] is None: tmp.T.take(indices[1], 1, out.T) # nearest neighbor
-    else: _imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
+    else: __imresize._imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
 
 def __imresize_10(im, tmp, out, weights, indices, nthreads):
     if weights[1] is None: im.T.take(indices[1], 1, tmp.T) # nearest neighbor
-    else: _imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
+    else: __imresize._imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
     if weights[0] is None: tmp.take(indices[0], 0, out) # nearest neighbor
-    else: _imresize(tmp, out, weights[0], indices[0], nthreads)
+    else: __imresize._imresize(tmp, out, weights[0], indices[0], nthreads)
 
 def __scale_shape(sh, scale_or_shape):
     from math import ceil
@@ -217,7 +216,7 @@ def __contributions(in_len, out_len, scale, kernel, kernel_width, antialiasing):
 
 ########## Fast imresize ##########
 
-def imresize_fast(im):
+def imresize_fast(im, out=None, nthreads=1):
     """
     Like imresize but with the following assumptions:
         scale is always (0.5, 0.5)
