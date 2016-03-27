@@ -1,23 +1,7 @@
 from distutils.extension import Extension
 from distutils.ccompiler import get_default_compiler
 
-compiler_name = get_default_compiler() # TODO: this isn't the compiler that will necessarily be used, but is a good guess...
-compiler_opt = {
-        'msvc'    : ['/openmp'],
-        'unix'    : ['-fopenmp'], # gcc/clang (whatever is system default)
-        'mingw32' : ['-fopenmp'],
-        'cygwin'  : ['-fopenmp'],
-    }
-linker_opt = {
-        'msvc'    : [],
-        'unix'    : ['-fopenmp'], # gcc/clang (whatever is system default)
-        'mingw32' : ['-fopenmp'],
-        'cygwin'  : ['-fopenmp'],
-    }
-
 def make_ext(modname, pyxfilename):
     return Extension(name=modname,
 	                 sources=[str(pyxfilename),'HOG.cpp','HOG-orig.cpp'],
-					 extra_compile_args=compiler_opt.get(compiler_name, []),
-					 extra_link_args=linker_opt.get(compiler_name, []),
 					 language="c++")
