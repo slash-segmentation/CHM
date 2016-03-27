@@ -88,15 +88,15 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
 
 def __imresize_01(im, tmp, out, weights, indices, nthreads):
     if weights[0] is None: im.take(indices[0], 0, tmp) # nearest neighbor
-    else: __imresize._imresize(im, tmp, weights[0], indices[0], nthreads)
+    else: __imresize.imresize(im, tmp, weights[0], indices[0], nthreads)
     if weights[1] is None: tmp.T.take(indices[1], 1, out.T) # nearest neighbor
-    else: __imresize._imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
+    else: __imresize.imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
 
 def __imresize_10(im, tmp, out, weights, indices, nthreads):
     if weights[1] is None: im.T.take(indices[1], 1, tmp.T) # nearest neighbor
-    else: __imresize._imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
+    else: __imresize.imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
     if weights[0] is None: tmp.take(indices[0], 0, out) # nearest neighbor
-    else: __imresize._imresize(tmp, out, weights[0], indices[0], nthreads)
+    else: __imresize.imresize(tmp, out, weights[0], indices[0], nthreads)
 
 def __scale_shape(sh, scale_or_shape):
     from math import ceil
@@ -229,8 +229,8 @@ def imresize_fast(im, out=None, nthreads=1):
     im, out, dt = __im_and_out(im, out, ((sh[0]+1)//2, (sh[1]+1)//2))
     tmp = empty((out.shape[0], sh[1]), im.dtype, order='F' if im.flags.fortran else 'C')
     if im.ndim == 2:
-        __imresize._imresize_fast(im,    tmp,   nthreads)
-        __imresize._imresize_fast(tmp.T, out.T, nthreads)
+        __imresize.imresize_fast(im,    tmp,   nthreads)
+        __imresize.imresize_fast(tmp.T, out.T, nthreads)
     else:
         # NOTE: this just cycles through all the channels and does each one indendently
         # A faster method sometimes is to reshape the final dimension down and run it all at once
@@ -238,8 +238,8 @@ def imresize_fast(im, out=None, nthreads=1):
         # If I find a good way to do this here, also should modify the non-fast version as well
         base = slice(None), slice(None)
         for idx in ndindex(sh[2:]):
-            __imresize._imresize_fast(im[base+idx], tmp,             nthreads)
-            __imresize._imresize_fast(tmp.T,        out[base+idx].T, nthreads)
+            __imresize.imresize_fast(im[base+idx], tmp,             nthreads)
+            __imresize.imresize_fast(tmp.T,        out[base+idx].T, nthreads)
     return greater(out, 128, out.view(dt)) if dt.kind == 'b' else out
 
 

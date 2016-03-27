@@ -3,7 +3,7 @@
 #distutils: language=c++
 
 """
-The core imresize functions in Cython. Just 2 functions are exposed: _imresize and _imresize_fast.
+The core imresize functions in Cython. Just 2 functions are exposed: imresize and imresize_fast.
 Each function is specialized for C or Fortran contiguous with a fallback to any strided array. They
 support all basic numpy numerical types.
 
@@ -22,7 +22,7 @@ from cython.view cimport contiguous
 from cython.parallel cimport prange
 from openmp cimport omp_get_max_threads
 
-def _imresize(ndarray im not None, ndarray out not None, ndarray weights not None, ndarray indices not None, int nthreads=1):
+def imresize(ndarray im not None, ndarray out not None, ndarray weights not None, ndarray indices not None, int nthreads=1):
     """
     Internal function for imresize written in Cython. The image must be aligned, RxC, and an
     integral or floating-point type (but not float16). The output array must be ((R+1)//2)xC and
@@ -163,7 +163,7 @@ cdef void __imresize_c_st(npy_number_basic[:,::1] im, npy_number_basic[:,::1] ou
 # Second, the indices can be calculated as needed which means lots of memory is saved along with some time
 # Third, it can be known that exactly two rows on the top and bottom need clipping of the indices, which saves even more time
 
-def _imresize_fast(ndarray im not None, ndarray out not None, int nthreads=1):
+def imresize_fast(ndarray im not None, ndarray out not None, int nthreads=1):
     """
     Internal function for imresize_fast written in Cython. The image and output have the same
     requirements as per imresize.
