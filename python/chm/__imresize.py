@@ -7,6 +7,8 @@ These have not been tested with the out argument and do nothing with the nthread
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
+#pylint: disable=unused-argument
+
 from __future__ import division
 from __future__ import unicode_literals
 from __future__ import absolute_import

@@ -69,10 +69,6 @@ ssize_t HOG_init(const ssize_t w, const ssize_t h, ssize_t *n);
  */
 void HOG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H);
 
-
-/** The original, nearly unmodified, HOG code. */
-void HOG_orig(double *pixels, double *params, int *img_size, double *dth_des, unsigned int grayscale);
-
 #ifdef __cplusplus
 }
 #endif

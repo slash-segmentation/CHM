@@ -1,7 +1,0 @@
-from distutils.extension import Extension
-from distutils.ccompiler import get_default_compiler
-
-def make_ext(modname, pyxfilename):
-    return Extension(name=modname,
-	                 sources=[str(pyxfilename),'HOG.cpp','HOG-orig.cpp'],
-					 language="c++")

@@ -34,11 +34,11 @@
 #endif
 
 // the x moves the fastest, followed by b, then finally y
-//#ifdef FORTRAN_ORDERING
-//#define H_INDEX(y,x,b) ((y) + (x)*hist1 + (b)*hist1*hist2)
-//#else
+#ifdef FORTRAN_ORDERING
+#define H_INDEX(y,x,b) ((y) + ((x) + (b)*hist2)*hist1)
+#else
 #define H_INDEX(y,x,b) (((y)*hist2 + (x))*NB_BINS + (b))
-//#endif
+#endif
 
 ssize_t HOG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n)
 {

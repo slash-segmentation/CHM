@@ -13,9 +13,7 @@ from __future__ import print_function
 from pysegtools.general.delayed import delayed
 from pysegtools.general import cython
 from numpy import finfo, float64
-
 cython.install()
-import __imresize
 
 __all__ = ('imresize', 'imresize_fast')
 
@@ -53,7 +51,7 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
       * 0 or 1 dimensional images, however this can be accomplished with adding length-1 dimensions
         outside the function
     """
-    from numpy import empty, ndindex, greater
+    from numpy import greater
     
     # Parse arguments scale_or_output_shape, method, and antialiasing
     sh = im.shape
@@ -70,33 +68,40 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
         wghts2, inds2 = wghts1, inds1
     else:
         wghts2, inds2 = __contributions(sh[1], out.shape[1], scale[1], kernel, kernel_width, antialiasing)
-        
-    if wghts1 is None and wghts2 is None:
-        im.take(inds1, 0).take(inds2.T, 1, out)
-    else:
-        wghts, inds = (wghts1, wghts2), (inds1, inds2)
-        imr, t_sh = ((__imresize_01, (out.shape[0], sh[1])) if scale[0] <= scale[1] else
-                     (__imresize_10, (sh[0], out.shape[1])))
-        tmp = empty(t_sh, im.dtype, order='F' if im.flags.fortran else 'C')
-        if len(sh) == 2: imr(im, tmp, out, wghts, inds, nthreads)
-        else:
-            base = slice(None), slice(None)
-            for idx in ndindex(sh[2:]): imr(im[base+idx], tmp, out[base+idx], wghts, inds, nthreads)
-        
+
+    # Resize the image
+    __imresize(im, out, (wghts1, wghts2), (inds1, inds2), scale, nthreads)
+    
     # Return the output array (possibly converted back to logicals)
     return greater(out, 128, out.view(dt)) if dt.kind == 'b' else out
 
+def __imresize(im, out, wghts, inds, scale, nthreads):
+    from numpy import empty, ndindex
+    if wghts[0] is None and wghts[1] is None:
+        return im.take(inds[0], 0).take(inds[1].T, 1, out)
+    sh = im.shape
+    imr, t_sh = ((__imresize_01, (out.shape[0], sh[1])) if scale[0] <= scale[1] else
+                 (__imresize_10, (sh[0], out.shape[1])))
+    tmp = empty(t_sh, im.dtype, order='F' if im.flags.fortran else 'C')
+    if len(sh) == 2: imr(im, tmp, out, wghts, inds, nthreads)
+    else:
+        base = slice(None), slice(None)
+        for idx in ndindex(sh[2:]): imr(im[base+idx], tmp, out[base+idx], wghts, inds, nthreads)
+    return out
+
 def __imresize_01(im, tmp, out, weights, indices, nthreads):
+    from .__imresize import imresize #pylint: disable=redefined-outer-name
     if weights[0] is None: im.take(indices[0], 0, tmp) # nearest neighbor
-    else: __imresize.imresize(im, tmp, weights[0], indices[0], nthreads)
+    else: imresize(im, tmp, weights[0], indices[0], nthreads)
     if weights[1] is None: tmp.T.take(indices[1], 1, out.T) # nearest neighbor
-    else: __imresize.imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
+    else: imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
 
 def __imresize_10(im, tmp, out, weights, indices, nthreads):
+    from .__imresize import imresize #pylint: disable=redefined-outer-name
     if weights[1] is None: im.T.take(indices[1], 1, tmp.T) # nearest neighbor
-    else: __imresize.imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
+    else: imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
     if weights[0] is None: tmp.take(indices[0], 0, out) # nearest neighbor
-    else: __imresize.imresize(tmp, out, weights[0], indices[0], nthreads)
+    else: imresize(tmp, out, weights[0], indices[0], nthreads)
 
 def __scale_shape(sh, scale_or_shape):
     from math import ceil
@@ -225,12 +230,13 @@ def imresize_fast(im, out=None, nthreads=1):
     But it does support everything else (2/3-D images, logical/integral/floating point types)
     """
     from numpy import empty, greater, ndindex
+    from .__imresize import imresize_fast #pylint: disable=redefined-outer-name
     sh = im.shape
     im, out, dt = __im_and_out(im, out, ((sh[0]+1)//2, (sh[1]+1)//2))
     tmp = empty((out.shape[0], sh[1]), im.dtype, order='F' if im.flags.fortran else 'C')
     if im.ndim == 2:
-        __imresize.imresize_fast(im,    tmp,   nthreads)
-        __imresize.imresize_fast(tmp.T, out.T, nthreads)
+        imresize_fast(im,    tmp,   nthreads)
+        imresize_fast(tmp.T, out.T, nthreads)
     else:
         # NOTE: this just cycles through all the channels and does each one indendently
         # A faster method sometimes is to reshape the final dimension down and run it all at once
@@ -238,8 +244,8 @@ def imresize_fast(im, out=None, nthreads=1):
         # If I find a good way to do this here, also should modify the non-fast version as well
         base = slice(None), slice(None)
         for idx in ndindex(sh[2:]):
-            __imresize.imresize_fast(im[base+idx], tmp,             nthreads)
-            __imresize.imresize_fast(tmp.T,        out[base+idx].T, nthreads)
+            imresize_fast(im[base+idx], tmp,             nthreads)
+            imresize_fast(tmp.T,        out[base+idx].T, nthreads)
     return greater(out, 128, out.view(dt)) if dt.kind == 'b' else out
 
 
