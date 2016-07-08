@@ -252,8 +252,9 @@ def __chm_train_main_parse_args():
     # Get defaults for optional arguments
     path = './temp/'
     nstages, nlevels = 2, 4
-    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor()),
-                         ('sift',SIFT()), ('intensity-stencil-10',Intensity.Stencil(10))))
+    # TODO: Gabor and SIFT should not need compat mode here!
+    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor(True)),
+                         ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
     output, dt = None, uint8
     restart = False
