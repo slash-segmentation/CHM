@@ -55,7 +55,7 @@ if __name__ == '__main__':
           url='https://www.sci.utah.edu/software/chm.html',
           packages=['chm'],
           install_requires=['numpy>=1.7','scipy>=0.16','cython>=0.22','pysegtools[MATLAB]>=0.1'],
-          extras_require={ 'OPT': ['fftw>=0.10'], },
+          extras_require={ 'OPT': ['pyfftw>=0.10'], },
           use_2to3=True, # the code *should* support Python 3 once run through 2to3 but this isn't tested
           zip_safe=False, # I don't think this code would work when running from inside a zip file due to the dynamic-load and dynamic-cython systems
           ext_modules = cythonize([

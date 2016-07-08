@@ -13,12 +13,13 @@ from ._base import Filter
 
 class Edge(Filter):
     """
-    Computes the edge features of the image. This calculates the Sobel gradient magnitude then
-    returns neighboring offsets in a 7x7 block.
+    Computes the edge features of the image. This calculates the gradient magnitude using a second
+    derivative of the Gaussian with a sigma of 1.0 then returns all neighboring offsets in a 7x7
+    block.
 
     The compat flag causes a padding of 0s to be used when needed instead of reflection. This is not
     a good approach since a transition from 0s to the image data will be an edge. Also it takes
-    extra effort and memory to do so because the Filterbank method adds reflection padding
+    extra effort and memory to do so because the FilterBank class adds reflection padding
     inherently, so we have to detect that and correct it.
 
     Uses O(2*im.size).

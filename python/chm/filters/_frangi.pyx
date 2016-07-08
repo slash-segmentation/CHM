@@ -25,6 +25,8 @@ from openmp cimport omp_get_num_threads, omp_get_thread_num
 ctypedef npy_double dbl
 ctypedef dbl* dbl_p
 
+DEF BETA=0.5
+
 def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     """
     Computes the 2D Frangi filter using the eigenvectors of the Hessian to compute the likeliness
@@ -208,8 +210,9 @@ cdef void vesselness(intp N, dbl_p lambda1, dbl_p lambda2, dbl_p out, dbl c) nog
         if lam2 > 0.0:
             # Compute similarity measures
             lam1 = lambda1[i]; lam2 = lam2*lam2
-            Rb2 =     exp(lam1/lam2*-2.0) # exp(-Rb^2/(2*beta^2)); Rb = lambda1 / lambda2
-            S2  = 1.0-exp((lam1+lam2)*c)  # 1-exp(-S^2/(2*c^2));   S = sqrt(sum(lambda_i^2))
+            Rb2 =     exp(lam1/lam2*(-1/(2*BETA*BETA))) # exp(-Rb^2/(2*beta^2)); Rb = lambda1 / lambda2
+            S2  = 1.0-exp((lam1+lam2)*c) # 1-exp(-S^2/(2*c^2));   S = sqrt(sum(lambda_i^2))
             # Compute vessel-ness
             out[i] = Rb2 * S2
         else: out[i] = 0
+
