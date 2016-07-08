@@ -68,4 +68,4 @@ if __name__ == '__main__':
               create_ext('chm.filters._sift'),
               create_ext('chm.filters._frangi'),
               create_ext('chm.filters._intensity'),
-          ]))
+          ], include_path=[cy_inc]))

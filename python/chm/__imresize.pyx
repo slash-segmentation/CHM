@@ -17,7 +17,7 @@ from __future__ import print_function
 
 from pysegtools.general.cython.npy_helper cimport *
 import_array()
-include "pysegtools/general/cython/fused.pxi"
+include "fused.pxi"
 
 from libc.math cimport floor
 from cython.view cimport contiguous
