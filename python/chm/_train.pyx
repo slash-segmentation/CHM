@@ -213,11 +213,10 @@ cdef inline void shuffle(intp *arr, const intp n, intp sub = -1) nogil:
     though).
     """
     if not rng_inited: init_rng()
-    # TODO: enable shuffling
-    #cdef intp i, j, t, end = 0 if sub == -1 else n-sub-1
-    #for i in xrange(n-1, end, -1):
-    #    j = rk_interval(i, &rng)
-    #    t = arr[j]; arr[j] = arr[i]; arr[i] = t
+    cdef intp i, j, t, end = 0 if sub == -1 else n-sub-1
+    for i in xrange(n-1, end, -1):
+        j = rk_interval(i, &rng)
+        t = arr[j]; arr[j] = arr[i]; arr[i] = t
 
     # The original implementation used rand()/RAND_MAX and was seriously flawed. On some systems
     # any training set with more than 32767 samples (a single 180x180 image would get past that) it
@@ -383,14 +382,13 @@ cdef ndarray random_subset(ndarray data, Py_ssize_t n, ndarray out = None):
     cdef intp* inds = <intp*>malloc(total*sizeof(intp))
     if inds is NULL: raise MemoryError()
     for i in xrange(total): inds[i] = i
-    # TODO:
-    #shuffle(inds, total, n) # note: shuffles n elements at the END of the array
-    #inds += total-n
+    shuffle(inds, total, n) # note: shuffles n elements at the END of the array
+    inds += total-n
     cdef dbl_p out_p  = <dbl_p>PyArray_DATA(out)
     cdef dbl_p data_p = <dbl_p>PyArray_DATA(data)
     for i in xrange(n):
         memcpy(out_p+i*m, data_p+inds[i]*m, m*sizeof(double))
-    #inds -= total-n
+    inds -= total-n
     free(inds)
     return out
     
