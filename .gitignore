@@ -2,6 +2,8 @@ algorithm/*.mat
 algorithm/FilterStuff/*.mat
 *.pyc
 *.pyxbldc
-python/*.so
+python/**/*.so
+python/build/
+python/**/_*.cpp
 *.o
 *.log
