@@ -322,7 +322,7 @@ def __get_filter(f):
         return F(f)
     filters = {'haar':Haar, 'hog':HOG, 'edge':Edge, 'frangi':Frangi, 'gabor':Gabor, 'sift': SIFT}
     if f not in filters: __chm_train_usage("Unknown filter '%s'"%f)
-    return filters[0]()
+    return filters[f]()
 
 def __chm_train_usage(err=None):
     import sys
@@ -339,7 +339,8 @@ def __chm_train_usage(err=None):
   label         The label/ground truth image(s) (0=background)
                 Accepts anything that can be given to `imstack -S` except that
                 the value must be quoted so it is a single argument.
-  matched up in the order they are in and paired images must be the same size.
+  The inputs and labels are matched up in the order they are given and paired
+  images must be the same size.
 
 Optional Arguments:
   -m model_dir  The folder where the model data is save to. Default is ./temp/.
@@ -355,8 +356,8 @@ Optional Arguments:
                 defaults. If the argument starts with - then they will be
                 removed from the defaults.
                 Defaults are: haar,hog,edge,gabor,sift,intensity-stencil-10
-  -c filter     The filter used to generate features for context images. A
-                single filter listed above.
+  -c filter     The filter used to generate features for context images. This
+                takes a single filter listed above.
                 Default is intensity-stencil-7
   -o ouput      Output the results of testing the model on the input data to the
                 given image. Accepts anything that is accepted by `imstack -S`
@@ -368,7 +369,7 @@ Optional Arguments:
                 after the last completed stage/level. You must give the same
                 inputs and labels as before for the model to make sense. However
                 you do not need to give the same filters, stages, or levels. The
-                model will be adjusted if necessary.
+                model will be adjusted as necessary.
   -N nthreads   How many threads to use. Default is to run as many threads as
                 there are CPUs. Note: only the extraction of features and
                 generation of outputs can use multiple threads and multiple
