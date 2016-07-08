@@ -1,0 +1,29 @@
+Current major issues to address:
+	TRAIN:	using non-compat Gabor and SIFT filters causes issues
+	TEST:	tiling has some seem effects even though it shouldn't
+			I have done a lot to reduce this (originally I was getting things -/+200, now just -/+32)
+	FILTER: SIFT is performing sub-optimally (both in time and accuracy)
+	FILTER: higher levels have much-reduced accuracy compared to MATLAB
+			even inten - thus does MyDownSample have issues?
+	FILTER: correlate_xy (used by Edge, Frangi, and others) currently can't do multithreaded in-place
+	TRAIN:  support image images/labels masks
+	
+Current planned optimizations:
+	TEST:	when doing a tile-subset only copy the surrounding region into shared memory
+			also, only downsample that region
+	FILTER:	find a way around the 1 padding left in HoG
+	FILTER:	optimize SIFT more
+	FILTER/TEST/TRAIN: see if any algorithms would still benefit from being made into CUDA vareties
+	FILTER:	find a way to increase performance of pixel-at-once filters (Haar, HOG, SIFT)
+			Haar can do X and Y separately with just a little extra shared computation
+	UTIL:	optimize/multi-thread numpy.pad, MyMaxPooling, and/or im2double
+	TRAIN:	multi-thread learning?
+	TRAIN:	save histogram?
+	TRAIN:	subsample?
+	TRAIN:	evaluation - Fortran or C ordering?
+
+Minor optimizations that could be done:
+	TEST:	give each process a different number of threads when nthreads is fractional
+	TRAIN:	use ntasks in addition to nthreads
+	FILTER:	cc_cmp_II in place?
+	FILTER:	Edge one less intermediate?

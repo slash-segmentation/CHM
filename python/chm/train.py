@@ -337,7 +337,7 @@ def __chm_train_usage(err=None):
                 Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.
   label         The label/ground truth image(s) (0=background)
-                Accepts anything that can be given to `imstack -S` except that
+                Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.
   The inputs and labels are matched up in the order they are given and paired
   images must be the same size.
