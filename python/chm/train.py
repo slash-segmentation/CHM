@@ -374,8 +374,8 @@ Optional Arguments:
                 there are CPUs. Note: only the extraction of features and
                 generation of outputs can use multiple threads and multiple
                 tasks are not supported."""
-          % (__version__, sys.argv[0]), file=sys.stderr)
-    sys.exit(1)
+          % (__version__, __loader__.fullname), file=sys.stderr)
+    sys.exit(0 if err is None else 1)
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support

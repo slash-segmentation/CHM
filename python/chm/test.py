@@ -754,8 +754,8 @@ Optional Arguments:
                 fit in memory (since the max memory is only used for a short
                 period of time) and divide the rest of the CPUs among the tasks.
                 If only one value is given the other is calculated using it."""
-          % (__version__, sys.argv[0]), file=sys.stderr)
-    sys.exit(1)
+          % (__version__, __loader__.fullname), file=sys.stderr)
+    sys.exit(0 if err is None else 1)
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support

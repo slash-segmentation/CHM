@@ -31,6 +31,7 @@ The following libraries are strongly recommended:
 These can all be installed with various Python managers such as Anaconda, Enthought, Python(x,y),
 or WinPython. On Linux machines they can be installed globally with `yum`, `apt-get`, or similar.
 For example on CentOS-7 all of these can be installed with the following:
+
     yum install gcc gcc-gfortran python python-devel python-virtualenv \
                 atlas atlas-devel lapack lapack-devel lapack64 lapack64-devel \
                 zlib zlib-devel libtiff libtiff-devel libjpeg-turbo libjpeg-turbo-devel \
@@ -49,7 +50,7 @@ the dependent Python packages. On Linux machines, setting this up would look lik
     source bin/activate
 
     # Install some of the dependencies
-    # Note: these can be skipped but greatly speed up the other commands
+    # Note: these can be skipped but greatly speeds up the other commands
     pip install numpy
     pip install cython
     pip install scipy
@@ -60,8 +61,18 @@ the dependent Python packages. On Linux machines, setting this up would look lik
     python -m pysegtools.imstack --check
 
     # Install the devel PyCHM
-    git@github.com:slash-segmentation/CHM.git
+    git clone git@github.com:slash-segmentation/CHM.git
     pip install -e CHM/python[OPT]
+
+Since the pysegtools and CHM packages are installed in editable mode (`-e`), if there are updates
+to the code, you can do the following to update them:
+
+    cd ~/virtenv/segtools
+    git pull
+
+    cd ~/virtenv/CHM/python
+    git pull
+    ./setup.py build_ext --inplace # builds any changed Cython modules
 
 
 CHM Test
@@ -77,7 +88,7 @@ General help will be given if no arguments (or invalid arguments) are provided
 The CHM test program takes a single 2D input image, calculates the labels according to a model,
 and saves the labels to the 2D output image. The images can be anything supported by the `imstack`
 program for 2D images. The output-image can given as a directory in which case the input image
-filename and type are used. *The MATLAB command line allowed multiple files*
+filename and type are used. *The MATLAB command line allowed multiple files.*
 
 By default this assumes the model data is stored in ./temp/. Typically this will be stored
 somewhere else and using the `-m` option this can be set to any folder. The folder can contain
@@ -228,7 +239,7 @@ each done with the image and the inverted image (looking for white and black rid
 value is fixed to 0.5 and c is dynamically calculated as half of the maximum Frobenius norm of all
 Hessian matrices.
 
-This is not used at all for MATLAB models.
+This is not used by default in Python models or at all for MATLAB models.
 
 ### Gabor
 
