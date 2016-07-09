@@ -5,9 +5,9 @@ This package includes the CHM train and test algorithms written in Python with s
 enhancements, including major speed and memory improvements, improved and added filters, and
 improvements to the processing algorithm.
 
-Models are not always compatible. MATLAB models created with `CHM_train` can be used with the
-Python version with only minor differences in output. However, Python models cannot be used with
-the MATLAB `CHM_train`.
+Models are not always compatible. MATLAB models created with the MATLAB `CHM_train` can be used
+with the Python `chm.test` with only minor differences in output. However, Python models cannot be
+used with the MATLAB `CHM_test`.
 
 
 Installation
@@ -161,6 +161,10 @@ and as much of it is reused as possible. This is useful for when a previous atte
 through or when desiring to add additional stages or levels to a model. If the filters are changed
 from the original model, any completed stages/levels will not use the new filters but new
 stages/levels will. The input images and labels must be the same when restarting.
+
+**Note:** the model folder can become fairly large (100+ MiB), however most of this is only needed
+if you plan to ever 'restart' the model. If not, all `output-#-#` directories within the model
+directory can be removed. After removing them, the models should only be 10-20 MiB.
 
 The default number of stages and levels are 2 and 4 respectively. They can be set using `-S #` and
 `-L #` respectively. The number of stages must be at least 2 while the number of levels must be at
