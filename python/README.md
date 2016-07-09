@@ -140,7 +140,7 @@ CHM Train
 ---------
 Basic usage is:
 
-    python -m chm.train input-images label-images <optionals>
+    python -m chm.train input-images label-images <options>
 
 General help will be given if no arguments (or invalid arguments) are provided
 
@@ -172,12 +172,12 @@ pointless - at least for non-massive structures.
 
 The filters used for generating features are, by default, the same used by the MATLAB CHM train but
 without extra compatibility. The filters can be adjusted using the `-f` option in various ways. The
-available filters are haar, hog, edge, gabor, sift, frangi, and intensity-<type>-# (where <type> is
-either stencil or square and # is the size in pixels). To add filters to the list of current
-filters do something like `-f +frangi`. To remove filters from the list of current filters do
-something like `-f -hog`. Additionally, the list of filters can be specified directly, for example
-`-f haar,hog,edge,gabor,sift,intensity-stencil-10` would specify the default filters. More then one
-`-f` option can be given and they will build off of each other.
+available filters are `haar`, `hog`, `edge`, `gabor`, `sift`, `frangi`, and `intensity-<type>-#`
+(where `<type>` is either `stencil` or `square` and `#` is the radius in pixels). To add filters to
+the list of current filters do something like `-f +frangi`. To remove filters from the list of
+current filters do something like `-f -hog`. Additionally, the list of filters can be specified
+directly, for example `-f haar,hog,edge,gabor,sift,intensity-stencil-10` would specify the default
+filters. More then one `-f` option can be given and they will build off of each other.
 
 Besides filters being used to generate the features for images, a filter is used on the 'contexts'
 from the previous stages and levels to generate additional features. This filter can be specified
