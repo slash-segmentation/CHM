@@ -43,7 +43,7 @@ class Intensity(Filter):
         super(Intensity, self).__init__(abs(offsets.ravel()).max(), offsets.shape[1])
         self.__offsets = offsets
     def __call__(self, im, out=None, region=None, nthreads=1):
-        from ._intensity import intensity #pylint: disable=import-error
+        from ._intensity import intensity #pylint: disable=no-name-in-module
         return intensity(im, self.__offsets, out=out, region=region, nthreads=nthreads)
 
     __squares = {}

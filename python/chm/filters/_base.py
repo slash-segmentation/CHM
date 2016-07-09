@@ -16,7 +16,7 @@ from pysegtools.general import cython
 cython.install()
 
 # Make a bunch of utils function available from here
-from ..utils import get_image_region, replace_sym_padding, hypot, copy, copy_flat, next_regular
+from ..utils import get_image_region, replace_sym_padding, hypot, copy, copy_flat, next_regular #pylint: disable=unused-import
 
 __all__ = ['Filter', 'FilterBank']
 

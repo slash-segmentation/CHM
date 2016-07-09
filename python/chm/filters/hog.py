@@ -27,6 +27,6 @@ class HOG(Filter):
         # OPT: the HOG calculator could be sped up slightly by not zero-padding each block it processes
         # TODO: there is a pre-computed division in the C code, should it be kept?
         from ._base import get_image_region
-        from ._hog import hog_entire #pylint: disable=import-error
+        from ._hog import hog_entire #pylint: disable=no-name-in-module
         im, region = get_image_region(im, 7, region)
         return hog_entire(im, 15, out=out, nthreads=nthreads)

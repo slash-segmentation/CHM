@@ -297,7 +297,7 @@ def __is_sym(im, n_pad):
 
 
 ########## General Utilities ##########
-from ._utils import par_copy as copy, par_hypot as hypot #pylint: disable=import-error
+from ._utils import par_copy as copy, par_hypot as hypot #pylint: disable=no-name-in-module, unused-import
 def copy_flat(dst, src, nthreads=1):
     """
     Copies all of the data from one array to another array of the same size even if they don't have
@@ -310,7 +310,7 @@ def copy_flat(dst, src, nthreads=1):
         dst.shape = src.shape
         copy(dst, src, nthreads)
     except AttributeError:
-        from ._utils import par_copy_any #pylint: disable=import-error
+        from ._utils import par_copy_any #pylint: disable=no-name-in-module
         par_copy_any(dst, src, nthreads)
         # Could also be done with nditers which appear to be slightly faster but do require more
         # memory and cannot be made parallel nearly as easily.
@@ -437,8 +437,10 @@ def __win_get_msvcr_ver(name):
     #pylint: disable=no-name-in-module
     from ctypes import c_char_p, sizeof, cast, POINTER
     from ctypes.wintypes import DWORD, LONG
-    from win32api import LoadLibraryEx, FreeLibrary, error
-    from win32con import LOAD_LIBRARY_AS_DATAFILE
+    try:
+        from win32api import LoadLibraryEx, FreeLibrary, error
+        from win32con import LOAD_LIBRARY_AS_DATAFILE
+    except ImportError: raise ValueError()
     import re
     try: lib = LoadLibraryEx(name, None, LOAD_LIBRARY_AS_DATAFILE)
     except error: raise ValueError()

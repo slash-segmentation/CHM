@@ -302,7 +302,7 @@ def __chm_train_main_parse_args():
             if nthreads <= 0: __chm_train_usage("Number of threads must be a positive integer")
         else: __chm_train_usage("Invalid argument %s" % o)
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
-    fltrs = FilterBank(fltrs.values())
+    fltrs = FilterBank(fltrs.values()) #pylint: disable=redefined-variable-type
     model = Model.create(path, nstages, nlevels, fltrs, cntxt_fltr, restart)
     return (ims, lbls, model, output, dt, nthreads)
 
@@ -374,7 +374,7 @@ Optional Arguments:
                 there are CPUs. Note: only the extraction of features and
                 generation of outputs can use multiple threads and multiple
                 tasks are not supported."""
-          % (__version__, __loader__.fullname), file=sys.stderr)
+          % (__version__, __loader__.fullname), file=sys.stderr) #pylint: disable=undefined-variable
     sys.exit(0 if err is None else 1)
 
 if __name__ == "__main__":

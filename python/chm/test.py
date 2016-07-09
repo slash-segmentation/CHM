@@ -548,7 +548,6 @@ def testCHM(im, model, nthreads=1):
     # CHANGED: the 'savingpath' (now called model) can now either be the path of the folder
     # containing the models or it can be an already loaded model
     # CHANGED: dropped Nstage, Nlevel, NFeatureContexts arguments - these are included in the model
-    from numpy import empty
     from .utils import MyDownSample1, MyUpSample
     from .model import Model
     model = Model.load(model)
@@ -623,7 +622,7 @@ def __chm_test_main():
 
 def __chm_test_main_parse_args():
     """Parse the command line arguments for the CHM test command line program."""
-    #pylint: disable=too-many-locals, too-many-branches
+    #pylint: disable=too-many-locals, too-many-branches, too-many-statements
     import os.path
     from sys import argv
     from getopt import getopt, GetoptError
@@ -645,7 +644,7 @@ def __chm_test_main_parse_args():
 
     # Check the output image
     output = argv[2]
-    if output == '': output = '.'
+    if output == '': output = '.' #pylint: disable=redefined-variable-type
     output_ended_with_slash = output[-1] == '/'
     output = os.path.abspath(output)
     if output_ended_with_slash:
@@ -754,7 +753,7 @@ Optional Arguments:
                 fit in memory (since the max memory is only used for a short
                 period of time) and divide the rest of the CPUs among the tasks.
                 If only one value is given the other is calculated using it."""
-          % (__version__, __loader__.fullname), file=sys.stderr)
+          % (__version__, __loader__.fullname), file=sys.stderr) #pylint: disable=undefined-variable
     sys.exit(0 if err is None else 1)
 
 if __name__ == "__main__":

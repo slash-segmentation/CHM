@@ -90,14 +90,14 @@ def __imresize(im, out, wghts, inds, scale, nthreads):
     return out
 
 def __imresize_01(im, tmp, out, weights, indices, nthreads):
-    from .__imresize import imresize #pylint: disable=redefined-outer-name
+    from .__imresize import imresize #pylint: disable=redefined-outer-name, no-name-in-module
     if weights[0] is None: im.take(indices[0], 0, tmp) # nearest neighbor
     else: imresize(im, tmp, weights[0], indices[0], nthreads)
     if weights[1] is None: tmp.T.take(indices[1], 1, out.T) # nearest neighbor
     else: imresize(tmp.T, out.T, weights[1], indices[1], nthreads)
 
 def __imresize_10(im, tmp, out, weights, indices, nthreads):
-    from .__imresize import imresize #pylint: disable=redefined-outer-name
+    from .__imresize import imresize #pylint: disable=redefined-outer-name, no-name-in-module
     if weights[1] is None: im.T.take(indices[1], 1, tmp.T) # nearest neighbor
     else: imresize(im.T, tmp.T, weights[1], indices[1], nthreads)
     if weights[0] is None: tmp.take(indices[0], 0, out) # nearest neighbor
@@ -122,7 +122,7 @@ def __scale_shape(sh, scale_or_shape):
 
             if sz_dim is not None:
                 scale = shape[sz_dim] / sh[sz_dim]
-                scale = (scale, scale)
+                scale = (scale, scale) #pylint: disable=redefined-variable-type
             else:
                 scale = (shape[0]/sh[0], shape[1]/sh[1])
             return scale, shape
@@ -230,7 +230,7 @@ def imresize_fast(im, out=None, nthreads=1):
     But it does support everything else (2/3-D images, logical/integral/floating point types)
     """
     from numpy import empty, greater, ndindex
-    from .__imresize import imresize_fast #pylint: disable=redefined-outer-name
+    from .__imresize import imresize_fast #pylint: disable=redefined-outer-name, no-name-in-module
     sh = im.shape
     im, out, dt = __im_and_out(im, out, ((sh[0]+1)//2, (sh[1]+1)//2))
     tmp = empty((out.shape[0], sh[1]), im.dtype, order='F' if im.flags.fortran else 'C')

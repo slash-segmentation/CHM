@@ -36,7 +36,7 @@ class SIFT(Filter):
         from numpy import empty, empty_like, sqrt, arctan2, cos, sin
         from scipy.ndimage.filters import correlate1d
         from ._base import run_threads
-        from ._sift import orientations, neighborhoods, normalize #pylint: disable=import-error
+        from ._sift import orientations, neighborhoods, normalize #pylint: disable=no-name-in-module
 
         # TODO: don't precompute division?
         im *= 1/im.max() # can modify im here since it is always the padded image
@@ -70,6 +70,7 @@ class SIFT(Filter):
             weight_x, weight_x_origin = SIFT.__weight_x, SIFT.__weight_x_origin
             tmp = empty_like(im) # INTERMEDIATE: im.shape * nthreads
             for a in xrange(start, stop):
+                #pylint: disable=unsubscriptable-object
                 correlate1d(im_orientation[a,:,:], weight_x, 0, mode='constant', origin=weight_x_origin, output=tmp)
                 correlate1d(tmp, weight_x, 1, mode='constant', origin=weight_x_origin, output=im_orientation[a,:,:])
         # OPT: these take about 12% of the time of SIFT (when single-threaded)

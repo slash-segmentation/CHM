@@ -177,7 +177,7 @@ class PythonModel(Model):
         if cntxt_fltr is None:
             from .filters import Intensity
             cntxt_fltr = Intensity.Stencil(7)
-        cntxt_fltr = PythonModel.__get_filters(nstgs, nlvls, cntxt_fltr)
+        cntxt_fltr = PythonModel.__get_filters(nstgs, nlvls, cntxt_fltr) #pylint: disable=redefined-variable-type
         
         # Get the submodels
         if restart:
@@ -232,7 +232,8 @@ class PythonModel(Model):
                 s,l = sm_info['stage'], sm_info['level']
                 disc = sm_info.get('discriminants')
                 disc = None if disc is None else abspath(join(dirname(sm), disc))
-                if disc is None or not exists(disc) or s > max_stg_keep or l > nlvls or (s == nstgs and l != 0):
+                remove_it = s > max_stg_keep or l > nlvls or (s == nstgs and l != 0)
+                if remove_it or disc is None or not exists(disc):
                     remove(sm)
                     sms[s-1][l] = None
                     if disc is not None and exists(disc): remove(disc)
@@ -568,7 +569,7 @@ class AndOrNetSubModel(SubModel):
         ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
         try: import numpy.random.mtrand # this may just always work, but I don't know
         except ImportError: pass
-        from ._train import learn #pylint: disable=import-error
+        from ._train import learn #pylint: disable=no-name-in-module
 
         # Run learning and save
         self._save(learn(X, Y, sb, maxepoch, nthreads), sb=sb)

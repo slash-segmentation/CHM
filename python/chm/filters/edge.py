@@ -31,7 +31,7 @@ class Edge(Filter):
     def __call__(self, im, out=None, region=None, nthreads=1):
         # CHANGED: no longer returns optional raw data
         from ._base import get_image_region, replace_sym_padding, hypot
-        from ._correlate import correlate_xy #pylint: disable=import-error
+        from ._correlate import correlate_xy #pylint: disable=no-name-in-module
         if self.__compat:
             # In compatibility mode, instead of symmetric reflections we pad with 0s
             im, region = replace_sym_padding(im, 3, region, 6, nthreads)

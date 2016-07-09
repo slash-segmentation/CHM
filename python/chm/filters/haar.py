@@ -30,7 +30,7 @@ class Haar(Filter):
         self.__compat = compat
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ._base import get_image_region
-        from ._haar import cc_cmp_II, cc_Haar_features #pylint: disable=import-error
+        from ._haar import cc_cmp_II, cc_Haar_features #pylint: disable=no-name-in-module
         # OPT: if the following line allocates a new im, the cc_cmp_II could be made to operate in-place (preliminary testing shows ~10% speed increase)
         im, region = get_image_region(im, 8, region)
         ii = cc_cmp_II(im) # INTERMEDIATE: im.shape + (16,16)

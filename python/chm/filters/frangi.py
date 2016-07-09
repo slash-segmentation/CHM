@@ -25,7 +25,7 @@ class Frangi(Filter):
     def __call__(self, im, out=None, region=None, nthreads=1):
         from numpy import empty
         from ._base import get_image_region
-        from ._frangi import frangi #pylint: disable=import-error
+        from ._frangi import frangi #pylint: disable=no-name-in-module
         
         sigmas = (2, 3, 4, 5, 7, 9, 11)
         im,region = get_image_region(im, 11*3, region)
