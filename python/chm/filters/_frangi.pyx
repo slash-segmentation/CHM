@@ -108,21 +108,21 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
                 _nthreads = omp_get_num_threads() # in case there is a difference...
                 inc = N / <double>_nthreads # a floating point number, use the floor of adding it together
                 a = <intp>floor(inc*i)
-                b = N if i == _nthreads - 1 else (<intp>floor(inc*(i+1)))
-                C[i] = eigvals(b-a, <dbl_p>(<char*>pDxx+a), <dbl_p>(<char*>pDxy+a), <dbl_p>(<char*>pDyy+a))
+                b = N if i == _nthreads-1 else (<intp>floor(inc*(i+1)))
+                C[i] = eigvals(b-a, pDxx+a, pDxy+a, pDyy+a)
             for i in xrange(nthreads):
                 if C[i] > c: c = C[i]
             free(C)
             c = -2.0/c
         
-            # Calculate the vesselness
+            ## Calculate the vesselness
             with parallel(num_threads=nthreads):
                 i = omp_get_thread_num()
                 nthreads = omp_get_num_threads() # in case there is a difference...
                 inc = N / <double>nthreads # a floating point number, use the floor of adding it together
                 a = <intp>floor(inc*i)
-                b = N if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
-                vesselness(b-a, <dbl_p>(<char*>lam1+a), <dbl_p>(<char*>lam2+a), <dbl_p>(<char*>pOut+a), c)
+                b = N if i == nthreads-1 else (<intp>floor(inc*(i+1)))
+                vesselness(b-a, lam1+a, lam2+a, pOut+a, c)
 
     # Return output
     return out
