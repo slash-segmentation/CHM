@@ -20,23 +20,30 @@ __all__ = ["CHM_train"]
 #    X[:,start:end].reshape((-1, im.shape))[0].flags.c_contiguous
 # is True for order='C' but the equivelent is False for order='F'
 
-def CHM_train(ims, lbls, model=None, nthreads=None):
-    # TODO: save histogram?
+def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
+    """
+    
+    """
     from itertools import izip
     from datetime import datetime
     from psutil import cpu_count
-    from .utils import im2double
+    from .utils import im2double, copy
 
-    # Basic checks of images and labels
+    # Basic checks of images, labels, and masks
     if len(ims) < 1 or len(ims) != len(lbls): raise ValueError('You must provide at least 1 image set and equal numbers of training and label images')
     if any(len(im.dtype) > 1 or im.dtype.kind not in ('iufb') for im in ims): raise ValueError('Images must be grayscale')
     if any(len(lbl.dtype) > 1 or lbl.dtype.kind not in ('iufb') for lbl in lbls): raise ValueError('Labels must be grayscale')
     shapes = [im.shape for im in ims]
     if any(sh != lbl.shape for sh,lbl in izip(shapes,lbls)): raise ValueError('Labels must be the same shape as the corresponding images')
-
+    if mask is not None:
+        if len(ims) != len(masks): raise ValueError('The number of mask images must be equal to the number of training/label images')
+        if any(len(mask.dtype) > 1 or mask.dtype.kind not in ('iufb') for mask in masks): raise ValueError('Masks must be grayscale')
+        if any(sh != mask.shape for sh,mask in izip(shapes,masks)): raise ValueError('Masks must be the same shape as the corresponding images')
+        
     # Load the images and labels for level 0
-    ims0  = [im2double(im.data) for im in ims]
-    lbls0 = [lbl.data>0 for lbl in lbls]
+    ims0   = [im2double(im.data) for im in ims]
+    lbls0  = [lbl.data>0 for lbl in lbls]
+    masks0 = None if masks is None else [mask.data>0 for mask in masks]
 
     # Get paramters
     shapes = __get_all_shapes(shapes, model.nlevels)
@@ -50,9 +57,10 @@ def CHM_train(ims, lbls, model=None, nthreads=None):
         ##### Update images, labels, contexts #####
         if sm.level == 0:
             ims, lbls = ims0[:], lbls0[:]
+            if masks0 is not None: masks = masks0[:]
             contexts, clabels = __reset_contexts(clabels, shapes, nthreads)
         else:
-            __downsample_images(ims, lbls, contexts, clabels, nthreads)
+            __downsample_images(ims, lbls, masks, contexts, clabels, nthreads)
 
         if sm.loaded:
             print('%s   Skipping... (already complete)'%str(datetime.utcnow())[:19])
@@ -61,20 +69,28 @@ def CHM_train(ims, lbls, model=None, nthreads=None):
 
         ##### Feature Extraction #####
         print('%s   Extracting features...'%str(datetime.utcnow())[:19])
-        X, Y = __extract_features(sm, ims, lbls, contexts, nthreads)
-        #__subsample(X, Y, 3000000) # TODO: use? increase this for real problems
+        X_full, Y, M = __extract_features(sm, ims, lbls, masks, contexts, nthreads)
 
         ##### Learning the classifier #####
         print('%s   Learning...'%str(datetime.utcnow())[:19])
-        from numpy import asfortranarray
-        X = asfortranarray(X) # TODO: does model.evaluate work better F- or C-ordered? (also, this is a fairly lengthy step)
+        if M is None:
+            # Convert to Fortran-ordered
+            X = empty(X_full.shape, order='F')
+            copy(X, X_full, nthreads)
+        else:
+            # Compress and convert to Fortran-ordered
+            # OPT: parallelize compress
+            X = empty((X_full.shape[0], M.sum()), order='F')
+            X_full.compress(M, 0, X)
+        #__subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
+        del M
         sm.learn(X, Y, nthreads)
-        del Y
+        del X, Y
 
         ##### Generate the outputs #####
         print('%s   Generating outputs...'%str(datetime.utcnow())[:19])
-        __generate_outputs(sm, X, shapes[sm.level], nthreads)
-        del X
+        __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
+        del X_full
         __load_clabels(sm, clabels)
 
     ########## Return final labels ##########
@@ -108,7 +124,7 @@ def __upsample(im, L, sh, nthreads):
     from .utils import MyUpSample
     return MyUpSample(im,L,nthreads=nthreads)[:sh[0],:sh[1]]
 
-def __downsample_images(ims, lbls, contexts, clabels, nthreads):
+def __downsample_images(ims, lbls, masks, contexts, clabels, nthreads):
     """
     Downsample the images, labels, and contexts when going from one level to the next. This
     operates on the lists in-place.
@@ -116,32 +132,43 @@ def __downsample_images(ims, lbls, contexts, clabels, nthreads):
     from .utils import MyDownSample1, MyMaxPooling1
     ims[:]  = [MyDownSample1(im,  None, nthreads) for im  in ims ]
     lbls[:] = [MyMaxPooling1(lbl, None, nthreads) for lbl in lbls]
+    if masks is not None:
+        masks[:] = [MyMaxPooling1(mask, None, nthreads) for mask in masks]
     if len(clabels[0]) == 0: contexts[:] = [[] for _ in ims]
     for i,clbl in enumerate(clabels): contexts[i].append(clbl[-1])
     contexts[:] = [[MyDownSample1(c, None, nthreads) for c in cntxts] for cntxts in contexts]
 
-def __extract_features(submodel, ims, lbls, contexts, nthreads):
+def __extract_features(submodel, ims, lbls, masks, contexts, nthreads):
     """
-    Extract all features from the images in a feature vector. Returns X (feature vector) and Y
-    (labels).
+    Extract all features from the images into a feature vector. Returns X (feature vector), Y
+    (labels), and M (mask or None if no masks).
     """
     from itertools import izip
     from numpy import empty
     from .utils import copy_flat
-    npixs = sum(im.shape[0]*im.shape[1] for im in ims)
-    nfeats = submodel.features
+    ends = list(__cumsum(im.shape[0]*im.shape[1] for im in ims))
+    npixs, nfeats = ends[-1], submodel.features
     start = 0
     X = empty((nfeats, npixs))
     Y = empty(npixs, bool)
-    for im,lbl,cntxts in izip(ims, lbls, contexts):
-        sh = im.shape
-        end = start + sh[0]*sh[1]
-        submodel.filter(im, cntxts, X[:,start:end].reshape((nfeats,)+sh), nthreads=nthreads)
+    for im,lbl,cntxts,end in izip(ims, lbls, contexts, ends):
+        submodel.filter(im, cntxts, X[:,start:end].reshape((nfeats,)+im.shape), nthreads=nthreads)
         copy_flat(Y[start:end], lbl, nthreads)
         start = end
-    return X, Y
+    if masks is None: return X, Y, None
+    start = 0
+    M = empty(npixs, bool)
+    for mask,end in izip(masks, ends):
+        copy_flat(M[start:end], mask, nthreads)
+        start = end
+    return X, Y, M
 
-def __subsample(X, Y, n=3000000): # TODO: increase this for real problems
+def __cumsum(itr):
+    """Like `numpy.cumsum` but takes any iterator and results in an iterator."""
+    total = 0
+    for x in itr: total += x; yield total
+    
+def __subsample(X, Y, n=3000000, nthreads=1): # TODO: increase this for real problems
     """
     Sub-sample the data. If the number of pixels is greater than 2*n then at most n rows are kept
     where Y is True and n rows from where Y is False. The rows kept are selected randomly.
@@ -151,6 +178,7 @@ def __subsample(X, Y, n=3000000): # TODO: increase this for real problems
 
     Returns the possibly subsampled X and Y.
     """
+    # OPT: use nthreads, check and improve speed 
     npixs = len(Y)
     if npixs <= 2*n: return X, Y
 
@@ -182,8 +210,8 @@ def __generate_outputs(submodel, X, shapes, nthreads):
     folder = __get_output_folder(submodel)
     if not exists(folder): mkdir(folder)
     for i,sh in enumerate(shapes):
-        end = start + sh[0]*sh[1]
         path = join(folder, '%03d.npy'%i)
+        end = start + sh[0]*sh[1]
         save(path, submodel.evaluate(X[:,start:end], nthreads).reshape(sh))
         start = end
 
@@ -193,12 +221,14 @@ def __load_clabels(submodel, clabels):
     memory-mapped arrays from NPY files. The clabels list is a list-of-list with the first index
     being the image index and the second being the level.
     """
-    from numpy import load
+    from numpy import load, ndarray
     from os.path import join
     folder = __get_output_folder(submodel)
     for i in xrange(len(clabels)):
         path = join(folder, '%03d.npy'%i)
-        clabels[i].append(load(path, 'r+')) # will be a memory-mapped array (should use 'r' mode but Cython typed memoryviews then reject it)
+        # Load as a memory-mapped array viewed as an ndarray
+        # (should be using 'r' mode but then Cython typed memoryviews reject it)
+        clabels[i].append(load(path, 'r+').view(ndarray))
 
 def __get_output_folder(submodel):
     """Get the folder where outputs are written to for a specific submodel."""
@@ -208,10 +238,10 @@ def __get_output_folder(submodel):
 def __chm_train_main():
     """The CHM train command line program"""
     # Parse Arguments
-    ims, lbls, model, output, dt, nthreads = __chm_train_main_parse_args()
+    ims, lbls, model, masks, output, dt, nthreads = __chm_train_main_parse_args()
 
     # Process input
-    out = CHM_train(ims, lbls, model, nthreads)
+    out = CHM_train(ims, lbls, model, masks, nthreads)
 
     # Save output
     if output is not None:
@@ -256,12 +286,13 @@ def __chm_train_main_parse_args():
     fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor(True)),
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
+    masks = None
     output, dt = None, uint8
     restart = False
     nthreads = None
 
     # Parse the optional arguments
-    try: opts, _ = getopt(argv[3:], "rm:S:L:f:c:o:d:n:N:")
+    try: opts, _ = getopt(argv[3:], "rm:S:L:f:c:M:o:d:n:N:")
     except GetoptError as err: __chm_train_usage(err)
     for o, a in opts:
         if o == "-m":
@@ -286,6 +317,8 @@ def __chm_train_main_parse_args():
                 fltrs = OrderedDict((f,__get_filter(f)) for f in a.lower().split(','))
         elif o == "-c":
             cntxt_fltr = __get_filter(a.lower())
+        elif o == "-M":
+            masks = FileImageStack.open_cmd(a)
         elif o == "-o":
             output = a
             FileImageStack.create_cmd(output, None, True)
@@ -304,7 +337,7 @@ def __chm_train_main_parse_args():
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
     fltrs = FilterBank(fltrs.values()) #pylint: disable=redefined-variable-type
     model = Model.create(path, nstages, nlevels, fltrs, cntxt_fltr, restart)
-    return (ims, lbls, model, output, dt, nthreads)
+    return (ims, lbls, model, masks, output, dt, nthreads)
 
 def __get_filter(f):
     """
@@ -359,6 +392,14 @@ Optional Arguments:
   -c filter     The filter used to generate features for context images. This
                 takes a single filter listed above.
                 Default is intensity-stencil-7
+  -M mask       Specify a mask of the input images and labels for which pixels
+                should be used during training. The default is to use all
+                pixels. The mask can be anything that can be given to
+                `imstack -L` except that the value must be quoted so it is a
+                single argument. It must contain the same number of images as
+                input and label along with each image being the same size. Any
+                non-zero pixel in the mask represent a point used for training,
+                either a positive or negative label.
   -o ouput      Output the results of testing the model on the input data to the
                 given image. Accepts anything that is accepted by `imstack -S`
                 in quotes. The data is always calculated anyways so this just
