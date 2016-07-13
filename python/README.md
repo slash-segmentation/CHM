@@ -164,7 +164,8 @@ stages/levels will. The input images and labels must be the same when restarting
 
 **Note:** the model folder can become fairly large (100+ MiB), however most of this is only needed
 if you plan to ever 'restart' the model. If not, all `output-#-#` directories within the model
-directory can be removed. After removing them, the models should only be 10-20 MiB.
+directory can be removed. After removing them, the models should only be 10-20 MiB. This is true
+for Python and MATLAB models.
 
 The default number of stages and levels are 2 and 4 respectively. They can be set using `-S #` and
 `-L #` respectively. The number of stages must be at least 2 while the number of levels must be at
@@ -195,6 +196,13 @@ takes anything that can be given to `imstack -S` although quotes may be required
 single argument. This means that if you want to see the results of running CHM test on the training
 data you can get it for free. Like CHM test, this support the `-d` argument to specify the data
 type used to save the data.
+
+If not all of the training data should be used, a set of mask images can be provided to select
+which pixels will be considered during training. This is done with `-M masks` where `masks` can be
+anything that can be given to `imstack -L` although quotes may be required to make it a single
+argument. The number and size of the images must be the same as the input-images and label-images.
+Any non-zero pixel in the mask will be used to train with. Note that all pixels, even if not
+covered by the mask, are considered for generation of the features.
 
 *The MATLAB command line option `-M` is completely gone as there is no need for MATLAB or MCR to be
 installed*
