@@ -368,7 +368,8 @@ class SubModel(object):
     def _evaluate(self, X, nthreads):
         """
         Evaluates the feature matrix X with the model. Internal method to be implemented by
-        inheritors. The array X has been checked to be 2 dimensional float64 at this point.
+        inheritors. The array X has been checked to be 2 dimensional float64 with the first
+        dimension equal to self.features at this point.
         """
         pass
     
@@ -382,6 +383,7 @@ class SubModel(object):
         gc.collect() # evaluation is very memory intensive, make sure we are ready
         from numpy import float64
         if X.ndim < 2: raise ValueError('X must be at least 2D')
+        if X.shape[0] != self.features: raise ValueError('X has the wrong number of features')
         sh = X.shape[1:]
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
         return self._evaluate(X, nthreads).astype(float64, copy=False).reshape(sh)
@@ -396,7 +398,8 @@ class SubModel(object):
         """
         Learns the feature matrix X (features by pixels) with Y is the labels with a length of
         pixels.Internal method to be implemented by inheritors. The array X has been checked to be
-        2 dimensional float64 at this point along with Y being a 1-dimensional bool array.
+        2 dimensional float64 with the first dimension equal to self.features at this point along
+        with Y being a 1-dimensional bool array of the same length as X.
         """
         pass
 
@@ -410,6 +413,7 @@ class SubModel(object):
         gc.collect() # learning is very memory intensive, make sure we are ready
         from numpy import float64
         if X.ndim < 2: raise ValueError('X must be at least 2D')
+        if X.shape[0] != self.features: raise ValueError('X has the wrong number of features')
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
         if Y.ndim != 1 or Y.shape[0] != X.shape[1]: raise ValueError('Y must be 1D of the same length as X')
         if Y.dtype != bool: Y = Y > 0
@@ -473,8 +477,8 @@ class AndOrNetSubModel(SubModel):
         """
         assert(disc.shape[0] == super(AndOrNetSubModel, self).features+1)
         assert(disc.shape[1] == self._nGrp*self._nDPG)
-        from numpy import float64
-        self._disc = disc.astype(float64, copy=False)
+        from numpy import float64, ndarray
+        self._disc = disc.view(ndarray).astype(float64, copy=False)
         self._set_loaded()
 
     @staticmethod
@@ -505,11 +509,11 @@ class AndOrNetSubModel(SubModel):
         info['filter'] = self.image_filter
         info['context_filter'] = self.context_filter
         if disc is not None:
-            # Save discriminants
+            # Save (and load) discriminants
             from numpy import save
             info['discriminants'] = basename(path)+'.npy'
             save(path+'.npy', disc)
-            self._load(disc)
+            self._load(load(path+'.npy', 'r'))
 
         # Save model information
         self._info = info
@@ -531,6 +535,11 @@ class AndOrNetSubModel(SubModel):
         from .utils import set_lib_threads
         set_lib_threads(nthreads)
 
+        # Some notes on "dot":
+        #   regardless of inputs always produces C-contiguous output
+        #   fastest when both inputs are C ordered and ~10% slower when both inputs are F ordered
+        #   mixed inputs (one input is C and the other is F) lie inbetween
+        
         from numpy import prod, exp, divide, subtract, negative, sqrt
         #npixels = X.shape[1]
         X[-1].fill(1)
