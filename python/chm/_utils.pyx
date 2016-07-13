@@ -2,9 +2,10 @@
 #cython: boundscheck=False, wraparound=False, initializedcheck=False, cdivision=True
 
 """
-Cython code for util. At the moment this is just fast, parallelized, copy functions. Other future
-functions that might go here are a parallelized version of numpy.pad and optimized versions of
-MyMaxPooling and/or im2double.
+Cython code for util. At the moment this is just fast/parallelized copy and hypot functions.
+
+Other future functions that might go here are a parallelized version of numpy.pad and optimized
+versions of MyMaxPooling and/or im2double.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -82,6 +83,7 @@ def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint preci
     # Check inputs
     cdef intp H = PyArray_DIM(x,0), W = PyArray_DIM(x,1)
     if not PyArray_ISBEHAVED_RO(x) or not PyArray_ISBEHAVED_RO(y) or \
+       PyArray_TYPE(x) != NPY_DOUBLE or PyArray_TYPE(y) != NPY_DOUBLE or \
        PyArray_NDIM(x) != 2 or PyArray_NDIM(y) != 2 or H != PyArray_DIM(y, 0) or W != PyArray_DIM(y, 1) or \
        PyArray_STRIDE(x, 1) != sizeof(double) or  PyArray_STRIDE(y, 1) != sizeof(double):
         raise ValueError('Invalid input arrays')
@@ -123,6 +125,10 @@ def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint preci
 
 ctypedef void (*hypot_fp)(dbl_p x, dbl_p y, dbl_p out, intp H, intp W, intp x_stride, intp y_stride, intp out_stride) nogil
 cdef void hypot1(dbl_p x, dbl_p y, dbl_p out, intp H, intp W, intp x_stride, intp y_stride, intp out_stride) nogil:
+    """
+    Calculates out = sqrt(x*x + y*y) for each value in x, y, and out. The arrays must all be HxW.
+    The strides between rows of each row are given x_stride, y_stride, and out_stride.
+    """
     cdef intp i, j
     for i in xrange(H):
         for j in xrange(W): out[j] = sqrt(x[j]*x[j] + y[j]*y[j])
@@ -130,6 +136,11 @@ cdef void hypot1(dbl_p x, dbl_p y, dbl_p out, intp H, intp W, intp x_stride, int
         y += y_stride
         out += out_stride
 cdef void hypot2(dbl_p x, dbl_p y, dbl_p out, intp H, intp W, intp x_stride, intp y_stride, intp out_stride) nogil:
+    """
+    Calculates out = hypot(x, y) for each value in x, y, and out (where hypot is the C hypot
+    function. The arrays must all be HxW. The strides between rows of each row are given x_stride,
+    y_stride, and out_stride.
+    """
     cdef intp i, j
     for i in xrange(H):
         for j in xrange(W): out[j] = hypot(x[j], y[j])
