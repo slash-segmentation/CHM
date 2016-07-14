@@ -43,8 +43,8 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     of all Hessian matrices. Assumes ridges are black. To do the opposite, invert the image.
     
     Outputs:
-        out         the filtered image
-                    if provided must be a double, 2D, C-contiguous, behaved, proper-sized array
+        out         the filtered image, if provided it must be a 2D double behaved proper-sized
+                    array with the last dimension contiguous
     
     Tempoarary memory usage is approximately 3 times the size of the image.
 
@@ -66,13 +66,13 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     if not PyArray_ISBEHAVED_RO(im) or PyArray_TYPE(im) != NPY_DOUBLE or PyArray_NDIM(im) != 2 or PyArray_STRIDE(im, 1) != sizeof(dbl): raise ValueError("Invalid im")
     if sigma <= 0.0: raise ValueError('Invalid sigma')
     cdef intp padding = <intp>(3.0*sigma+0.5)
-    cdef intp H = PyArray_DIM(im, 0) - 2*padding, W = PyArray_DIM(im, 1) - 2*padding, N = H*W
+    cdef intp H = PyArray_DIM(im, 0) - 2*padding, W = PyArray_DIM(im, 1) - 2*padding
     cdef intp[2] dims
     if out is None:
         dims[0] = H; dims[1] = W
         out = PyArray_EMPTY(2, dims, NPY_DOUBLE, False)
-    elif not PyArray_ISCARRAY(out) or PyArray_TYPE(out) != NPY_DOUBLE or \
-         PyArray_NDIM(out) != 2 or PyArray_DIM(out, 0) != H or PyArray_DIM(out, 1) != W:
+    elif not PyArray_ISBEHAVED(out) or PyArray_TYPE(out) != NPY_DOUBLE or PyArray_NDIM(out) != 2 \
+         or PyArray_DIM(out, 0) != H or PyArray_DIM(out, 1) != W or PyArray_STRIDE(out, 1) != sizeof(dbl):
         raise ValueError('Invalid output array')
     nthreads = get_nthreads(nthreads, H // 64) # make sure each thread is doing at least 64 rows
 
@@ -83,9 +83,11 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     cdef ndarray Dxx = correlate_xy(im, v,  u,  None, nthreads)
     cdef ndarray Dxy = correlate_xy(im, uu, uu, None, nthreads)
     cdef ndarray Dyy = correlate_xy(im, u,  v,  None, nthreads)
+    assert PyArray_STRIDE(Dxx, 0) == PyArray_STRIDE(Dxy, 0) and PyArray_STRIDE(Dxx, 0) == PyArray_STRIDE(Dyy, 0)
+    assert PyArray_STRIDE(Dxx, 1) == sizeof(dbl) and PyArray_STRIDE(Dxy, 1) == sizeof(dbl) and PyArray_STRIDE(Dyy, 1) == sizeof(dbl)
     
     # Get ready to calculate the vesselness
-    cdef intp a, b, i, _nthreads
+    cdef intp a, b, i, _nthreads, stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
     cdef double inc
     cdef dbl_p pDxx = <dbl_p>PyArray_DATA(Dxx), pDxy = <dbl_p>PyArray_DATA(Dxy), pDyy = <dbl_p>PyArray_DATA(Dyy)
     cdef dbl_p lam1 = pDxx, lam2 = pDxy # re-use pDxx and pDxy for lambda1 and lambda2
@@ -95,8 +97,8 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     # Main computations
     with nogil:
         if nthreads == 1:
-            c = -2.0/eigvals(N, pDxx, pDxy, pDyy)
-            vesselness(N, lam1, lam2, pOut, c)
+            c = -2.0/eigvals(H, W, stride, pDxx, pDxy, pDyy)
+            vesselness(H, W, stride, out_stride, lam1, lam2, pOut, c)
         else:
             # Calculate (abs sorted) eigenvalues and the dynamic c value
             C = <dbl_p>malloc(nthreads*sizeof(dbl))
@@ -106,10 +108,10 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
             with parallel(num_threads=nthreads):
                 i = omp_get_thread_num()
                 _nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = N / <double>_nthreads # a floating point number, use the floor of adding it together
+                inc = H / <double>_nthreads # a floating point number, use the floor of adding it together
                 a = <intp>floor(inc*i)
-                b = N if i == _nthreads-1 else (<intp>floor(inc*(i+1)))
-                C[i] = eigvals(b-a, pDxx+a, pDxy+a, pDyy+a)
+                b = H if i == _nthreads-1 else (<intp>floor(inc*(i+1)))
+                C[i] = eigvals(b-a, W, stride, pDxx+a, pDxy+a, pDyy+a)
             for i in xrange(nthreads):
                 if C[i] > c: c = C[i]
             free(C)
@@ -119,10 +121,10 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
             with parallel(num_threads=nthreads):
                 i = omp_get_thread_num()
                 nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = N / <double>nthreads # a floating point number, use the floor of adding it together
+                inc = H / <double>nthreads # a floating point number, use the floor of adding it together
                 a = <intp>floor(inc*i)
-                b = N if i == nthreads-1 else (<intp>floor(inc*(i+1)))
-                vesselness(b-a, lam1+a, lam2+a, pOut+a, c)
+                b = H if i == nthreads-1 else (<intp>floor(inc*(i+1)))
+                vesselness(b-a, W, stride, out_stride, lam1+a, lam2+a, pOut+a, c)
 
     # Return output
     return out
@@ -149,14 +151,15 @@ cdef get_hessian_filters(dbl sigma):
         filters[sigma] = fs = u, uu, v
     return fs # u, uu, v
 
-cdef dbl eigvals(intp N, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) nogil:
+cdef dbl eigvals(intp H, intp W, intp stride, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) nogil:
     """
     Calculate the eigenvalues from the Hessian matrix of an image, sorted by absolute value.
 
-    `eigvals(Dxx,Dxy,Dyy,H,W,stride)`
+    `eigvals(H,W,stride,Dxx,Dxy,Dyy)`
     
     Inputs:
-        N               the number of values in the arrays
+        H, W            the height and width of the arrays
+        stride          the stride between rows of the arrays
         Dxx,Dxy,Dyy     the outputs from hessian2
         
     Outputs:
@@ -165,54 +168,62 @@ cdef dbl eigvals(intp N, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) nogil:
     Returns:
         Frobenius maximum norm of all Hessian matrices
     """
-    cdef intp i
+    cdef intp x, y
     cdef dbl summ, diff, temp, mu1, mu2, lam1, lam2, S2, c = 0.0
-    for i in xrange(N):
-        summ = Dxx[i] + Dyy[i]
-        diff = Dxx[i] - Dyy[i]
-        temp = sqrt(diff*diff + 4*Dxy[i]*Dxy[i])
+    for y in xrange(H):
+        for x in xrange(W):
+            summ = Dxx[x] + Dyy[x]
+            diff = Dxx[x] - Dyy[x]
+            temp = sqrt(diff*diff + 4*Dxy[x]*Dxy[x])
 
-        # Compute the eigenvalues
-        mu1 = 0.5*(summ + temp) # mu1 = (Dxx + Dyy + sqrt((Dxx-Dyy)^2+4*Dxy^2)) / 2
-        mu2 = 0.5*(summ - temp) # mu2 = (Dxx + Dyy - sqrt((Dxx-Dyy)^2+4*Dxy^2)) / 2
+            # Compute the eigenvalues
+            mu1 = 0.5*(summ + temp) # mu1 = (Dxx + Dyy + sqrt((Dxx-Dyy)^2+4*Dxy^2)) / 2
+            mu2 = 0.5*(summ - temp) # mu2 = (Dxx + Dyy - sqrt((Dxx-Dyy)^2+4*Dxy^2)) / 2
 
-        # Sort eigenvalues by absolute value abs(eig1) < abs(eig2)
-        if fabs(mu1) > fabs(mu2): lam1 = mu2*mu2; lam2 = mu1 # lambda1 is always used squared
-        else:                     lam1 = mu1*mu1; lam2 = mu2
-        Dxx[i] = lam1; Dxy[i] = lam2
+            # Sort eigenvalues by absolute value abs(eig1) < abs(eig2)
+            if fabs(mu1) > fabs(mu2): lam1 = mu2*mu2; lam2 = mu1 # lambda1 is always used squared
+            else:                     lam1 = mu1*mu1; lam2 = mu2
+            Dxx[x] = lam1; Dxy[x] = lam2
 
-        # Calculate the dynamic c value
-        if lam2 > 0.0:
-            S2 = lam1 + lam2*lam2
-            if S2 > c: c = S2
+            # Calculate the dynamic c value
+            if lam2 > 0.0:
+                S2 = lam1 + lam2*lam2
+                if S2 > c: c = S2
+        Dxx = <dbl_p>(<char*>Dxx+stride)
+        Dxy = <dbl_p>(<char*>Dxy+stride)
+        Dyy = <dbl_p>(<char*>Dyy+stride)
 
     # Return the Frobenius maximum norm of all Hessian matrices
     return c
 
-cdef void vesselness(intp N, dbl_p lambda1, dbl_p lambda2, dbl_p out, dbl c) nogil:
+cdef void vesselness(intp H, intp W, intp stride, intp out_stride, dbl_p lambda1, dbl_p lambda2, dbl_p out, dbl c) nogil:
     """
     Calculates the vesselness based on the absolute-value sorted eigenvalues.
 
-    `vesselness(N,lambda1,lambda2,out,c)`
+    `vesselness(H,W,stride,out_stride,lambda1,lambda2,out,c)`
     
     Inputs:
-        N               the number of values in the arrays
-        lambda1,lambda2 the outputs from eigval2image
-        c               the constant value `c`
+        H, W                the height and width of the arrays
+        stride, out_stride  the stride between rows of the arrays
+        lambda1,lambda2     the outputs from eigval2image
+        c                   the constant value `c`
         
     Outputs:
-        out             the vesselness values
+        out                the vesselness values
     """
-    cdef intp i
+    cdef intp x, y
     cdef dbl lam1, lam2, Rb2, S2
-    for i in xrange(N):
-        lam2 = lambda2[i]
-        if lam2 > 0.0:
-            # Compute similarity measures
-            lam1 = lambda1[i]; lam2 = lam2*lam2
-            Rb2 =     exp(lam1/lam2*(-1/(2*BETA*BETA))) # exp(-Rb^2/(2*beta^2)); Rb = lambda1 / lambda2
-            S2  = 1.0-exp((lam1+lam2)*c) # 1-exp(-S^2/(2*c^2));   S = sqrt(sum(lambda_i^2))
-            # Compute vessel-ness
-            out[i] = Rb2 * S2
-        else: out[i] = 0
-
+    for y in xrange(H):
+        for x in xrange(W):
+            lam2 = lambda2[x]
+            if lam2 > 0.0:
+                # Compute similarity measures
+                lam1 = lambda1[x]; lam2 = lam2*lam2
+                Rb2 =     exp(lam1/lam2*(-1/(2*BETA*BETA))) # exp(-Rb^2/(2*beta^2)); Rb = lambda1 / lambda2
+                S2  = 1.0-exp((lam1+lam2)*c) # 1-exp(-S^2/(2*c^2));   S = sqrt(sum(lambda_i^2))
+                # Compute vessel-ness
+                out[x] = Rb2 * S2
+            else: out[x] = 0
+        lambda1 = <dbl_p>(<char*>lambda1+stride)
+        lambda2 = <dbl_p>(<char*>lambda2+stride)
+        out = <dbl_p>(<char*>out+out_stride)
