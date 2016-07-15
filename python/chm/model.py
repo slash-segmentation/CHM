@@ -227,7 +227,7 @@ class PythonModel(Model):
         folder = dirname(path)
         try:
             with open(path, 'rb') as f: info = pickle.load(f)
-        except pickle.UnpicklingError, IOError, EOFError: return None,None
+        except (pickle.UnpicklingError, IOError, EOFError): return None,None
         if not isinstance(info, dict) or 'submodels' not in info: return None,None
         sms = info['submodels']
         max_stg_keep = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
