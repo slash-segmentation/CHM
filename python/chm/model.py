@@ -141,19 +141,20 @@ class PythonModel(Model):
     file named 'model'. The info files are pickled dictionaries.
     """
     def __init__(self, path, get_sub_model=None, info=None):
+        from os.path import isdir, join, dirname, abspath, relpath
+        if info is None and isdir(path): path = join(path, 'model')
+        folder = dirname(path)
         self._path = path
-        if get_sub_model is None:
-            from os.path import abspath, isdir, join, dirname
-            if isdir(path): path = join(path, 'model')
-            folder = dirname(path)
+        if info is None:
             with open(path, 'rb') as f: info = pickle.load(f)
             self._nstages = info['nstages']
             self._nlevels = info['nlevels']
-            sms = info['submodels']
-            model = [[AndOrNetSubModel.load(self, abspath(join(folder,sm))) for sm in sm] for sm in sms]
+            model = [[AndOrNetSubModel.load(self, abspath(join(folder,sm))) for sm in sms]
+                     for sms in info['submodels']]
         else:
             self._nstages = nstages = info['nstages']
             self._nlevels = nlevels = info['nlevels']
+            info['submodels'] = [[relpath(sm, folder) for sm in sms] for sms in info['submodels']]
             model = Model.nested_list(nstages, nlevels, lambda s,l:get_sub_model(self,s,l))
         self.__info = info
         super(PythonModel, self).__init__(path, model)
@@ -184,6 +185,12 @@ class PythonModel(Model):
             if isdir(path): path = join(path, 'model')
             folder = dirname(path)
             sms,info = PythonModel.__check_submodels(path, nstgs, nlvls)
+            if sms is None: restart = False
+        else:
+            if not exists(path): mkdir(path)
+            elif not isdir(path): raise ValueError('If path exists, it must be a directory')
+            folder,path = path, join(path, 'model')
+        if restart:
             info.update(extra_info)
             info['submodels'] = Model.nested_list(nstgs, nlvls, lambda s,l:sms[s-1][l] or ('%s-%d-%d'%(path,s,l)))
             def get_sub_model(m,s,l):
@@ -192,9 +199,6 @@ class PythonModel(Model):
                     return AndOrNetSubModel.load(m,abspath(join(folder,sms[s-1][l])))
                 return AndOrNetSubModel.create(m,s,l,fltr[s-1][l],cntxt_fltr[s-1][l])
         else:
-            if not exists(path): mkdir(path)
-            elif not isdir(path): raise ValueError('If path exists, it must be a directory')
-            folder,path = path, join(path, 'model')
             info = dict(extra_info)
             info['submodels'] = Model.nested_list(nstgs, nlvls, lambda s,l:join(folder,'model-%d-%d'%(s,l)))
             # Always loads
@@ -220,8 +224,11 @@ class PythonModel(Model):
         """
         from os.path import abspath, dirname, exists, join
         from os import remove
-        with open(path, 'rb') as f: info = pickle.load(f)
         folder = dirname(path)
+        try:
+            with open(path, 'rb') as f: info = pickle.load(f)
+        except pickle.UnpicklingError, IOError, EOFError: return None,None
+        if not isinstance(info, dict) or 'submodels' not in info: return None,None
         sms = info['submodels']
         max_stg_keep = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
         for s,sm in enumerate(sms):
