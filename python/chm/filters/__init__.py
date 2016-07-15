@@ -45,8 +45,6 @@ from .intensity import Intensity
 #   SIFT (at least during the final normalization step and has 128 features!)
 #
 # Other optimizations/fixes:
-#   Haar  get_image_region allocates a new im, the cc_cmp_II could be made to operate in-place
-#         (preliminary testing shows ~10% speed increase)
 #   Edge  if out exists, could an intermediate be avoided?
 #   Gabor don't precompute division?
 #   SIFT  **lots of work needed
