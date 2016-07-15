@@ -58,22 +58,20 @@ def learn(ndarray X, ndarray Y, bint sb, int maxepoch, int nthreads=1):
     # CHANGED: only returns discriminants
     # CHANGED: assumes the X array includes the extra feature for the centroids
     # TODO: use nthreads
-    from datetime import datetime
-
     if PyArray_FLAGS(X) & NPY_ARRAY_FARRAY    != NPY_ARRAY_FARRAY:    raise ValueError('Bad X')
     if PyArray_FLAGS(Y) & NPY_ARRAY_FARRAY_RO != NPY_ARRAY_FARRAY_RO: raise ValueError('Bad Y')
     # Note: the extra feature is set to all 1s at this point and won't effect kmeans
     fill_last_row_with_1(X)
     cdef Py_ssize_t n_feats = PyArray_DIM(X, 0), n_samps = PyArray_DIM(X, 1)
     
-    print('%s     Clustering...'%str(datetime.utcnow())[:19])
+    __print('    Clustering...')
     cdef int n_group, n_dpg
     if sb: n_group = N_GROUP_SB; n_dpg = N_DISC_PER_GROUP_SB
     else:  n_group = N_GROUP;    n_dpg = N_DISC_PER_GROUP
     cdef ndarray pos = calc_kmeans(n_group, X,  Y)
     cdef ndarray neg = calc_kmeans(n_dpg,   X, ~Y)
     
-    print('%s     Number of training samples = %d'%(str(datetime.utcnow())[:19],n_samps))
+    __print('    Number of training samples = %d'%n_samps)
 
     cdef int n_disc = n_group*n_dpg
     cdef PyArray_Dims shape
@@ -93,7 +91,7 @@ def learn(ndarray X, ndarray Y, bint sb, int maxepoch, int nthreads=1):
     #from numpy.random import randn
     #discriminants = randn(n_feats+1, n_disc) #uncomment for random initialization
 
-    print('%s     Updating discriminants...'%str(datetime.utcnow())[:19])
+    __print('    Updating discriminants...')
     cdef c_dbl_p  x = <c_dbl_p>PyArray_DATA(X)
     cdef c_bool_p y = <c_bool_p>PyArray_DATA(Y)
     cdef dbl_p    disc = <dbl_p>PyArray_DATA(discriminants)
@@ -105,6 +103,12 @@ def learn(ndarray X, ndarray Y, bint sb, int maxepoch, int nthreads=1):
 
     return discriminants
 
+cdef __print(s):
+    """Like print(...) but pre-pends the current timestamp and forces a flush."""
+    import sys, datetime
+    print('%s %s'%(str(datetime.utcnow())[:19], s))
+    sys.stdout.flush()
+    
 cdef void fill_last_row_with_1(ndarray X):
     """
     Fills the last row of a double matrix with 1.0, like X[-1,:] = 1.0. Works with srided arrays.
@@ -565,9 +569,7 @@ cdef int UpdateDiscriminants_SB(c_dbl_p X, c_bool_p Y, const intp M, const intp 
                     updts[0] = 0;                  updts += 1
 
         totalerror = sqrt(totalerror/N)
-        with gil:
-            from datetime import datetime
-            print('%s        Epoch #%d error=%f' % (str(datetime.utcnow())[:19], e+1,totalerror))
+        with gil: __print('       Epoch #%d error=%f' % (e+1,totalerror))
 
     free(sample_order)
     free(prevupdates)
@@ -655,9 +657,7 @@ cdef int UpdateDiscriminants(c_dbl_p X, c_bool_p Y, const intp M, const intp N, 
                         prevs[j] = update
 
         totalerror = sqrt(totalerror/N)
-        with gil:
-            from datetime import datetime
-            print('%s        Epoch #%d error=%f' % (str(datetime.utcnow())[:19], e+1,totalerror))
+        with gil: __print('       Epoch #%d error=%f' % (e+1,totalerror))
 
     free(samp_order)
     free(prevupdates)

@@ -25,7 +25,6 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
     
     """
     from itertools import izip
-    from datetime import datetime
     from psutil import cpu_count
     from .utils import im2double, copy
 
@@ -52,7 +51,7 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
     ########## CHM Train Core ##########
     contexts, clabels = None, None # contexts and clabels are indexed by image-index then level
     for sm in model:
-        print('%s Training stage %d level %d...'%(str(datetime.utcnow())[:19],sm.stage,sm.level))
+        __print('Training stage %d level %d...'%(sm.stage,sm.level))
 
         ##### Update images, labels, contexts #####
         if sm.level == 0:
@@ -63,16 +62,16 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
             __downsample_images(ims, lbls, masks, contexts, clabels, nthreads)
 
         if sm.loaded:
-            print('%s   Skipping... (already complete)'%str(datetime.utcnow())[:19])
+            __print('  Skipping... (already completed)')
             __load_clabels(sm, clabels)
             continue
 
         ##### Feature Extraction #####
-        print('%s   Extracting features...'%str(datetime.utcnow())[:19])
+        __print('  Extracting features...')
         X_full, Y, M = __extract_features(sm, ims, lbls, masks, contexts, nthreads)
 
         ##### Learning the classifier #####
-        print('%s   Learning...'%str(datetime.utcnow())[:19])
+        __print('  Learning...')
         if M is None:
             # Convert to Fortran-ordered
             X = empty(X_full.shape, order='F')
@@ -88,14 +87,21 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
         del X, Y
 
         ##### Generate the outputs #####
-        print('%s   Generating outputs...'%str(datetime.utcnow())[:19])
+        __print('  Generating outputs...')
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)
 
     ########## Return final labels ##########
+    __print('Complete!')
     return [clbl[0] for clbl in clabels]
-
+    
+def __print(s):
+    """Like print(...) but pre-pends the current timestamp and forces a flush."""
+    import sys, datetime
+    print('%s %s'%(str(datetime.utcnow())[:19], s))
+    sys.stdout.flush()
+    
 def __get_all_shapes(shapes, nlvls):
     """Get the downsampled image shapes from the image shapes at level 0"""
     all_shapes = [None]*(nlvls+1)
