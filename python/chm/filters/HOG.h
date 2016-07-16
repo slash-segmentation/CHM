@@ -42,14 +42,14 @@ extern "C" {
 
 /**
  * HOG filtering.
- *   image is in pixels of w and h, must be C order
+ *   image is in pixels of w and h, must be C-contiguous
  *   out is where data is saved, it is n pixels long
  *   returns:
  *     -1 if out is not long enough
  *     -2 if temporary memory can't be allocated
  *     otherwise it returns the number of values written to out
  *
- * This essentially calls HOG_init then Hog_run.
+ * This essentially calls HOG_init then HOG_run.
  */
 ssize_t HOG(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, const ssize_t n);
 
@@ -63,11 +63,12 @@ ssize_t HOG_init(const ssize_t w, const ssize_t h, ssize_t *n);
 
 /**
  * The core code for the HOG filtering.
- *   image is in pixels of w and h, must be C order
+ *   image is in pixels of (w+2*padding)*(h+2*padding), must be C-contiguous
+ *     if padding is 0, data is implicitly padded with 0s; padding above 1 is pointless
  *   out is where data is saved, it must be at least n pixels long (the n from HOG_init)
  *   H is a temporary buffer with the number of elements returned by HOG_init
  */
-void HOG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H);
+void HOG_run(dbl_ptr_car pixels, const ssize_t w, const ssize_t h, dbl_ptr_ar out, dbl_ptr_ar H, const ssize_t padding);
 
 #ifdef __cplusplus
 }
