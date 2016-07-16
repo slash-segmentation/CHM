@@ -31,7 +31,7 @@ class HOG(Filter):
     Uses minimal intermediate memory.
     """
     
-    __compat = False
+    __compat = True
     
     def __init__(self, compat=False):
         super(HOG, self).__init__(7 if compat else 8, 36)

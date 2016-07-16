@@ -126,7 +126,7 @@ class MatlabModel(Model):
         """Get the fixed set of filters used by MATLAB models."""
         if cls.__filters is None:
             from .filters import FilterBank, Haar, HOG, Edge, Gabor, SIFT, Intensity
-            cls.__filters = FilterBank((Haar(True), HOG(), Edge(True), Gabor(True), SIFT(True), Intensity.Stencil(10)))
+            cls.__filters = FilterBank((Haar(True), HOG(True), Edge(True), Gabor(True), SIFT(True), Intensity.Stencil(10)))
             cls.__cntxt_fltr = Intensity.Stencil(7)
         return cls.__filters, MatlabModel.__cntxt_fltr
 
