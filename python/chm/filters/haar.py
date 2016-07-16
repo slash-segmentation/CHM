@@ -15,7 +15,8 @@ class Haar(Filter):
     """
     Computes the Haar-like features of the image. This produces Viola and Jones's 2-rectangle
     features (x and y directional features). It uses their method of computing the integral image
-    first and then using fast lookups to get the features.
+    first and then using fast lookups to get the features. The rectangles are 16-pixels on each
+    side.
 
     The compat flag causes slower computations but reduces the drift errors compared to the MATLAB
     output. Additionally, with compat set to False there is no longer an arbitrary value added to
