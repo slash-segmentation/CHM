@@ -29,7 +29,6 @@ from .intensity import Intensity
 
 ##### OPTIMIZATIONS #####
 # Reduce padding:
-#   HOG  (+1 due to the algorithm zero-padding every block)
 #   SIFT (+3? has lots of correlate1d's)
 #
 # Could further optimize reflective padding by not actually adding padding but instead use the
@@ -45,7 +44,6 @@ from .intensity import Intensity
 #   SIFT (at least during the final normalization step and has 128 features!)
 #
 # Other optimizations/fixes:
-#   Edge  if out exists, could an intermediate be avoided?
 #   Gabor don't precompute division?
 #   SIFT  **lots of work needed
 #   Inten all DOUBLE_PTR_R and DOUBLE_PTR_CR should be aligned (A) but doing so causes illegal
