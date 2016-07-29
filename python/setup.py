@@ -46,14 +46,14 @@ def create_ext(name, dep=[], src=[], inc=[], lib=[]):
         language='c++',
     )
 
-if __name__ == '__main__':
-    setup(name='chm',
+
+setup(name='chm',
           version='%s'%chm.__version__,
           description='Cascaded Hierarchical Model - an image segmentation framework',
           author='Jeffrey Bush',
           author_email='jeff@coderforlife.com',
           url='https://www.sci.utah.edu/software/chm.html',
-          packages=['chm'],
+          packages=['chm', 'chm.filters'],
           install_requires=['numpy>=1.7','scipy>=0.16','cython>=0.22','pysegtools[MATLAB]>=0.1'],
           extras_require={ 'OPT': ['pyfftw>=0.10'], },
           use_2to3=True, # the code *should* support Python 3 once run through 2to3 but this isn't tested
