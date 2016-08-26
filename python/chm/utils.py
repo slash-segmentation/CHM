@@ -302,7 +302,6 @@ def copy_flat(dst, src, nthreads=1):
     """
     Copies all of the data from one array to another array of the same size even if they don't have
     the same shape. This is performed with only a small amount of extra copying and memory.
-    Currently nthreads is ignored but provided so that when/if it is available in the future.
     """
     try:
         # If the shape is directly convertible without creating a copy
@@ -372,7 +371,7 @@ def set_lib_threads(nthreads):
     for the OpenMP, BLAS, and MKL libraries. If this cannot determine the location of the
     libraries, it does nothing.
     """
-    global __set_num_thread_funcs #pylint: disable=global-statement
+    global __set_num_thread_funcs, __last_set_num_threads #pylint: disable=global-statement
     if __set_num_thread_funcs is None:
         import os, sys
         __set_num_thread_funcs = []
@@ -381,11 +380,14 @@ def set_lib_threads(nthreads):
         elif sys.platform == 'darwin': __init_set_library_threads_darwin()
         elif os.name == 'posix':       __init_set_library_threads_posix()
     nthreads = int(nthreads)
-    for f in __set_num_thread_funcs:
-        try: f(nthreads)
-        except OSError: pass
+    if __last_set_num_threads is None or __last_set_num_threads != nthreads:
+        for f in __set_num_thread_funcs:
+            try: f(nthreads)
+            except OSError: pass
+    __last_set_num_threads = nthreads
         
 __set_num_thread_funcs = None
+__last_set_num_threads = None
 def __add_set_num_threads_func(dll, func='omp_set_num_threads', ref=False):
     """
     Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll` (which
