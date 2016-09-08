@@ -3,9 +3,12 @@
 
 """
 HOG filter written in Cython and C. This was originally in MEX (MATLAB's Cython-like system) and
-C++. Improved speed, added multi-threading, and increased accuracy.
+C++. Improved speed, added multi-threading, and increased accuracy. Additionally, an entirely new
+version was created (named hog_new) which runs faster and implements the algorithm much more
+accurately than the MATLAB version.
 
-Most of the code is in a separate C++ file.
+Most of the MATLAB code is in a separate C++ file. The new Cython version is completely in this
+file.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -18,9 +21,9 @@ from __future__ import print_function
 include "filters.pxi"
 
 from libc.stdlib cimport malloc, free
-from libc.math cimport ceil, floor
-from cython.parallel cimport parallel
-from openmp cimport omp_get_num_threads, omp_get_thread_num
+from libc.string cimport memset, memcpy
+from libc.math cimport M_PI, sqrt, atan
+from cython.parallel cimport parallel, prange
 from cython.view cimport contiguous
 
 ##### MATLAB Compatible Version #####
@@ -139,25 +142,25 @@ def hog_entire(ndarray im not None, int filt_width=15, bint compat=True, ndarray
     cdef DOUBLE_PTR_AR tmp = <DOUBLE_PTR_AR>malloc(nthreads * tmp_n * sizeof(double))
     if tmp is NULL: raise MemoryError()
     
-    cdef intp a, b
+    cdef Range r
     with nogil:
         if nthreads == 1:
             success = generic_filter(im_mv, <filter_func>&HOG_run, tmp, filt_width, pad, out_mv)
         else:
             # This uses OpenMP to do the multi-processing
             with parallel(num_threads=nthreads):
-                a = get_range(H, &b);
-                if not generic_filter(im_mv[a:b+fw_1,:], <filter_func>&HOG_run,
+                r = get_thread_range(H);
+                if not generic_filter(im_mv[r.start:r.stop+fw_1,:], <filter_func>&HOG_run,
                                       tmp+omp_get_thread_num()*tmp_n,
-                                      filt_width, pad, out_mv[:,a:b,:]):
+                                      filt_width, pad, out_mv[:,r.start:r.stop,:]):
                     success_p[0] = False
 
         ## This can be done without OpenMP as well but instead with Python threads, with very little penalty
         #from threading import Thread
         #def thread(intp i):
-        #    cdef intp b, a = get_range(H, &b)
-        #    cdef double[:, :] im = im_mv[a:b+fw_1,:]
-        #    cdef double[:,:,::contiguous] out = out_mv[:,a:b,:]
+        #    cdef Range r = get_thread_range(H)
+        #    cdef double[:, :] im = im_mv[r.start:r.stop+fw_1,:]
+        #    cdef double[:,:,::contiguous] out = out_mv[:,r.start:r.stop,:]
         #    with nogil:
         #        if not generic_filter(im, <filter_func>&HOG_run, tmp+omp_get_thread_num()*tmp_n,
         #                              filt_width, pad, out):
@@ -172,3 +175,178 @@ def hog_entire(ndarray im not None, int filt_width=15, bint compat=True, ndarray
    
     if not success: raise MemoryError()
     return out
+
+    
+##### New Python Version #####
+DEF CELL_SIZE=8
+DEF BLOCK_SIZE=2
+DEF NBINS=9
+DEF UNSIGNED_ANGLES=True
+DEF NORM='L2-hys' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
+DEF CLIP_VAL=0.2 # only used if NORM is 'L2-hys'
+DEF NFEATURES=BLOCK_SIZE*BLOCK_SIZE*NBINS
+
+def hog_new(double[:,::contiguous] im, ndarray out=None, int nthreads=1):
+    """
+    The HOG filter over the entire image written entirely in Cython. Instead of using a
+    generic-filter approach this calculates the histogram for every pixel first then normalizes
+    them. This does take more memory as the entire histogram must be stored in memory. This
+    temporary memory is approximately im.size*NBINS (with NBINS being 9). The overall speedup is
+    around 30-35x faster. This algorithm also generates results closer to the original description
+    of the algorithm instead of having several problems that hog_entire has (even when compat is
+    False).
+    
+    Some other changes are that the filter width is fixed at compile-time to 18 which is larger
+    than for hog_entire (which is due to the fact that hog_entire isn't actually correctly
+    implemented).
+    """
+    # Get the height and width of the image, the intemediate histogram, and the output
+    cdef intp H = im.shape[0], W = im.shape[1]
+    cdef intp H_hist = H-CELL_SIZE-1, W_hist = W-CELL_SIZE-1
+    cdef intp H_out = H_hist-CELL_SIZE*(BLOCK_SIZE-1), W_out = W_hist-CELL_SIZE*(BLOCK_SIZE-1)
+    
+    # Make sure each thread is doing at least 64 rows
+    nthreads = get_nthreads(nthreads, H_out // 64)
+    
+    # Allocate the intermediate histogram array and output array
+    cdef double[:,:,::1] hist = PyArray_ZEROS(3, [H_hist, W_hist, NBINS], NPY_DOUBLE, False)
+    out = get_out(out, NFEATURES, H_out, W_out)
+    cdef double[:,:,:] out_mv = out
+
+    # Allocate the temporary blocks used in normalize
+    cdef double* blocks = <double*>malloc(NFEATURES*nthreads*sizeof(double))
+    if blocks is NULL: raise MemoryError()
+
+    # Allocate the temporary stop positions for dealing with overlaps
+    cdef intp* stops = <intp*>memset(malloc(nthreads*sizeof(intp)), 0, nthreads*sizeof(intp))
+    if stops is NULL: free(blocks); raise MemoryError()
+
+    # Perform the calculations using __gradients and __normalize
+    cdef Range r
+    cdef intp i
+    with nogil:
+        if nthreads == 1:
+            __gradients(im, 1, H-1, hist)
+            __normalize(hist, 0, H_out, blocks, out_mv)
+        else:
+            # Calculate the gradients except for the CELL_SIZE regions between the chunks
+            with parallel(num_threads=nthreads):
+                r = get_thread_range(H-2)
+                stops[omp_get_thread_num()] = r.stop+1
+                __gradients(im, r.start+1, (r.stop if r.stop == (H-2) else r.stop-CELL_SIZE)+1, hist)
+            # Calculate the gradiatents in the CELL_SIZE regions between chunks
+            for i in prange(nthreads, num_threads=nthreads):
+                if stops[i] != 0 and stops[i] != H-1: __gradients(im, stops[i]-CELL_SIZE, stops[i], hist)
+            # Normalize the histogram data
+            with parallel(num_threads=nthreads):
+                r = get_thread_range(H_out)
+                __normalize(hist, r.start, r.stop, blocks + omp_get_thread_num()*NFEATURES, out_mv)
+
+    free(blocks)
+    free(stops)
+    return out
+    
+cdef void __gradients(double[:,::contiguous] im, intp a, intp b, double[:,:,::1] hist) nogil:
+    """
+    Calculates all gradients from row a to b in the given image outputing the sum of magnitudes
+    for each bin into the histogram.
+    
+    This function is not thread-safe with respect to the hist argument. It does a += on elements in
+    the histogram between a-CELL_SIZE to b. When this is called with several threads with the same
+    histogram, the last CELL_SIZE rows of the chunk before must be handled very carefully.
+    """
+    cdef intp W = im.shape[1], H_hist = hist.shape[0], W_hist = hist.shape[1]
+    cdef intp y, x, i, j, i_start, i_end, j_start, j_end, obin
+    cdef double mag
+    for y in xrange(a, b):
+        i_start = max(y-CELL_SIZE, 0)
+        i_end   = min(y, H_hist)
+        for x in xrange(1, W-1):
+            j_start = max(x-CELL_SIZE, 0)
+            j_end   = min(x, W_hist)
+            obin = __gradient(im, y, x, &mag)
+            for i in xrange(i_start, i_end):
+                for j in xrange(j_start, j_end):
+                    hist[i,j,obin] += mag # TODO: BAD PARALLEL MEMORY ACCESS HERE
+
+cdef inline intp __gradient(double[:,::contiguous] im, intp y, intp x, double* mag) nogil:
+    """
+    Calculates the gradient for a single pixel in the given image and returns the orientation bin
+    along with setting the mag argument.
+    """
+    cdef double dx = im[y,x+1] - im[y,x-1]
+    cdef double dy = im[y+1,x] - im[y-1,x]
+    mag[0] = sqrt(dx*dx + dy*dy)
+    cdef double ornt
+    IF UNSIGNED_ANGLES:
+        #ornt = atan2(dy, dx); ornt %= M_PI
+        #ornt = atan2(dy, dx); ornt += (ornt<0)*M_PI
+        if dx == 0: ornt = 0 if y == 0 else M_PI/2
+        else: ornt = atan(dy/dx); ornt += (ornt<0)*M_PI
+        return <intp>(ornt*NBINS/M_PI)
+    ELSE:
+        ornt = atan2(dy, dx) + M_PI
+        return <intp>(ornt*NBINS/(2*M_PI))
+
+cdef void __normalize(double[:,:,::1] hist, intp a, intp b, double* block, double[:,:,:] out) nogil:
+    """
+    Normalizes all HOG blocks from rows a to b in the given histogram outputing to out. The
+    argument block for temporary memory.
+    """
+    cdef intp W = out.shape[2], y, x, i, j
+    for y in xrange(a, b):
+        for x in xrange(W):
+            for i in xrange(BLOCK_SIZE):
+                for j in xrange(BLOCK_SIZE):
+                    memcpy(block+(i*BLOCK_SIZE+j)*NBINS,
+                           &hist[y+CELL_SIZE*i, x+CELL_SIZE*j, 0],
+                           NBINS*sizeof(double))
+            __norm(block)
+            for i in xrange(NFEATURES): out[i,y,x] = block[i]
+
+IF NORM == 'L2-hys':
+    cdef inline void __norm(double* block) nogil:
+        """
+        Normalizes a HOG block using the L2-hys norm which normalizes using the L2-norm first,
+        clips all values above 0.2 down to 0.2 and then re-normalizes using the L2-norm again.
+        """
+        cdef intp i
+        cdef double norm = 0.0, norm_2 = 0.0
+        for i in xrange(NFEATURES): norm += block[i]*block[i]
+        if norm != 0.0:
+            norm = 1.0 / sqrt(norm)
+            for i in xrange(NFEATURES):
+                block[i] *= norm
+                if block[i] >= CLIP_VAL: block[i] = CLIP_VAL
+                norm_2 += block[i]*block[i]
+        if norm_2 != 0.0:
+            norm_2 = 1.0 / sqrt(norm_2)
+            for i in xrange(NFEATURES): block[i] *= norm_2
+        else: memset(block, 0, NFEATURES*sizeof(double))
+ELIF NORM == 'L2-norm':
+    cdef inline void __norm(double* block) nogil:
+        """
+        Normalizes a HOG block using the L2-norm which divides every value by sqrt(sum(x**2)).
+        """
+        cdef intp i
+        cdef double norm = 0.0
+        for i in xrange(NFEATURES): norm += block[i]*block[i]
+        if norm != 0.0:
+            norm = 1.0 / sqrt(norm)
+            for i in xrange(NFEATURES): block[i] *= norm
+        else: memset(block, 0, NFEATURES*sizeof(double))
+ELSE:
+    cdef inline void __norm(double* block) nogil:
+        """
+        Normalizes a HOG block using either the L1-norm which divides every value by sum(x) or the
+        L1-sqrt norm then takes the sqrt of the normalized value.
+        """
+        cdef intp i
+        cdef double norm = 0.0
+        for i in xrange(NFEATURES): norm += block[i]
+        if norm != 0.0:
+            norm = 1.0 / norm
+            for i in xrange(NFEATURES):
+                IF NORM == 'L1-norm': block[i] *= norm
+                ELSE:                 block[i] = sqrt(block[i]*norm) # IF NORM == 'L1-sqrt':
+        else: memset(block, 0, NFEATURES*sizeof(double))

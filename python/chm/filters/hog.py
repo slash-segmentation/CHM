@@ -1,5 +1,5 @@
 """
-HOG Filter. Mostly implemented in Cython and C++.
+HOG Filter. Mostly implemented in Cython and/or C++.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -18,28 +18,48 @@ class HOG(Filter):
     
     This uses cells of 8x8 pixels and blocks of 2x2 cells. Each cell uses 9 orientation bins,
     covering angles from 0 to pi (unsigned). Each block is normalized using the L2-hys norm,
-    clipping at 0.2 before renomarlizing. The 36 features come from the 9 orientation bins for each
+    clipping at 0.2 before renormalizing. The 36 features come from the 9 orientation bins for each
     of the 4 cells per block.
 
-    The compat mode adds an implicit 0-padding on each 15x15 region that the HOG filter is
-    calculated for. In non-compat mode, only pixels along the edge of the image have any padding
-    and it is a reflection padding instead of 0-padding.
-
-    Note that the original used float32 values for many intermediate values so the outputs from
-    this function are understandably off by up to 1e-7 even in compat mode.
-
-    Uses minimal intermediate memory.
+    There are significant differences in compat and non-compat mode. In compat mode this uses a
+    15x15 region for each each output which means that the entire 16x16 region is not completely
+    covered and an implicit padding of 0s must be added to calculate the final row and column and
+    the gradients for the values on the edges.
+    
+    In non-compat the filter size is instead 18x18 allowing for the entire 16x16 region and the
+    gradients along the edge to get all of the data they need. This is much more accurate to the
+    original description of the algorithm.
+    
+    They also take different approached while caclulating the data. In compat mode each output
+    pixel is calculated at once while in non-compat mode the entire histogram is calculated first
+    for all pixels then each block is normalized and saved to the output pixel. This has the
+    benefit of being much faster (about 30-35x faster) but takes more memory. While the compat mode
+    uses minimal intermediate memory the non-compat mode uses O(9*im.size) in temporary memory.
+    
+    The scale flag causes the output data to be multiplied by 3.75, resulting in most data being in
+    the range 0 to 1 with a mean of 0.5 (the unscaled theoretical range is 0 to 1, but the vast
+    majority of data is only from 0 to 0.265). It defaults to the opposite of the compat flag.
+    
+    Note that the original MATLAB function used float32 values for many intermediate values so the
+    outputs from this function are understandably off by up to 1e-7 even in compat mode.
     """
-    
+    # Defaults for Python models created before these flags were added
     __compat = True
+    __scale = False
     
-    def __init__(self, compat=False):
-        super(HOG, self).__init__(7 if compat else 8, 36)
+    def __init__(self, compat=False, scale=None):
+        super(HOG, self).__init__(7 if compat else 9, 36)
         self.__compat = compat
-        
+        self.__scale = (not compat) if scale is None else scale
+    
     def __call__(self, im, out=None, region=None, nthreads=1):
-        # TODO: there is a pre-computed division in the C code, should it be kept?
         from ._base import get_image_region
-        from ._hog import hog_entire #pylint: disable=no-name-in-module
-        im, region = get_image_region(im, self.padding, region)
-        return hog_entire(im, 15, self.__compat, out, nthreads)
+        from ._hog import hog_entire, hog_new #pylint: disable=no-name-in-module
+        im, region = get_image_region(im, self._padding, region)
+        if self.__compat:
+            # TODO: there is a pre-computed division in the C code, should it be kept?
+            out = hog_entire(im, 15, True, out, nthreads)
+        else:
+            out = hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding
+        if self.__scale: out *= 3.75
+        return out
