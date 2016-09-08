@@ -75,8 +75,7 @@ def learn(ndarray X, ndarray Y, bint sb, int maxepoch, int nthreads=1):
 
     cdef int n_disc = n_group*n_dpg
     cdef PyArray_Dims shape
-    cdef intp dims[2]
-    dims[0] = n_feats; dims[1] = n_disc; shape.len = 2; shape.ptr = dims
+    shape.len = 2; shape.ptr = [n_feats, n_disc]
     cdef ndarray discriminants = PyArray_Newshape(pos[:,:,None] - neg[:,None,:], &shape, NPY_CORDER)
     cdef ndarray centroids     = PyArray_Newshape(pos[:,:,None] + neg[:,None,:], &shape, NPY_CORDER)
     del pos, neg
@@ -158,10 +157,7 @@ cdef ndarray calc_kmeans(int k, ndarray X, ndarray Y):
         print('%d < %d'%(n_trues,k))
         raise ValueError('Not enough data - either increase the data size or lower the number of levels')
     cdef bint downsample = n_trues > k*CLUSTER_DOWNSAMPLE
-    cdef intp[2] dims
-    dims[0] = m
-    dims[1] = (n_trues+CLUSTER_DOWNSAMPLE-1)//CLUSTER_DOWNSAMPLE if downsample else n_trues
-    cdef ndarray Z = PyArray_EMPTY(2, dims, NPY_DOUBLE, True) # X.take(flatnonzero(Y), 1)  (possibly downsampled)
+    cdef ndarray Z = PyArray_EMPTY(2, [m, (n_trues+CLUSTER_DOWNSAMPLE-1)//CLUSTER_DOWNSAMPLE if downsample else n_trues], NPY_DOUBLE, True) # X.take(flatnonzero(Y), 1)  (possibly downsampled)
     cdef dbl_p x = <dbl_p>PyArray_DATA(X)
     cdef dbl_p z = <dbl_p>PyArray_DATA(Z)
     if downsample:
@@ -272,9 +268,7 @@ cdef ndarray kmeansML(int k, ndarray data):
     data = PyArray_Transpose(data, NULL)
     # data is n x d (after transpose above)
     cdef int n = PyArray_DIM(data, 0), d = PyArray_DIM(data, 1)
-    cdef intp[2] dims
-    dims[0] = k; dims[1] = d
-    cdef ndarray means = PyArray_EMPTY(2, dims, NPY_DOUBLE, False)
+    cdef ndarray means = PyArray_EMPTY(2, [k, d], NPY_DOUBLE, False)
     cdef int_p membership = <int_p>malloc(n*max(sizeof(double),sizeof(int)))
     cdef int_p counts     = <int_p>malloc(k*sizeof(int))
     cdef dbl_p temp       = <dbl_p>malloc(n*k*sizeof(double))
@@ -378,11 +372,9 @@ cdef int __kmeansML(int k, ndarray data, ndarray means, int retry,
 cdef ndarray random_subset(ndarray data, Py_ssize_t n, ndarray out = None):
     """Takes a random n rows from the C-ordered data array."""
     cdef intp total = PyArray_DIM(data, 0), m = PyArray_DIM(data, 1), i
-    cdef intp[2] dims
     assert total >= n
     if out is None:
-        dims[0] = n; dims[1] = m
-        out = PyArray_EMPTY(2, dims, NPY_DOUBLE, False)
+        out = PyArray_EMPTY(2, [n, m], NPY_DOUBLE, False)
     cdef intp* inds = <intp*>malloc(total*sizeof(intp))
     if inds is NULL: raise MemoryError()
     for i in xrange(total): inds[i] = i

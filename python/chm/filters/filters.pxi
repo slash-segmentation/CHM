@@ -20,10 +20,8 @@ cdef inline ndarray get_out(ndarray out, intp N, intp H, intp W):
     If out is None then a new array is created and returned. If it is not None and doesn't meet the
     requirements, a ValueError is raised.
     """
-    cdef intp[3] dims
     if out is None:
-        dims[0] = N; dims[1] = H; dims[2] = W
-        return PyArray_EMPTY(3, dims, NPY_DOUBLE, False)
+        return PyArray_EMPTY(3, [N, H, W], NPY_DOUBLE, False)
     elif not PyArray_ISBEHAVED(out) or PyArray_TYPE(out) != NPY_DOUBLE or PyArray_NDIM(out) != 3 or \
          PyArray_DIM(out, 0) != N or PyArray_DIM(out, 1) != H or PyArray_DIM(out, 2) != W or \
          PyArray_STRIDE(out, 1) != <intp>(W*sizeof(double)) or PyArray_STRIDE(out, 2) != sizeof(double):

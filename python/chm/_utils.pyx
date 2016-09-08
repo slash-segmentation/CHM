@@ -89,10 +89,8 @@ def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint preci
         raise ValueError('Invalid input arrays')
     
     # Check output
-    cdef intp[2] dims
     if out is None:
-        dims[0] = H; dims[1] = W
-        out = PyArray_EMPTY(2, dims, NPY_DOUBLE, False)
+        out = PyArray_EMPTY(2, [H, W], NPY_DOUBLE, False)
     elif not PyArray_ISBEHAVED(out) or PyArray_TYPE(out) != NPY_DOUBLE or PyArray_NDIM(out) != 2 or \
          PyArray_DIM(out, 0) != H or PyArray_DIM(out, 1) != W or PyArray_STRIDE(out, 1) != sizeof(double):
         raise ValueError('Invalid output array')

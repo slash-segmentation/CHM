@@ -48,8 +48,7 @@ def intensity(ndarray im, ndarray offsets, ndarray out=None, tuple region=None, 
     cdef intp out_stride = PyArray_STRIDE(out, 0)
 
     # Get the image rows, including the reflected ones
-    cdef intp n_rows = H+T_rad+B_rad
-    cdef ndarray im_rows = PyArray_EMPTY(1, &n_rows, NPY_INTP, False)
+    cdef ndarray im_rows = PyArray_EMPTY(1, [H+T_rad+B_rad], NPY_INTP, False)
     cdef const char** irp = <const char**>PyArray_DATA(im_rows)
     cdef const char* im_p = <const char*>PyArray_DATA(im)
     cdef pre_y  = clip_neg( T_rad-T)

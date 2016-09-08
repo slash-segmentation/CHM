@@ -28,9 +28,7 @@ def orientations(double[:,::1] im_mag not None,
     
     # make orientation images
     # for each histogram angle
-    cdef intp[3] dims
-    dims[0] = num_angles; dims[1] = H; dims[2] = W
-    cdef ndarray out = PyArray_EMPTY(3, dims, NPY_DOUBLE, False) # INTERMEDIATE: 8 * im.shape
+    cdef ndarray out = PyArray_EMPTY(3, [num_angles, H, W], NPY_DOUBLE, False) # INTERMEDIATE: 8 * im.shape
     cdef double[:,:,::1] im_orientation = out
     for a in prange(num_angles, nogil=True, schedule='static', num_threads=nthreads):
         # compute each orientation channel

@@ -66,10 +66,8 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     if sigma <= 0.0: raise ValueError('Invalid sigma')
     cdef intp padding = <intp>(3.0*sigma+0.5)
     cdef intp H = PyArray_DIM(im, 0) - 2*padding, W = PyArray_DIM(im, 1) - 2*padding
-    cdef intp[2] dims
     if out is None:
-        dims[0] = H; dims[1] = W
-        out = PyArray_EMPTY(2, dims, NPY_DOUBLE, False)
+        out = PyArray_EMPTY(2, [H, W], NPY_DOUBLE, False)
     elif not PyArray_ISBEHAVED(out) or PyArray_TYPE(out) != NPY_DOUBLE or PyArray_NDIM(out) != 2 \
          or PyArray_DIM(out, 0) != H or PyArray_DIM(out, 1) != W or PyArray_STRIDE(out, 1) != sizeof(dbl):
         raise ValueError('Invalid output array')
