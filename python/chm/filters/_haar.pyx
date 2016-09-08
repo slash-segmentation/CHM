@@ -15,9 +15,7 @@ from __future__ import print_function
 
 include "filters.pxi"
 
-from libc.math cimport floor
 from cython.parallel cimport parallel
-from openmp cimport omp_get_thread_num, omp_get_num_threads
 
 def cc_cmp_II(ndarray im not None):
     """
@@ -87,17 +85,12 @@ def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads
     if compat: cc_Haar_features = cc_Haar_features_compat
     else:      cc_Haar_features = cc_Haar_features_core
     
-    cdef intp a, b, i
-    cdef double inc
+    cdef intp a, b
     with nogil:
         if nthreads == 1: cc_Haar_features(II_p, H, W, S, X, Y)
         else:
             with parallel(num_threads=nthreads):
-                i = omp_get_thread_num()
-                nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = H / <double>nthreads # a floating point number, use the floor of adding it together
-                a = <intp>floor(inc*i)
-                b = H if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
+                a = get_range(H, &b)
                 cc_Haar_features(II_p+a*II_W, b-a, W, S, X+a*W, Y+a*W)
     return out
 

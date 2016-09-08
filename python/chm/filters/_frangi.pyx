@@ -18,9 +18,8 @@ include "filters.pxi"
 
 from libc.stdlib cimport malloc, free
 from libc.string cimport memset
-from libc.math cimport floor, fabs, sqrt, exp, M_PI
+from libc.math cimport fabs, sqrt, exp, M_PI
 from cython.parallel cimport parallel
-from openmp cimport omp_get_num_threads, omp_get_thread_num
 
 ctypedef npy_double dbl
 ctypedef dbl* dbl_p
@@ -87,8 +86,7 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     assert PyArray_STRIDE(Dxx, 1) == sizeof(dbl) and PyArray_STRIDE(Dxy, 1) == sizeof(dbl) and PyArray_STRIDE(Dyy, 1) == sizeof(dbl)
     
     # Get ready to calculate the vesselness
-    cdef intp a, b, i, _nthreads, stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
-    cdef double inc
+    cdef intp a, b, stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
     cdef dbl_p pDxx = <dbl_p>PyArray_DATA(Dxx), pDxy = <dbl_p>PyArray_DATA(Dxy), pDyy = <dbl_p>PyArray_DATA(Dyy)
     cdef dbl_p lam1 = pDxx, lam2 = pDxy # re-use pDxx and pDxy for lambda1 and lambda2
     cdef dbl_p pOut = <dbl_p>PyArray_DATA(out), C
@@ -106,12 +104,8 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
                 with gil: raise MemoryError()
             memset(C, 0, nthreads*sizeof(dbl))
             with parallel(num_threads=nthreads):
-                i = omp_get_thread_num()
-                _nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = H / <double>_nthreads # a floating point number, use the floor of adding it together
-                a = <intp>floor(inc*i)
-                b = H if i == _nthreads-1 else (<intp>floor(inc*(i+1)))
-                C[i] = eigvals(b-a, W, stride, pDxx+a, pDxy+a, pDyy+a)
+                a = get_range(H, &b)
+                C[omp_get_thread_num()] = eigvals(b-a, W, stride, pDxx+a, pDxy+a, pDyy+a)
             for i in xrange(nthreads):
                 if C[i] > c: c = C[i]
             free(C)
@@ -119,11 +113,7 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
         
             ## Calculate the vesselness
             with parallel(num_threads=nthreads):
-                i = omp_get_thread_num()
-                nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = H / <double>nthreads # a floating point number, use the floor of adding it together
-                a = <intp>floor(inc*i)
-                b = H if i == nthreads-1 else (<intp>floor(inc*(i+1)))
+                a = get_range(H, &b)
                 vesselness(b-a, W, stride, out_stride, lam1+a, lam2+a, pOut+a, c)
 
     # Return output
