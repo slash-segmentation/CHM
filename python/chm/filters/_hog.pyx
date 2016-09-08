@@ -139,32 +139,28 @@ def hog_entire(ndarray im not None, int filt_width=15, bint compat=True, ndarray
     cdef DOUBLE_PTR_AR tmp = <DOUBLE_PTR_AR>malloc(nthreads * tmp_n * sizeof(double))
     if tmp is NULL: raise MemoryError()
     
-    cdef intp a, b, i
-    cdef double inc
+    cdef intp a, b
     with nogil:
         if nthreads == 1:
             success = generic_filter(im_mv, <filter_func>&HOG_run, tmp, filt_width, pad, out_mv)
         else:
             # This uses OpenMP to do the multi-processing
             with parallel(num_threads=nthreads):
-                i = omp_get_thread_num()
-                nthreads = omp_get_num_threads() # in case there is a difference...
-                inc = H / <double>nthreads # a floating point number, use the floor of adding it together
-                a = <intp>floor(inc*i)
-                b = H if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
+                a = get_range(H, &b);
                 if not generic_filter(im_mv[a:b+fw_1,:], <filter_func>&HOG_run,
-                                      tmp+i*tmp_n, filt_width, pad, out_mv[:,a:b,:]):
+                                      tmp+omp_get_thread_num()*tmp_n,
+                                      filt_width, pad, out_mv[:,a:b,:]):
                     success_p[0] = False
 
         ## This can be done without OpenMP as well but instead with Python threads, with very little penalty
         #from threading import Thread
         #def thread(intp i):
-        #    cdef double inc = H / <double>nthreads
-        #    cdef intp a = floor(inc*i), b = H if i == nthreads - 1 else floor(inc*(i+1))
+        #    cdef intp b, a = get_range(H, &b)
         #    cdef double[:, :] im = im_mv[a:b+fw_1,:]
         #    cdef double[:,:,::contiguous] out = out_mv[:,a:b,:]
         #    with nogil:
-        #        if not generic_filter(im, <filter_func>&HOG_run, tmp+i*tmp_n, filt_width, pad, out):
+        #        if not generic_filter(im, <filter_func>&HOG_run, tmp+omp_get_thread_num()*tmp_n,
+        #                              filt_width, pad, out):
         #            success = False
         #threads = [None] * nthreads
         #for i in xrange(nthreads):
