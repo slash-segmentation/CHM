@@ -39,15 +39,18 @@ cdef inline int get_nthreads(int nthreads, intp max_threads) nogil:
     if nthreads > omp_get_max_threads(): nthreads = omp_get_max_threads()
     return 1 if nthreads < 1 else nthreads
 
-cdef inline intp get_range(intp N, intp* stop) nogil:
+cdef struct Range:
+    intp start, stop
+    
+cdef inline Range get_thread_range(intp N) nogil:
     """
     Gets the range of values that should be iterated over for this thread. Overall range is from
-    0 to N. The start of the range is returned and the argument stop is set to the (non-inclusive)
-    stopping point of the range.
+    0 to N. A Range object is returned which has start and stop (inclusive and exclusive
+    respectively).
     """
-    cdef intp i = omp_get_thread_num()
-    cdef intp nthreads = omp_get_num_threads() # in case there is a difference...
+    cdef intp i = omp_get_thread_num(), nthreads = omp_get_num_threads() # might be a difference...
     cdef double inc = N / <double>nthreads # a floating point number, use the floor of adding it together
-    stop[0] = N if i == nthreads-1 else (<intp>floor(inc*(i+1)))
-    return <intp>floor(inc*i)
-    
+    cdef Range r
+    r.start = <intp>floor(inc*i)
+    r.stop = N if i == nthreads-1 else (<intp>floor(inc*(i+1)))
+    return r

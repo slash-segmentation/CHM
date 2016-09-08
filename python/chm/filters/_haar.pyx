@@ -85,13 +85,13 @@ def cc_Haar_features(ndarray II not None, intp S, ndarray out=None, int nthreads
     if compat: cc_Haar_features = cc_Haar_features_compat
     else:      cc_Haar_features = cc_Haar_features_core
     
-    cdef intp a, b
+    cdef Range r
     with nogil:
         if nthreads == 1: cc_Haar_features(II_p, H, W, S, X, Y)
         else:
             with parallel(num_threads=nthreads):
-                a = get_range(H, &b)
-                cc_Haar_features(II_p+a*II_W, b-a, W, S, X+a*W, Y+a*W)
+                r = get_thread_range(H)
+                cc_Haar_features(II_p+r.start*II_W, r.stop-r.start, W, S, X+r.start*W, Y+r.start*W)
     return out
 
 ctypedef void (*cc_Haar_features_func)(DOUBLE_PTR_CAR II, intp H, intp W, intp S, DOUBLE_PTR_AR X, DOUBLE_PTR_AR Y) nogil

@@ -84,7 +84,8 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     assert PyArray_STRIDE(Dxx, 1) == sizeof(dbl) and PyArray_STRIDE(Dxy, 1) == sizeof(dbl) and PyArray_STRIDE(Dyy, 1) == sizeof(dbl)
     
     # Get ready to calculate the vesselness
-    cdef intp a, b, stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
+    cdef Range r
+    cdef intp stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
     cdef dbl_p pDxx = <dbl_p>PyArray_DATA(Dxx), pDxy = <dbl_p>PyArray_DATA(Dxy), pDyy = <dbl_p>PyArray_DATA(Dyy)
     cdef dbl_p lam1 = pDxx, lam2 = pDxy # re-use pDxx and pDxy for lambda1 and lambda2
     cdef dbl_p pOut = <dbl_p>PyArray_DATA(out), C
@@ -102,8 +103,9 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
                 with gil: raise MemoryError()
             memset(C, 0, nthreads*sizeof(dbl))
             with parallel(num_threads=nthreads):
-                a = get_range(H, &b)
-                C[omp_get_thread_num()] = eigvals(b-a, W, stride, pDxx+a, pDxy+a, pDyy+a)
+                r = get_thread_range(H)
+                C[omp_get_thread_num()] = eigvals(r.stop-r.start, W, stride,
+                                                  pDxx+r.start, pDxy+r.start, pDyy+r.start)
             for i in xrange(nthreads):
                 if C[i] > c: c = C[i]
             free(C)
@@ -111,8 +113,9 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
         
             ## Calculate the vesselness
             with parallel(num_threads=nthreads):
-                a = get_range(H, &b)
-                vesselness(b-a, W, stride, out_stride, lam1+a, lam2+a, pOut+a, c)
+                r = get_thread_range(H)
+                vesselness(r.stop-r.start, W, stride, out_stride,
+                           lam1+r.start, lam2+r.start, pOut+r.start, c)
 
     # Return output
     return out

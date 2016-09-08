@@ -19,9 +19,8 @@ include "filters/filters.pxi"
 
 ctypedef double* dbl_p
 
-from libc.math cimport floor, sqrt, hypot
+from libc.math cimport sqrt, hypot
 from cython.parallel cimport parallel
-from openmp cimport omp_get_num_threads, omp_get_thread_num
 
 def par_copy(dst, src, int nthreads):
     """
@@ -30,17 +29,13 @@ def par_copy(dst, src, int nthreads):
     """
     if dst.shape != src.shape: raise ValueError('dst and src must be same shape')
     nthreads = get_nthreads(nthreads, dst.size // 100000000)
-    cdef double inc
-    cdef intp N = dst.shape[0], a, b, i
+    cdef intp N = dst.shape[0]
+    cdef Range r
     if nthreads == 1: PyArray_CopyInto(dst, src)
     else:
         with nogil, parallel(num_threads=nthreads):
-            i = omp_get_thread_num()
-            nthreads = omp_get_num_threads()
-            inc = N / <double>nthreads
-            a = <intp>floor(inc*i)
-            b = N if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
-            with gil: PyArray_CopyInto(dst[a:b], src[a:b])
+            r = get_thread_range(N)
+            with gil: PyArray_CopyInto(dst[r.start:r.stop], src[r.start:r.stop])
 
 def par_copy_any(dst, src, int nthreads):
     """
@@ -50,26 +45,13 @@ def par_copy_any(dst, src, int nthreads):
     """
     if dst.size != src.size: raise ValueError('dst and src must be same size')
     nthreads = get_nthreads(nthreads, dst.size // 50000000)
-    cdef intp N1 = dst.shape[0], N2 = src.shape[0], i, a1, b1, a2, b2
-    cdef double inc1, inc2
+    cdef intp N1 = dst.shape[0], N2 = src.shape[0]
+    cdef Range r1, r2
     if nthreads == 1: PyArray_CopyAnyInto(dst, src)
     else:
         with nogil, parallel(num_threads=nthreads):
-            #a1 = get_thread_range(N1, &b1)
-            #a2 = get_thread_range(N1, &b2)
-            i = omp_get_thread_num()
-            nthreads = omp_get_num_threads()
-            inc1 = N1 / <double>nthreads
-            inc2 = N2 / <double>nthreads
-            a1 = <intp>floor(inc1*i)
-            a2 = <intp>floor(inc2*i)
-            if i == nthreads-1:
-                b1 = N1
-                b2 = N2
-            else:
-                b1 = <intp>floor(inc1*(i+1))
-                b2 = <intp>floor(inc2*(i+1))
-            with gil: PyArray_CopyAnyInto(dst[a1:b1], src[a2:b2])
+            r1 = get_thread_range(N1); r2 = get_thread_range(N2)
+            with gil: PyArray_CopyAnyInto(dst[r1.start:r1.stop], src[r2.start:r2.stop])
 
 def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint precise=False):
     """
@@ -104,19 +86,15 @@ def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint preci
     cdef dbl_p X = <dbl_p>PyArray_DATA(x), Y = <dbl_p>PyArray_DATA(y), OUT = <dbl_p>PyArray_DATA(out)
     
     # Run the hypotenuse calculator
-    cdef double inc
-    cdef intp a, b, i
+    cdef Range r
     cdef hypot_fp hyp = <hypot_fp>hypot2 if precise else <hypot_fp>hypot1
     with nogil:
         if nthreads == 1: hyp(X, Y, OUT, H, W, x_stride, y_stride, out_stride)
         else:
             with parallel(num_threads=nthreads):
-                i = omp_get_thread_num()
-                nthreads = omp_get_num_threads()
-                inc = H / <double>nthreads
-                a = <intp>floor(inc*i)
-                b = H if i == nthreads - 1 else (<intp>floor(inc*(i+1)))
-                hyp(X+a*x_stride, Y+a*y_stride, OUT+a*out_stride, b-a, W, x_stride, y_stride, out_stride)
+                r = get_thread_range(H)
+                hyp(X+r.start*x_stride, Y+r.start*y_stride, OUT+r.start*out_stride, r.stop-r.start,
+                    W, x_stride, y_stride, out_stride)
                 
     # Done!
     return out
