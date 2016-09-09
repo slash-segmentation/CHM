@@ -218,8 +218,10 @@ def hog_new(double[:,::contiguous] im, ndarray out=None, int nthreads=1):
     if blocks is NULL: raise MemoryError()
 
     # Allocate the temporary stop positions for dealing with overlaps
-    cdef intp* stops = <intp*>memset(malloc(nthreads*sizeof(intp)), 0, nthreads*sizeof(intp))
-    if stops is NULL: free(blocks); raise MemoryError()
+    cdef intp* stops = NULL
+    if nthreads != 1:
+        stops = <intp*>malloc(nthreads*sizeof(intp))
+        if stops is NULL: free(blocks); raise MemoryError()
 
     # Perform the calculations using __gradients and __normalize
     cdef Range r
@@ -230,6 +232,7 @@ def hog_new(double[:,::contiguous] im, ndarray out=None, int nthreads=1):
             __normalize(hist, 0, H_out, blocks, out_mv)
         else:
             # Calculate the gradients except for the CELL_SIZE regions between the chunks
+            memset(stops, 0, nthreads*sizeof(intp))
             with parallel(num_threads=nthreads):
                 r = get_thread_range(H-2)
                 stops[omp_get_thread_num()] = r.stop+1
@@ -237,13 +240,13 @@ def hog_new(double[:,::contiguous] im, ndarray out=None, int nthreads=1):
             # Calculate the gradiatents in the CELL_SIZE regions between chunks
             for i in prange(nthreads, num_threads=nthreads):
                 if stops[i] != 0 and stops[i] != H-1: __gradients(im, stops[i]-CELL_SIZE, stops[i], hist)
+            free(stops)
             # Normalize the histogram data
             with parallel(num_threads=nthreads):
                 r = get_thread_range(H_out)
                 __normalize(hist, r.start, r.stop, blocks + omp_get_thread_num()*NFEATURES, out_mv)
 
     free(blocks)
-    free(stops)
     return out
     
 cdef void __gradients(double[:,::contiguous] im, intp a, intp b, double[:,:,::1] hist) nogil:
