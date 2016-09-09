@@ -30,7 +30,7 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     """
     Computes the 2D Frangi filter using the eigenvectors of the Hessian to compute the likeliness
     of an image region to contain vessels or other image ridges, according to the method described
-    by Frangi (1998).
+    by Frangi et al (1998).
     
     Inputs:
         im          the input image, must be a 2D grayscale image from 0.0 to 1.0
@@ -85,12 +85,15 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
     
     # Get ready to calculate the vesselness
     cdef Range r
-    cdef intp stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0)
+    cdef intp stride = PyArray_STRIDE(Dxx, 0), out_stride = PyArray_STRIDE(out, 0), n
     cdef dbl_p pDxx = <dbl_p>PyArray_DATA(Dxx), pDxy = <dbl_p>PyArray_DATA(Dxy), pDyy = <dbl_p>PyArray_DATA(Dyy)
     cdef dbl_p lam1 = pDxx, lam2 = pDxy # re-use pDxx and pDxy for lambda1 and lambda2
-    cdef dbl_p pOut = <dbl_p>PyArray_DATA(out), C
+    cdef dbl_p pOut = <dbl_p>PyArray_DATA(out), C = NULL
     cdef dbl c = 0.0
-    
+    if nthreads != 1:
+        C = <dbl_p>malloc(nthreads*sizeof(dbl))
+        if C is NULL: raise MemoryError()
+
     # Main computations
     with nogil:
         if nthreads == 1:
@@ -98,14 +101,12 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
             vesselness(H, W, stride, out_stride, lam1, lam2, pOut, c)
         else:
             # Calculate (abs sorted) eigenvalues and the dynamic c value
-            C = <dbl_p>malloc(nthreads*sizeof(dbl))
-            if C is NULL:
-                with gil: raise MemoryError()
             memset(C, 0, nthreads*sizeof(dbl))
             with parallel(num_threads=nthreads):
                 r = get_thread_range(H)
+                n = r.start*stride
                 C[omp_get_thread_num()] = eigvals(r.stop-r.start, W, stride,
-                                                  pDxx+r.start, pDxy+r.start, pDyy+r.start)
+                                                  off(pDxx, n), off(pDxy, n), off(pDyy, n))
             for i in xrange(nthreads):
                 if C[i] > c: c = C[i]
             free(C)
@@ -114,8 +115,9 @@ def frangi(ndarray im, dbl sigma, ndarray out=None, int nthreads=1):
             ## Calculate the vesselness
             with parallel(num_threads=nthreads):
                 r = get_thread_range(H)
+                n = r.start*stride
                 vesselness(r.stop-r.start, W, stride, out_stride,
-                           lam1+r.start, lam2+r.start, pOut+r.start, c)
+                           off(lam1, n), off(lam2, n), off(pOut, r.start*out_stride), c)
 
     # Return output
     return out
@@ -141,6 +143,8 @@ cdef get_hessian_filters(dbl sigma):
             u[i]  = v[i]*(x*x-sigma2)
         filters[sigma] = fs = u, uu, v
     return fs # u, uu, v
+
+cdef inline dbl_p off(dbl_p ptr, intp nbytes) nogil: return <dbl_p>(<char*>ptr+nbytes)
 
 cdef dbl eigvals(intp H, intp W, intp stride, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) nogil:
     """
@@ -180,9 +184,9 @@ cdef dbl eigvals(intp H, intp W, intp stride, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) n
             if lam2 > 0.0:
                 S2 = lam1 + lam2*lam2
                 if S2 > c: c = S2
-        Dxx = <dbl_p>(<char*>Dxx+stride)
-        Dxy = <dbl_p>(<char*>Dxy+stride)
-        Dyy = <dbl_p>(<char*>Dyy+stride)
+        Dxx = off(Dxx, stride)
+        Dxy = off(Dxy, stride)
+        Dyy = off(Dyy, stride)
 
     # Return the Frobenius maximum norm of all Hessian matrices
     return c
@@ -215,6 +219,6 @@ cdef void vesselness(intp H, intp W, intp stride, intp out_stride, dbl_p lambda1
                 # Compute vessel-ness
                 out[x] = Rb2 * S2
             else: out[x] = 0
-        lambda1 = <dbl_p>(<char*>lambda1+stride)
-        lambda2 = <dbl_p>(<char*>lambda2+stride)
-        out = <dbl_p>(<char*>out+out_stride)
+        lambda1 = off(lambda1, stride)
+        lambda2 = off(lambda2, stride)
+        out = off(out, out_stride)
