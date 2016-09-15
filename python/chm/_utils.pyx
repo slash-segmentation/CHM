@@ -2,10 +2,8 @@
 #cython: boundscheck=False, wraparound=False, initializedcheck=False, cdivision=True
 
 """
-Cython code for util. At the moment this is just fast/parallelized copy and hypot functions.
-
-Other future functions that might go here are a parallelized version of numpy.pad and optimized
-versions of MyMaxPooling and/or im2double.
+Cython code for util. At the moment this includes fast/parallelized copy, hypot, and pooling
+functions. Another future function that might go here are a parallelized versions of im2double.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -20,6 +18,7 @@ include "filters/filters.pxi"
 ctypedef double* dbl_p
 
 from libc.math cimport sqrt, hypot
+from cython.view cimport contiguous
 from cython.parallel cimport parallel
 
 def par_copy(dst, src, int nthreads):
@@ -53,6 +52,8 @@ def par_copy_any(dst, src, int nthreads):
             r1 = get_thread_range(N1); r2 = get_thread_range(N2)
             with gil: PyArray_CopyAnyInto(dst[r1.start:r1.stop], src[r2.start:r2.stop])
 
+
+########## Hypot Function ##########
 def par_hypot(ndarray x, ndarray y, ndarray out=None, int nthreads=1, bint precise=False):
     """
     Equivilent to doing sqrt(x*x + y*y) elementwise but slightly faster and parallelized.
@@ -123,3 +124,135 @@ cdef void hypot2(dbl_p x, dbl_p y, dbl_p out, intp H, intp W, intp x_stride, int
         x += x_stride
         y += y_stride
         out += out_stride
+
+
+########## Max Pooling ##########
+# Supported types, can add more as needed
+ctypedef fused ptype:
+    npy_bool
+    npy_double
+
+# Pooling function
+ctypedef ptype (*pfunc)(ptype* block, intp stride, intp H, intp W) nogil
+# Pooling of 2x2 function
+ctypedef ptype (*p2func)(ptype* block, intp stride) nogil
+
+def max_pooling(in_np, int L, ptype[:,::contiguous] out, int nthreads=1):
+    """
+    Decreases the 2D array size by 2**L. For example if L == 1 the 2D array each dimension is
+    halved in size. The downsampling uses max-pooling. The Python functions MyMaxPooling or
+    MyMaxPooling1 should be used as they check the inputs, take care of various edge cases (like
+    L==0), allocate the output appropiately if necessary, and support the region argument.
+    
+    Special cases:
+        L==1 is made faster (~10%) than without the special code
+        booleans is handled specially as well and is faster (~10-25%) than doubles
+        
+    Currently only supports doubles and booleans but this can be changed at compile-time fairly
+    easily. Additionally, a simple change can make it use a different pooling method.
+    """
+    # Workaround for Cython not supporting readonly buffers
+    cdef bint readonly = not PyArray_ISWRITEABLE(in_np)
+    if readonly: PyArray_ENABLEFLAGS(in_np, NPY_ARRAY_WRITEABLE)
+    cdef ptype[:,::contiguous] in_ = in_np
+    if readonly: PyArray_CLEARFLAGS(in_np, NPY_ARRAY_WRITEABLE)
+    
+    # Get basic values about the blocks and shapes
+    cdef intp in_h = in_.shape[0], in_w = in_.shape[1]
+    cdef intp H = in_h>>L, W = in_w>>L # size of output not including results from partial blocks
+    cdef intp in_stride  = in_.strides[0], out_stride = out.strides[0]
+    cdef intp bs = 2<<(L-1), bh = in_h&(bs-1), bw = in_w&(bs-1) # size of standard or partial blocks
+    nthreads = get_nthreads(nthreads, H // 128)
+    cdef pfunc f = pool_max[ptype] # the pooling function
+    cdef p2func f2 = pool2_max[ptype] # the pooling function for 2x2 blocks
+    
+    # Pool the data
+    cdef Range r
+    cdef intp y, Y, h
+    with nogil:
+        if nthreads == 1:
+            # Core of the data
+            if bs == 2: pool2[ptype](f2, &in_[0,0], &out[0,0], in_stride, out_stride, H, W)
+            else: pool[ptype](f, &in_[0,0], &out[0,0], in_stride, out_stride, H, W, bs, bs)
+            # Partial column
+            if bw > 0: pool[ptype](f, &in_[0,W*bs], &out[0,W], in_stride, out_stride, H, 1, bs, bw)
+        else:
+            with parallel(num_threads=nthreads):
+                r = get_thread_range(H)
+                y = r.start; Y = y*bs; h = r.stop-y
+                # Core of the data
+                if bs == 2: pool2[ptype](f2, &in_[Y,0], &out[y,0], in_stride, out_stride, h, W)
+                else: pool[ptype](f, &in_[Y,0], &out[y,0], in_stride, out_stride, h, W, bs, bs)
+                # Partial column
+                if bw > 0: pool[ptype](f, &in_[Y,W*bs], &out[y,W], in_stride, out_stride, h, 1, bs, bw)
+        if bh > 0:
+            # Partial row
+            pool[ptype](f, &in_[H*bs,0], &out[H,0], in_stride, out_stride, 1, W, bh, bs)
+            # Partial column and row
+            if bw > 0: out[H,W] = f(&in_[H*bs, W*bs], in_stride, bh, bw)
+    return out
+
+cdef inline void pool(pfunc f, ptype *in_, ptype *out, intp in_stride, intp out_stride, intp H, intp W, intp bh, intp bw) nogil:
+    """
+    Pool the data from in_ to out using the function f. The size of each block is given by (bh,bw).
+    The size of out is given by (H,W). The size of in_ is not explicity given.
+    """
+    cdef intp x, y
+    for y in xrange(H):
+        for x in xrange(W):
+            out[x] = f(in_+x*bh, in_stride, bh, bw)
+        in_ = <ptype*>((<char*>in_)+in_stride*bh)
+        out = <ptype*>((<char*>out)+out_stride)
+
+cdef inline ptype pool_max(ptype* block, intp stride, intp H, intp W) nogil:
+    """Calculates the max of a HxW block."""
+    cdef intp j
+    cdef ptype mx
+
+    if ptype is npy_bool:
+        # Special case for booleans that does logical-or with short-circuiting
+        for _ in xrange(H):
+            for j in xrange(W):
+                if block[j]: return True
+            block = <ptype*>((<char*>block)+stride)
+        return False
+    
+    else:
+        mx = block[0]
+        for j in xrange(1, W):
+            if block[j] > mx: mx = block[j]
+        block = <ptype*>((<char*>block)+stride)
+        for _ in xrange(1, H):
+            for j in xrange(W):
+                if block[j] > mx: mx = block[j]
+            block = <ptype*>((<char*>block)+stride)
+        return mx
+
+cdef inline void pool2(p2func f, ptype *in_, ptype *out, intp in_stride, intp out_stride, intp H, intp W) nogil:
+    """
+    Pool the data from in_ to out using the function f with the size of each block is (2,2). The
+    size of out is given by (H,W). The size of in_ is not explicity given.
+    """
+    cdef intp x, y
+    for y in xrange(H):
+        for x in xrange(W):
+            out[x] = f(in_+x*2, in_stride)
+        in_ = <ptype*>((<char*>in_)+in_stride*2)
+        out = <ptype*>((<char*>out)+out_stride)
+
+cdef inline ptype pool2_max(ptype* block, intp stride) nogil:
+    """Calculates the max of a 2x2 block."""
+    cdef intp j
+    cdef ptype mx
+
+    if ptype is npy_bool:
+        # Special case for booleans that does logical-or with short-circuiting
+        return (block[0] or block[1] or (<ptype*>((<char*>block)+stride))[0] or
+                (<ptype*>((<char*>block)+stride))[1])
+    
+    else:
+        mx = block[1] if (block[1] > block[0]) else block[0]
+        block = <ptype*>((<char*>block)+stride)
+        if block[0] > mx: mx = block[0]
+        if block[1] > mx: mx = block[1]
+        return mx

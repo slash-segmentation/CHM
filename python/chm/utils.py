@@ -22,13 +22,13 @@ def im2double(im, out=None, region=None, nthreads=1):
     """
     from numpy import float64, iinfo
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
+    # OPT: more use of nthreads (astype, /, -)
     if out is None: out = im.astype(float64, copy=False)
     else:           copy(out, im, nthreads)
     # NOTE: The divisions here could be pre-calculated for ~60% faster code but this is always the
     # first step and the errors will propogate (although minor, max at ~1.11e-16 or 1/2 EPS and
     # averaging ~5e-18). This will only add a milisecond or two per 1000x1000 block.
     # TODO: If I ever extend "compat" mode to this function, it would be a good candidate.
-    # OPT: more use of nthreads
     k, t = im.dtype.kind, im.dtype.type
     if k == 'u': out /= iinfo(t).max
     elif k == 'i':
@@ -43,7 +43,8 @@ def im2double(im, out=None, region=None, nthreads=1):
 def MyUpSample(im, L, out=None, region=None, nthreads=1):
     """
     Increases the image size by 2**L. So if L == 0, image is returned unchanged, if L == 1 the
-    image is doubled, and so forth. The upsampling is done with no interpolation (nearest neighbor).
+    image is doubled, and so forth. The upsampling is done with no interpolation (nearest
+    neighbor).
 
     To match the filters, it supports out, region, and nthreads arguments.
     """
@@ -77,16 +78,13 @@ def MyDownSample(im, L, out=None, region=None, nthreads=1):
     where out and im overlap.
     """
     # CHANGED: only supports 2D
-    # OPT: parallelize pad function
-    from numpy import pad
     from .imresize import imresize_fast # built exactly for our needs
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
     if L == 0:
         if out is None: return im.view()
         copy(out, im, nthreads)
         return out
-    nr,nc = im.shape[:2]
-    if nr&1 or nc&1: im = pad(im, ((0,nr&1), (0,nc&1)), mode=str('edge'))
+    im = pad_to_even(im, nthreads)
     if L==1 and out is not None: return imresize_fast(im, out, nthreads)
     return MyDownSample(imresize_fast(im, None, nthreads), L-1, out, None, nthreads)
 
@@ -99,87 +97,85 @@ def MyDownSample(im, L, out=None, region=None, nthreads=1):
 
 def MyDownSample1(im, out=None, nthreads=1):
     """Equivalent to MyDownSample(..., L=1, ..., region=None, ...)"""
-    # OPT: parallelize pad function
-    from numpy import pad
     from .imresize import imresize_fast
-    nr,nc = im.shape[:2]
-    if nr&1 or nc&1: im = pad(im, ((0,nr&1), (0,nc&1)), mode=str('edge'))
-    return imresize_fast(im, out, nthreads)
+    return imresize_fast(pad_to_even(im, nthreads), out, nthreads)
 
 def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     """
     Decreases the image size by 2**L. So if L == 0, image is returned unchanged, if L == 1 the
     image is halved, and so forth. The downsampling uses max-pooling.
 
-    To match the filters it supports out, region, and nthreads arguments. However, nthreads is
-    mostly ignored.
+    To match the filters it supports out, region, and nthreads arguments.
     """    
-    # CHANGED: only supports 2D instead of 3D (the 3D just did each layer independently [but all at once])
-    # 3D could be re-added, using the more complex _im_bin function from pysegtools.images.filters.resize
+    # CHANGED: only supports 2D (the 3D just did each layer independently [but all at once])
     
     # Original method, directly converted
     #from numpy import maximum, zeros, vstack, hstack
     #if L == 0: return im
-    #nr,nc = im.shape
+    #nr,nc = im.shape # this part could be re-done with fast-pad or a slightly modified pad_to_even
     #if nr&1: im = vstack((im, zeros((1,nc), im.dtype)))
     #if nc&1: im = hstack((im, zeros((nr,1), im.dtype)))
     #im = maximum(maximum(im[0::2,0::2],im[0::2,1::2]),
     #             maximum(im[1::2,0::2],im[1::2,1::2]))
     #return MyMaxPooling(im, L-1)
     
-    # Using blockviews, ~4 times faster
+    ## Using blockviews, ~4 times faster
+    #sz = 2 << (L-1)
+    #nR,nC = im.shape
+    #eR = nR&(sz-1); eC = nC&(sz-1) # the size of the not-block fitting edges
+    #oR = nR >> L;   oC = nC >> L   # the main part of out, not including the partial edges
+    #if out is None: out = empty(((nR+sz-1)>>L, (nC+sz-1)>>L), dtype=im.dtype)
+    #if oR and oC: __bv(im,            (sz, sz)).max(2).max(2, out=out[:oR,:oC])
+    #if eR and oC: __bv(im[-eR:,   :], (eR, sz)).max(2).max(2, out=out[-1:,:oC])
+    #if oR and eC: __bv(im[   :,-eC:], (sz, eC)).max(2).max(2, out=out[:oR,-1:])
+    #if eR and eC: __bv(im[-eR:,-eC:], (eR, eC)).max(2).max(2, out=out[-1:,-1:])
+    
+    # Using Cython, ~4-5 times even faster than blockviews and is parallelized
     from numpy import empty
+    from ._utils import max_pooling
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
     if L == 0:
         if out is None: return im.view()
         copy(out, im, nthreads)
         return out
-    # OPT: use nthreads (and in MyMaxPooling1 as well)
     sz = 2 << (L-1)
-    nR,nC = im.shape
-    eR = nR&(sz-1); eC = nC&(sz-1) # the size of the not-block fitting edges
-    oR = nR >> L;   oC = nC >> L   # the main part of out, not including the partial edges
-    if out is None: out = empty(((nR+sz-1)>>L, (nC+sz-1)>>L), dtype=im.dtype)
-    if oR and oC: __bv(im,            (sz, sz)).max(2).max(2, out=out[:oR,:oC])
-    if eR and oC: __bv(im[-eR:,   :], (eR, sz)).max(2).max(2, out=out[-1:,:oC])
-    if oR and eC: __bv(im[   :,-eC:], (sz, eC)).max(2).max(2, out=out[:oR,-1:])
-    if eR and eC: __bv(im[-eR:,-eC:], (eR, eC)).max(2).max(2, out=out[-1:,-1:])
+    sh = ((im.shape[0]+sz-1)>>L, (im.shape[1]+sz-1)>>L)
+    if out is None: out = empty(sh, dtype=im.dtype)
+    elif out.shape != sh or out.dtype != im.dtype: raise ValueError('Invalid output array')
+    if im.dtype == bool:
+        # Cython doesn't handle boolean arrays very well, so view it as unsigned chars
+        max_pooling['npy_bool'](im.astype('u1', copy=False), L, out.astype('u1', copy=False), nthreads)
+    else: max_pooling(im, L, out, nthreads)
     return out
 
-def __bv(im, bs):
-    """
-    Gets the image as a set of blocks. Any blocks that don't fit in are simply dropped (on bottom
-    and right edges). The blocks are made into additional axes (axis=2 and 3).
-    """
-    from numpy.lib.stride_tricks import as_strided
-    shape   = (im.shape[0]//bs[0],  im.shape[1]//bs[1])  + bs
-    strides = (im.strides[0]*bs[0], im.strides[1]*bs[1]) + im.strides
-    return as_strided(im, shape=shape, strides=strides)
+#def __bv(im, bs):
+#    """
+#    Gets the image as a set of blocks. Any blocks that don't fit in are simply dropped (on bottom
+#    and right edges). The blocks are made into additional axes (axis=2 and 3).
+#    """
+#    from numpy.lib.stride_tricks import as_strided
+#    shape   = (im.shape[0]//bs[0],  im.shape[1]//bs[1])  + bs
+#    strides = (im.strides[0]*bs[0], im.strides[1]*bs[1]) + im.strides
+#    return as_strided(im, shape=shape, strides=strides)
 
 def MyMaxPooling1(im, out=None, nthreads=1):
     """Equivalent to MyMaxPooling(..., L=1, ..., region=None, ...)"""
-    # Note: using logical_or instead of max for booleans seems to actually be slightly slower
+    # NOTE: now that the Cython code always checks for L==1 and optimizes this function is not
+    # really needed as it doesn't really have any speed up over MyMaxPooling
     from numpy import empty
-    from numpy.lib.stride_tricks import as_strided
-    nR,nC = im.shape
-    eR = nR&1;  eC = nC&1  # the size of the not-block fitting edges (0 or 1)
-    oR = nR>>1; oC = nC>>1 # the main part of out, not including the partial edges
-    if out is None: out = empty((oR+eR, oC+eC), dtype=im.dtype)
-    if oR and oC:
-        sr,sc = im.strides
-        as_strided(im,(oR,oC,2,2),(sr*2,sc*2,sr,sc)).max(2).max(2, out[:oR,:oC])
-    if eR and eC:
-        out[-1,-1] = im[-1,-1]
-        if oR: im[:-1,-1].reshape(2,-1).max(0, out[:oR,-1])
-        if oC: im[-1,:-1].reshape(-1,2).max(1, out[-1,:oC])
-    else:
-        if oR and eC: im[:,-1].reshape(2,-1).max(0, out[:oR,-1])
-        if eR and oC: im[-1,:].reshape(-1,2).max(1, out[-1,:oC])
+    from ._utils import max_pooling
+    sh = ((im.shape[0]+1)>>1, (im.shape[1]+1)>>1)
+    if out is None: out = empty(sh, dtype=im.dtype)
+    elif out.shape != sh or out.dtype != im.dtype: raise ValueError('Invalid output array')
+    if im.dtype == bool:
+        # Cython doesn't handle boolean arrays very well, so view it as unsigned chars
+        max_pooling['npy_bool'](im.astype('u1', copy=False), 1, out.astype('u1', copy=False), nthreads)
+    else: max_pooling(im, 1, out, nthreads)
     return out
 
 
 ########## Extracting and Padding Image ##########
-def get_image_region(im, padding=0, region=None, mode='symmetric'):
+def get_image_region(im, padding=0, region=None, mode='symmetric', nthreads=1):
     """
     Gets the desired subregion of an image with the given amount of padding. If possible, the
     padding is taken from the image itself. If not possible, the pad function is used to add the
@@ -187,18 +183,18 @@ def get_image_region(im, padding=0, region=None, mode='symmetric'):
         padding is the amount of extra space around the region that is desired
         region is the portion of the image we want to use, or None to use the whole image
             given as top, left, bottom, right - negative values do not go from the end of the axis
-            like normal, but instead indicate before the beginning of the axis; the right and bottom
-            values should be one past the end just like normal
-        mode is the padding mode, if padding is required
+            like normal, but instead indicate before the beginning of the axis; the right and
+            bottom values should be one past the end just like normal
+        mode is the padding mode, if padding is required, and defaults to symmetric
+        ntheads is the number of threads used during any padding operations and defaults to 1
     Besides returning the image, a new region is returned that is valid for the returned image to be
     processed again.
     """
-    # OPT: parallelize pad function
     from numpy import pad
     if region is None:
         region = (padding, padding, padding + im.shape[0], padding + im.shape[1]) # the new region
         if padding == 0: return im, region
-        return pad(im, int(padding), mode=str(mode)), region
+        return fast_pad(im, ((padding,padding),(padding,padding)), mode, nthreads), region
     T, L, B, R = region #pylint: disable=unpacking-non-sequence
     region = (padding, padding, padding + (B-T), padding + (R-L)) # the new region
     T -= padding; L -= padding
@@ -209,7 +205,7 @@ def get_image_region(im, padding=0, region=None, mode='symmetric'):
         if L < 0: padding[1][0] = -L; L = 0
         if B > im.shape[0]: padding[0][1] = B - im.shape[0]; B = im.shape[0]
         if R > im.shape[1]: padding[1][1] = R - im.shape[1]; R = im.shape[1]
-        return pad(im[T:B, L:R], padding, mode=str(mode)), region
+        return fast_pad(im[T:B, L:R], ((padding,padding),(padding,padding)), mode, nthreads), region
     return im[T:B, L:R], region
 
 def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1):
@@ -218,7 +214,7 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
     symmetric padding with 0s. In any situation where 0 padding is added, the image data is copied.
     In this situation, sides that do not have 0 padding added are copied with up to full_padding
     pixels from the original image data. The symmetric padding must originate right at the edge of
-    the region to be detected.
+    the region to be detected. Also supports nthreads argument.
     
     If full_padding > padding, this will sometimes use symmetric padding to fill in the gap between
     the two.
@@ -227,14 +223,14 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
     """
     if region is None:
         # Using entire image, just add the constant padding
-        return get_image_region(im, padding, region, 'constant')
+        return get_image_region(im, padding, region, 'constant', nthreads)
     
     # Region indices
     T,L,B,R = region #pylint: disable=unpacking-non-sequence
     max_pad = (T, L, im.shape[0]-B, im.shape[1]-R)
     if all(mp == 0 for mp in max_pad):
         # Region specifies the entire image, just add the constant padding
-        return get_image_region(im, padding, region, 'constant')
+        return get_image_region(im, padding, region, 'constant', nthreads)
 
     # Number of pixels available for padding on each side
     if full_padding is None: full_padding = padding
@@ -246,30 +242,29 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
                         __is_sym(im_pad[::-1], pB), __is_sym(im_pad.T[::-1], pR))
 
     # If all sides have symmetrical padding (or no padding), just 0 pad all sides
-    if all(zs): return get_image_region(im[T:B,L:R], padding, None, 'constant')
+    if all(zs): return fast_pad(im[T:B,L:R], ((padding,padding),(padding,padding)), 'constant', nthreads)
     
     # If no sides have symmetrical padding, just extract the image region
-    if not any(zs): return get_image_region(im, full_padding, region)
+    if not any(zs): return get_image_region(im, full_padding, region, nthreads)
     
     # At this point `zs` has at least one True and one False
     # Each side that has `zX` needs padding of size `padding` full of 0s
     # The other sides need image data/symmetic padding of size `full_padding`
-    from itertools import izip
-    from numpy import copyto, zeros
     H,W = B-T, R-L
     pT,pL,pB,pR = ps = [(padding if z else full_padding) for z in zs]
-    out = zeros((H+pT+pB, W+pL+pR), dtype=im.dtype) # full output size
-    copy(out[pT:H+pT,pL:W+pL], im[T:B,L:R], nthreads) # copy central image
+    out = fast_pad(im[T:B,L:R], ((pT,pB),(pL,pR)), 'constant', nthreads) # create a 0-padded copy of central image
     
     # Output now just needs padding that comes from the image data
     # The size of symmetric padding required
+    from itertools import izip
     spT, spL, spB, spR = sps = [max(p-mp, 0) if z else 0 for z,p,mp in izip(zs, ps, max_pad)]
-    if not zT: copyto(out[spT:pT], im[T-pT+spT:T])
-    if not zL: copyto(out[:,spL:pL], im[:,L-pL+spL:L])
-    if not zB: copyto(out[-pB:-pB+spB], im[B:B+pB-spB])
-    if not zR: copyto(out[:,-pR:-pR+spR], im[:,R:R+pR-spR])
+    if not zT: copy(out[spT:pT], im[T-pT+spT:T], nthreads)
+    if not zL: copy(out[:,spL:pL], im[:,L-pL+spL:L], nthreads)
+    if not zB: copy(out[-pB:-pB+spB], im[B:B+pB-spB], nthreads)
+    if not zR: copy(out[:,-pR:-pR+spR], im[:,R:R+pR-spR], nthreads)
     if any(sp > 0 for sp in sps):
         # Fill in the symmetric padding
+        # TODO: optimize this using the new fast_pad method and don't use fill_padding
         from pysegtools.images.filters.bg import fill_padding
         out = fill_padding(out, sps, 'reflect')
     
@@ -297,7 +292,22 @@ def __is_sym(im, n_pad):
 
 
 ########## General Utilities ##########
-from ._utils import par_copy as copy, par_hypot as hypot #pylint: disable=no-name-in-module, unused-import
+from ._utils import par_hypot as hypot #pylint: disable=no-name-in-module, unused-import
+def copy(dst, src, nthreads=1):
+    """
+    Equivilent to numpy.copyto(dst, src, 'unsafe', None) but is parallelized with the given number
+    of threads. Note however that since copying is such a fast operation in most cases, the
+    threshold for number of threads is quite high so this will frequently just use copyto without
+    threading.
+    """
+    if dst.shape != src.shape: raise ValueError('dst and src must be same shape')
+    if nthreads <= 1 or dst.size < 200000000:
+        from numpy import copyto
+        copyto(dst, src, 'unsafe')
+    else:
+        from ._utils import par_copy
+        par_copy(dst, src, nthreads)
+    
 def copy_flat(dst, src, nthreads=1):
     """
     Copies all of the data from one array to another array of the same size even if they don't have
@@ -319,6 +329,122 @@ def copy_flat(dst, src, nthreads=1):
         #ii = nditer(src, order='C', flags=['zerosize_ok', 'buffered', 'external_loop'])
         #oi = nditer(dst, order='C', flags=['zerosize_ok', 'buffered', 'external_loop', 'refs_ok'], op_flags=["writeonly"])
         #for i, o in izip(ii, oi): o[...] = i
+
+def pad_to_even(X, nthreads=1):
+    """
+    Equivilent to:
+        if any((n&1) == 1 for n in X.shape):
+            return np.pad(X, [(0,n&1) for n in X.shape], mode='edge')
+        else:
+            return X.view()
+    with the bulk of the work possibily parallelized and even when not it is ~8.5x faster.
+    """
+    from numpy import empty
+    
+    # Get the new shape and check that it will change
+    new_sh = [(n+(n&1)) for n in X.shape]
+    if new_sh == X.shape: return X.view()
+    
+    # Allocate the output array
+    out = empty(new_sh, dtype=X.dtype)
+    
+    # Copy the core over directly
+    copy(out[[slice(n) for n in X.shape]], X, nthreads)
+    
+    # Perform edge padding
+    dst = [slice(0, n) for n in X.shape]
+    src = [slice(0, n) for n in X.shape]
+    for i,n in enumerate(X.shape):
+        if n&1 != 1: continue
+        dst[i],src[i] = n,n-1
+        out[dst] = out[src]
+        dst[i],src[i] = slice(None),slice(None)
+    return out
+
+__pad_modes = frozenset(('constant', 'zero', 'one', 'edge', 'reflect', 'symmetric'))
+def fast_pad(X, padding, mode, nthreads=1):
+    """
+    Equivilent to:
+        return np.pad(X, padding, mode)
+    with the bulk of the work possibily parallelized and even when not it is much faster.
+    
+    However the `padding` must be fully specified (as in a 2-element tuple of values for each axis)
+    and only the following modes are supported:
+     * 'constant'/'zero'  ('constant' with constant_values=0)
+     * 'one'              ('constant' with constant_values=1)
+     * 'edge'
+     * 'reflect'          ('even' type only)
+     * 'symmetric'        ('even' type only)
+    """
+    from itertools import izip
+    from numpy import empty
+    
+    if mode not in __pad_modes:
+        raise ValueError('Unknown mode '+mode)
+    
+    # Create the output and fill in the bulk of the data
+    new_sh = [(n+p1+p2) for n,(p1,p2) in izip(X.shape, padding)]
+    out = empty(new_sh, dtype=X.dtype)
+    copy(out[[slice(p1,p1+n) for n,(p1,p2) in izip(X.shape, padding)]], X, nthreads)
+
+    # Fill in padding
+    # Not done in parallel since it is assumed to be a small amount compared to the core. However
+    # could make it 'choose' if copy(A[...], B[...]) is used instead of A[...] = B[...] (but this
+    # doesn't help fill functions).
+    if mode == 'constant' or mode == 'zero' or mode == 'one':
+        c = 1 if mode == 'one' else 0
+        slices = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
+        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
+            if p1 != 0:
+                slices[i] = slice(p1)
+                out[slices].fill(c)
+            if p2 != 0:
+                slices[i] = slice(n+p1, n+p1+p2)
+                out[slices].fill(c)
+            slices[i] = slice(None)
+    elif mode == 'edge':
+        from numpy.lib.stride_tricks import as_strided
+        dst = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
+        src = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
+        def repeat_dim(X, dim, n):
+            sh = list(X.shape)
+            sh.insert(dim, n)
+            st = list(X.strides)
+            st.insert(dim, 0)
+            return as_strided(X, sh, st)
+        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
+            if p1 != 0:
+                dst[i],src[i] = slice(0, p1), p1
+                out[dst] = repeat_dim(out[src], i, p1)
+            if p2 != 0:
+                dst[i],src[i] = slice(n+p1, n+p1+p2), n+p1-1
+                out[dst] = repeat_dim(out[src], i, p2)
+            dst[i],src[i] = slice(None), slice(None)
+    else: # if mode in ('reflect', 'symmetric'):
+        off = 1 if mode == 'reflect' else 0 # do not duplicate edge when reflecting
+        dst = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
+        src = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
+        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
+            while n-off < p1:
+                # Copy n-off at a time until we have enough to do p1 all at once
+                dst[i],src[i] = slice(p1-n+off, p1), slice(p1+n-1, p1-1+off, -1)
+                out[dst] = out[src]
+                p1 -= n-off; n += n-off
+            if p1 != 0:
+                # Do all of p1 at once
+                dst[i],src[i] = slice(0, p1), slice(2*p1-1+off, p1-1+off, -1)
+                out[dst] = out[src]
+            while n-off < p2:
+                # Copy n-off at a time until we have enough to do p2 all at once
+                dst[i],src[i] = slice(p1+n, p1+2*n-off), slice(p1+n-1-off, p1-1, -1)
+                out[dst] = out[src]
+                p2 -= n-off; n += n-off
+            if p2 != 0:
+                # Do all of p2 at once
+                dst[i],src[i] = slice(p1+n, p1+n+p2), slice(p1+n-1-off, p1+n-p2-1-off, -1)
+                out[dst] = out[src]
+            dst[i],src[i] = slice(None), slice(None)
+    return out
 
 
 ########## FFT Utility ##########
