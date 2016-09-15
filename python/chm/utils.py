@@ -132,7 +132,7 @@ def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     
     # Using Cython, ~4-5 times even faster than blockviews and is parallelized
     from numpy import empty
-    from ._utils import max_pooling
+    from ._utils import max_pooling #pylint: disable=no-name-in-module
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
     if L == 0:
         if out is None: return im.view()
@@ -163,7 +163,7 @@ def MyMaxPooling1(im, out=None, nthreads=1):
     # NOTE: now that the Cython code always checks for L==1 and optimizes this function is not
     # really needed as it doesn't really have any speed up over MyMaxPooling
     from numpy import empty
-    from ._utils import max_pooling
+    from ._utils import max_pooling #pylint: disable=no-name-in-module
     sh = ((im.shape[0]+1)>>1, (im.shape[1]+1)>>1)
     if out is None: out = empty(sh, dtype=im.dtype)
     elif out.shape != sh or out.dtype != im.dtype: raise ValueError('Invalid output array')
@@ -190,11 +190,10 @@ def get_image_region(im, padding=0, region=None, mode='symmetric', nthreads=1):
     Besides returning the image, a new region is returned that is valid for the returned image to be
     processed again.
     """
-    from numpy import pad
     if region is None:
         region = (padding, padding, padding + im.shape[0], padding + im.shape[1]) # the new region
         if padding == 0: return im, region
-        return fast_pad(im, ((padding,padding),(padding,padding)), mode, nthreads), region
+        return fast_pad(im, padding, mode, nthreads), region
     T, L, B, R = region #pylint: disable=unpacking-non-sequence
     region = (padding, padding, padding + (B-T), padding + (R-L)) # the new region
     T -= padding; L -= padding
@@ -205,7 +204,7 @@ def get_image_region(im, padding=0, region=None, mode='symmetric', nthreads=1):
         if L < 0: padding[1][0] = -L; L = 0
         if B > im.shape[0]: padding[0][1] = B - im.shape[0]; B = im.shape[0]
         if R > im.shape[1]: padding[1][1] = R - im.shape[1]; R = im.shape[1]
-        return fast_pad(im[T:B, L:R], ((padding,padding),(padding,padding)), mode, nthreads), region
+        return fast_pad(im[T:B, L:R], padding, mode, nthreads), region
     return im[T:B, L:R], region
 
 def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1):
@@ -228,7 +227,7 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
     # Region indices
     T,L,B,R = region #pylint: disable=unpacking-non-sequence
     max_pad = (T, L, im.shape[0]-B, im.shape[1]-R)
-    if all(mp == 0 for mp in max_pad):
+    if not any(max_pad):
         # Region specifies the entire image, just add the constant padding
         return get_image_region(im, padding, region, 'constant', nthreads)
 
@@ -238,39 +237,44 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
     im_pad = im[T-pT:B+pB, L-pL:R+pR]
     
     # Check if the padding is a symmetric reflection of the data
-    zT,zL,zB,zR = zs = (__is_sym(im_pad,       pT), __is_sym(im_pad.T, pL),
-                        __is_sym(im_pad[::-1], pB), __is_sym(im_pad.T[::-1], pR))
+    zs = (__is_sym(im_pad,       pT), __is_sym(im_pad.T,       pL),
+          __is_sym(im_pad[::-1], pB), __is_sym(im_pad.T[::-1], pR))
 
     # If all sides have symmetrical padding (or no padding), just 0 pad all sides
-    if all(zs): return fast_pad(im[T:B,L:R], ((padding,padding),(padding,padding)), 'constant', nthreads)
+    if all(zs): return fast_pad(im[T:B,L:R], padding, 'constant', nthreads)
     
     # If no sides have symmetrical padding, just extract the image region
-    if not any(zs): return get_image_region(im, full_padding, region, nthreads)
+    if not any(zs): return get_image_region(im, full_padding, region, 'constant', nthreads)
     
     # At this point `zs` has at least one True and one False
-    # Each side that has `zX` needs padding of size `padding` full of 0s
+    # Each side that has a True in `zs` needs padding of size `padding` full of 0s
     # The other sides need image data/symmetic padding of size `full_padding`
-    H,W = B-T, R-L
-    pT,pL,pB,pR = ps = [(padding if z else full_padding) for z in zs]
-    out = fast_pad(im[T:B,L:R], ((pT,pB),(pL,pR)), 'constant', nthreads) # create a 0-padded copy of central image
+    pT,pL = ((padding if z else full_padding) for z in zs[:2])
+    return __replace_sym_padding(im, zs, padding, full_padding, region, nthreads), (pT, pL, pT+(B-T), pL+(R-L))
     
-    # Output now just needs padding that comes from the image data
-    # The size of symmetric padding required
+def __replace_sym_padding(im, zs, padding, full_padding, region, nthreads):
+    """
+    Internal function for replace_sym_padding for dealing with the most difficult case when some
+    sides need zero padding and some sides need image or symmetic padding. The `zs` argument should
+    have at least one True and one False. Each side that has a True in `zs` needs padding of size
+    `padding` full of 0s and the other sides need image/symmetic padding of size `full_padding`.
+    Returns just the newly created array and not the region
+    """
+    # Get image region and various paddings
     from itertools import izip
-    spT, spL, spB, spR = sps = [max(p-mp, 0) if z else 0 for z,p,mp in izip(zs, ps, max_pad)]
-    if not zT: copy(out[spT:pT], im[T-pT+spT:T], nthreads)
-    if not zL: copy(out[:,spL:pL], im[:,L-pL+spL:L], nthreads)
-    if not zB: copy(out[-pB:-pB+spB], im[B:B+pB-spB], nthreads)
-    if not zR: copy(out[:,-pR:-pR+spR], im[:,R:R+pR-spR], nthreads)
-    if any(sp > 0 for sp in sps):
-        # Fill in the symmetric padding
-        # TODO: optimize this using the new fast_pad method and don't use fill_padding
-        from pysegtools.images.filters.bg import fill_padding
-        out = fill_padding(out, sps, 'reflect')
+    T,L,B,R = region
+    max_pad = (T, L, im.shape[0]-B, im.shape[1]-R)
+    ips = [(0 if z else min(full_padding,p)) for z,p in izip(zs, max_pad)] # image padding
+    sps = [(0 if z else full_padding-p) for z,p in izip(zs, ips)] # symmetric padding
+    xps = [padding if z else p for z,p in izip(zs,sps)] # non-image padding
     
-    # Return output and region
-    return out, (pT, pL, H+pT, W+pL)
-
+    # Create a 0-padded copy of image
+    out = fast_pad(im[T-ips[0]:B+ips[2],L-ips[1]:R+ips[3]], (xps[::2],xps[1::2]), 'constant', nthreads)
+    # Now add symmetric padding between padding and full_padding
+    if any(sps): __fill_symmetric_padding(out, sps, False)
+    # Return output
+    return out
+    
 def __is_sym(im, n_pad):
     """
     Returns True if the top `n_pad` pixels of `im` are a symmetric reflection of the remainder of
@@ -305,7 +309,7 @@ def copy(dst, src, nthreads=1):
         from numpy import copyto
         copyto(dst, src, 'unsafe')
     else:
-        from ._utils import par_copy
+        from ._utils import par_copy #pylint: disable=no-name-in-module
         par_copy(dst, src, nthreads)
     
 def copy_flat(dst, src, nthreads=1):
@@ -361,90 +365,124 @@ def pad_to_even(X, nthreads=1):
         dst[i],src[i] = slice(None),slice(None)
     return out
 
-__pad_modes = frozenset(('constant', 'zero', 'one', 'edge', 'reflect', 'symmetric'))
-def fast_pad(X, padding, mode, nthreads=1):
+__pad_modes = frozenset(('constant', 'edge', 'reflect', 'symmetric'))
+def fast_pad(X, pad_width, mode, nthreads=1, constant_values=0, reflect_type='even'):
     """
     Equivilent to:
-        return np.pad(X, padding, mode)
+        return np.pad(X, pad_width, mode)
     with the bulk of the work possibily parallelized and even when not it is much faster.
     
-    However the `padding` must be fully specified (as in a 2-element tuple of values for each axis)
-    and only the following modes are supported:
-     * 'constant'/'zero'  ('constant' with constant_values=0)
-     * 'one'              ('constant' with constant_values=1)
+    However the `pad_width` must be fully specified (as in a 2-element tuple of values for each
+    axis) and only the following modes are supported:
+     * 'constant'   ('constant_values' keyword is supported)
      * 'edge'
-     * 'reflect'          ('even' type only)
-     * 'symmetric'        ('even' type only)
+     * 'reflect'    ('even' type only)
+     * 'symmetric'  ('even' type only)
     """
     from itertools import izip
     from numpy import empty
     
+    # Check arguments
     if mode not in __pad_modes:
         raise ValueError('Unknown mode '+mode)
+    pad_width = __get_all_values('pad_width', pad_width, X.ndim)
+    if mode == 'constant':
+        constant_values = __get_all_values('constant_values', constant_values, X.ndim, X.dtype.type)
+    elif mode == 'edge': pass # no extra arguments
+    else: # if mode in ('reflect', 'symmetric'):
+        if reflect_type not in ('even', 'odd'): raise ValueError('Unknown reflect_type '+reflect_type)
+        if reflect_type == 'odd': raise ValueError('reflect_type of odd not supported')
     
     # Create the output and fill in the bulk of the data
-    new_sh = [(n+p1+p2) for n,(p1,p2) in izip(X.shape, padding)]
+    new_sh = [(n+p1+p2) for n,(p1,p2) in izip(X.shape, pad_width)]
     out = empty(new_sh, dtype=X.dtype)
-    copy(out[[slice(p1,p1+n) for n,(p1,p2) in izip(X.shape, padding)]], X, nthreads)
+    copy(out[[slice(p1,p1+n) for n,(p1,p2) in izip(X.shape, pad_width)]], X, nthreads)
 
     # Fill in padding
     # Not done in parallel since it is assumed to be a small amount compared to the core. However
     # could make it 'choose' if copy(A[...], B[...]) is used instead of A[...] = B[...] (but this
-    # doesn't help fill functions).
-    if mode == 'constant' or mode == 'zero' or mode == 'one':
-        c = 1 if mode == 'one' else 0
-        slices = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
-        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
-            if p1 != 0:
-                slices[i] = slice(p1)
-                out[slices].fill(c)
-            if p2 != 0:
-                slices[i] = slice(n+p1, n+p1+p2)
-                out[slices].fill(c)
-            slices[i] = slice(None)
+    # doesn't help constant padding which uses the fill function).
+    if mode == 'constant':
+        __fill_constant_padding(out, pad_width, constant_values)
     elif mode == 'edge':
-        from numpy.lib.stride_tricks import as_strided
-        dst = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
-        src = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
-        def repeat_dim(X, dim, n):
-            sh = list(X.shape)
-            sh.insert(dim, n)
-            st = list(X.strides)
-            st.insert(dim, 0)
-            return as_strided(X, sh, st)
-        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
-            if p1 != 0:
-                dst[i],src[i] = slice(0, p1), p1
-                out[dst] = repeat_dim(out[src], i, p1)
-            if p2 != 0:
-                dst[i],src[i] = slice(n+p1, n+p1+p2), n+p1-1
-                out[dst] = repeat_dim(out[src], i, p2)
-            dst[i],src[i] = slice(None), slice(None)
+        __fill_edge_padding(out, pad_width)
     else: # if mode in ('reflect', 'symmetric'):
-        off = 1 if mode == 'reflect' else 0 # do not duplicate edge when reflecting
-        dst = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
-        src = [slice(p1, n+p1) for n,(p1,p2) in izip(X.shape, padding)]
-        for i,(n,(p1,p2)) in enumerate(izip(X.shape, padding)):
-            while n-off < p1:
-                # Copy n-off at a time until we have enough to do p1 all at once
-                dst[i],src[i] = slice(p1-n+off, p1), slice(p1+n-1, p1-1+off, -1)
-                out[dst] = out[src]
-                p1 -= n-off; n += n-off
-            if p1 != 0:
-                # Do all of p1 at once
-                dst[i],src[i] = slice(0, p1), slice(2*p1-1+off, p1-1+off, -1)
-                out[dst] = out[src]
-            while n-off < p2:
-                # Copy n-off at a time until we have enough to do p2 all at once
-                dst[i],src[i] = slice(p1+n, p1+2*n-off), slice(p1+n-1-off, p1-1, -1)
-                out[dst] = out[src]
-                p2 -= n-off; n += n-off
-            if p2 != 0:
-                # Do all of p2 at once
-                dst[i],src[i] = slice(p1+n, p1+n+p2), slice(p1+n-1-off, p1+n-p2-1-off, -1)
-                out[dst] = out[src]
-            dst[i],src[i] = slice(None), slice(None)
+        __fill_symmetric_padding(out, pad_width, mode == 'reflect')
     return out
+def __fill_constant_padding(X, pad_width, constant_values):
+    from itertools import izip
+    slices = [slice(p1, n-p2) for n,(p1,p2) in izip(X.shape, pad_width)]
+    for i,(n,(p1,p2),(c1,c2)) in enumerate(izip(X.shape, pad_width, constant_values)):
+        if p1 != 0:
+            slices[i] = slice(p1)
+            X[slices].fill(c1)
+        if p2 != 0:
+            slices[i] = slice(n-p2, n)
+            X[slices].fill(c2)
+        slices[i] = slice(None)
+def __fill_edge_padding(X, pad_width):
+    from itertools import izip
+    from numpy.lib.stride_tricks import as_strided
+    dst = [slice(p1, n-p2) for n,(p1,p2) in izip(X.shape, pad_width)]
+    src = [slice(p1, n-p2) for n,(p1,p2) in izip(X.shape, pad_width)]
+    def repeat_dim(X, dim, n):
+        sh = list(X.shape);   sh.insert(dim, n)
+        st = list(X.strides); st.insert(dim, 0)
+        return as_strided(X, sh, st)
+    for i,(n,(p1,p2)) in enumerate(izip(X.shape, pad_width)):
+        if p1 != 0:
+            dst[i],src[i] = slice(0, p1), p1
+            X[dst] = repeat_dim(X[src], i, p1)
+        if p2 != 0:
+            dst[i],src[i] = slice(n-p2, n), n-p2-1
+            X[dst] = repeat_dim(X[src], i, p2)
+        dst[i],src[i] = slice(None), slice(None)
+def __fill_symmetric_padding(X, pad_width, reflect):
+    from itertools import izip
+    off = 1 if reflect else 0 # do not duplicate edge when reflecting
+    dst = [slice(p1, n-p2) for n,(p1,p2) in izip(X.shape, pad_width)]
+    src = [slice(p1, n-p2) for n,(p1,p2) in izip(X.shape, pad_width)]
+    for i,(n,(p1,p2)) in enumerate(izip(X.shape, pad_width)):
+        n = n-p1-p2 # unpadded size
+        while n-off < p1:
+            # Copy n-off at a time until we have enough to do p1 all at once
+            dst[i],src[i] = slice(p1-n+off, p1), slice(p1+n-1, p1-1+off, -1)
+            X[dst] = X[src]
+            p1 -= n-off; n += n-off
+        if p1 != 0:
+            # Do all of p1 at once
+            dst[i],src[i] = slice(0, p1), slice(2*p1-1+off, p1-1+off, -1)
+            X[dst] = X[src]
+        while n-off < p2:
+            # Copy n-off at a time until we have enough to do p2 all at once
+            dst[i],src[i] = slice(p1+n, p1+2*n-off), slice(p1+n-1-off, p1-1, -1)
+            X[dst] = X[src]
+            p2 -= n-off; n += n-off
+        if p2 != 0:
+            # Do all of p2 at once
+            dst[i],src[i] = slice(p1+n, p1+n+p2), slice(p1+n-1-off, p1+n-p2-1-off, -1)
+            X[dst] = X[src]
+        dst[i],src[i] = slice(None), slice(None)
+def __get_all_values(name, val, ndim, cast=int):
+    from collections import Sequence
+    if not isinstance(val, Sequence):
+        # Single number
+        return ((cast(val),cast(val)),)*ndim
+    if len(val) == 0:
+        # Only could be 0-dim
+        if ndim == 0: return ()
+        raise ValueError('Wrong number of items for '+name)
+    if not isinstance(val[0], Sequence):
+        # Must be (val,)
+        if len(val) == 1: return ((cast(val[0]), cast(val[0])),)*ndim
+        raise ValueError('Wrong number of items for '+name)
+    if len(val) == 1:
+        # Must be ((before,after),)
+        if len(val[0]) == 2: return ((cast(val[0][0]), cast(val[0][1])),)*ndim
+        raise ValueError('Wrong number of items for '+name)
+    if len(val) != ndim or any(len(x) != 2 for x in val):
+        raise ValueError('Wrong number of items for '+name)
+    return tuple((cast(b),cast(a)) for b,a in val)
 
 
 ########## FFT Utility ##########
