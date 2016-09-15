@@ -82,7 +82,7 @@ class FilterBank(Filter):
 
         # Pad/region the image
         P = self._padding
-        im = im2double(get_image_region(im, P, region)[0])
+        im = im2double(get_image_region(im, P, region, nthreads=nthreads)[0])
         region = (P, P, im.shape[0]-P, im.shape[1]-P)
 
         # Get the output for the filters

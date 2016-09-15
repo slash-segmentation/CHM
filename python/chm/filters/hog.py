@@ -55,7 +55,7 @@ class HOG(Filter):
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ._base import get_image_region
         from ._hog import hog_entire, hog_new #pylint: disable=no-name-in-module
-        im, region = get_image_region(im, self._padding, region)
+        im, region = get_image_region(im, self._padding, region, nthreads=nthreads)
         if self.__compat:
             # TODO: there is a pre-computed division in the C code, should it be kept?
             out = hog_entire(im, 15, True, out, nthreads)

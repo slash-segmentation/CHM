@@ -69,7 +69,7 @@ class Gabor(Filter):
 
         padding = Gabor.__padding
         compat = self.__compat
-        im, region = get_image_region(im, padding, region)
+        im, region = get_image_region(im, padding, region, nthreads=nthreads)
         H, W = im.shape[0]-2*padding, im.shape[1]-2*padding # post-filtering shape
         if out is None: out = empty((len(Gabor.__filters), H, W), dtype=im.dtype)
         IF2 = empty((H, W), dtype=im.dtype)

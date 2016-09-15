@@ -36,7 +36,7 @@ class Edge(Filter):
             # In compatibility mode, instead of symmetric reflections we pad with 0s
             im, region = replace_sym_padding(im, 3, region, 6, nthreads)
         else:
-            im, region = get_image_region(im, 6, region)
+            im, region = get_image_region(im, 6, region, nthreads=nthreads)
             region = (region[0]-3, region[1]-3, region[2]-3, region[3]-3)
         # OPT: if out exists, could one of these intermediates be avoided?
         imx = correlate_xy(im, Edge.__kernel[0], Edge.__kernel[1], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)

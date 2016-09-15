@@ -20,7 +20,7 @@ class SIFT(Filter):
         from scipy.ndimage.filters import correlate1d
         from ._base import get_image_region, round_u8_steps
         half_patch_sz = (SIFT.__patch_sz // 2) - 1
-        im, region = get_image_region(im, half_patch_sz, region, 'constant') # OPT: +3? for multiple correlate1d's
+        im, region = get_image_region(im, half_patch_sz, region, 'constant', nthreads=nthreads) # OPT: +3? for multiple correlate1d's
         gauss_filter = SIFT.__gauss_filter
         im = correlate1d(im, gauss_filter, 0, mode='nearest') # INTERMEDIATE: im.shape
         im = correlate1d(im, gauss_filter, 1, mode='nearest') # TODO: TEMPORARY: im.shape
