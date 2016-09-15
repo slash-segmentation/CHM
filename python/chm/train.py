@@ -26,6 +26,7 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
     """
     from itertools import izip
     from psutil import cpu_count
+    from numpy import empty
     from .utils import im2double, copy
 
     # Basic checks of images, labels, and masks
@@ -34,7 +35,7 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
     if any(len(lbl.dtype) > 1 or lbl.dtype.kind not in ('iufb') for lbl in lbls): raise ValueError('Labels must be grayscale')
     shapes = [im.shape for im in ims]
     if any(sh != lbl.shape for sh,lbl in izip(shapes,lbls)): raise ValueError('Labels must be the same shape as the corresponding images')
-    if mask is not None:
+    if masks is not None:
         if len(ims) != len(masks): raise ValueError('The number of mask images must be equal to the number of training/label images')
         if any(len(mask.dtype) > 1 or mask.dtype.kind not in ('iufb') for mask in masks): raise ValueError('Masks must be grayscale')
         if any(sh != mask.shape for sh,mask in izip(shapes,masks)): raise ValueError('Masks must be the same shape as the corresponding images')
@@ -99,7 +100,7 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
 def __print(s):
     """Like print(...) but pre-pends the current timestamp and forces a flush."""
     import sys, datetime
-    print('%s %s'%(str(datetime.utcnow())[:19], s))
+    print('%s %s'%(str(datetime.datetime.utcnow())[:19], s))
     sys.stdout.flush()
     
 def __get_all_shapes(shapes, nlvls):
@@ -234,7 +235,7 @@ def __load_clabels(submodel, clabels):
         path = join(folder, '%03d.npy'%i)
         # Load as a memory-mapped array viewed as an ndarray
         # (should be using 'r' mode but then Cython typed memoryviews reject it)
-        clabels[i].append(load(path, 'r+').view(ndarray))
+        clabels[i].append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
 
 def __get_output_folder(submodel):
     """Get the folder where outputs are written to for a specific submodel."""

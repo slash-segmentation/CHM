@@ -517,7 +517,7 @@ class AndOrNetSubModel(SubModel):
         info['context_filter'] = self.context_filter
         if disc is not None:
             # Save (and load) discriminants
-            from numpy import save
+            from numpy import save, load
             info['discriminants'] = basename(path)+'.npy'
             save(path+'.npy', disc)
             self._load(load(path+'.npy', 'r'))
