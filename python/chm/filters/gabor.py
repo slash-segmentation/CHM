@@ -86,10 +86,6 @@ class Gabor(Filter):
             if compat:
                 round_u8_steps(IF1)
                 round_u8_steps(IF2)
-            else:
-                # TODO: this really should not be necessary
-                IF1.clip(0.0, 1.0, IF1)
-                IF2.clip(0.0, 1.0, IF2)
             hypot(IF1, IF2, IF1, nthreads)
             
         return out
