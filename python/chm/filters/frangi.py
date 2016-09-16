@@ -18,13 +18,18 @@ class Frangi(Filter):
     described by Frangi (1998). This produces 14 features from the seven Gaussian sigmas 2, 3, 4,
     5, 7, 9, and 11 each done with the image and the inverted image.
 
-    This filter does not have a compat mode since it never existed in the MATLAB version and does
-    not have a scale flag since it is already fixed between 0 and 1.
+    This filter does not have a compat mode since it never existed in the MATLAB version.
+    
+    The scale flag causes the output data to be multiplied by 1/(1-exp(-2)), resulting in all data
+    being in the range 0 to 1 (the unscaled theoretical range is 0 to 1-exp(-2)). Most of the values
+    (>75%) will end up at exactly 0. Besides those most of the points will end up at about 1. It
+    defaults to True.
     
     Uses 4 times the image size as tempoarary memory usage.
     """
-    def __init__(self):
+    def __init__(self, scale=True):
         super(Frangi, self).__init__(11*3, 14)
+        self.__scale = scale
     def __call__(self, im, out=None, region=None, nthreads=1):
         from numpy import empty
         from ._base import get_image_region
@@ -46,4 +51,10 @@ class Frangi(Filter):
         for i,sigma in enumerate(sigmas, 7):
             frangi(get_image_region(im, sigma*3, region, nthreads=nthreads)[0], float(sigma), out[i], nthreads)
 
+        # Scale the output data
+        if self.__scale:
+            from math import exp
+            factor = 1/(1-exp(-2))
+            out *= factor
+            
         return out
