@@ -22,6 +22,9 @@ class Edge(Filter):
     extra effort and memory to do so because the FilterBank class adds reflection padding
     inherently, so we have to detect that and correct it.
 
+    Scaling is ever applied. The theoretical range of the filter is 0 to 1.96658337 however only
+    about 1 in 385 values are above 1.
+
     Uses O(2*im.size).
     """
     def __init__(self, compat=False):
