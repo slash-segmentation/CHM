@@ -164,7 +164,7 @@ cdef dbl eigvals(intp H, intp W, intp stride, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) n
         Frobenius maximum norm of all Hessian matrices
     """
     cdef intp x, y
-    cdef dbl summ, diff, temp, mu1, mu2, lam1, lam2, S2, c = 0.0
+    cdef dbl summ, diff, temp, mu1, mu2, lam1, lam2, c = 0.0
     for y in xrange(H):
         for x in xrange(W):
             summ = Dxx[x] + Dyy[x]
@@ -176,14 +176,14 @@ cdef dbl eigvals(intp H, intp W, intp stride, dbl_p Dxx, dbl_p Dxy, dbl_p Dyy) n
             mu2 = 0.5*(summ - temp) # mu2 = (Dxx + Dyy - sqrt((Dxx-Dyy)^2+4*Dxy^2)) / 2
 
             # Sort eigenvalues by absolute value abs(eig1) < abs(eig2)
-            if fabs(mu1) > fabs(mu2): lam1 = mu2*mu2; lam2 = mu1 # lambda1 is always used squared
-            else:                     lam1 = mu1*mu1; lam2 = mu2
+            # lambda1 is always used squared
+            # lambda2 is always used squared when greater than 0
+            if fabs(mu1) > fabs(mu2): lam1 = mu2*mu2; lam2 = (mu1*mu1) if mu1 > 0 else 0
+            else:                     lam1 = mu1*mu1; lam2 = (mu2*mu2) if mu2 > 0 else 0
             Dxx[x] = lam1; Dxy[x] = lam2
 
             # Calculate the dynamic c value
-            if lam2 > 0.0:
-                S2 = lam1 + lam2*lam2
-                if S2 > c: c = S2
+            if lam2 > 0.0 and lam1+lam2 > c: c = lam1 + lam2
         Dxx = off(Dxx, stride)
         Dxy = off(Dxy, stride)
         Dyy = off(Dyy, stride)
@@ -210,10 +210,9 @@ cdef void vesselness(intp H, intp W, intp stride, intp out_stride, dbl_p lambda1
     cdef dbl lam1, lam2, Rb2, S2
     for y in xrange(H):
         for x in xrange(W):
-            lam2 = lambda2[x]
-            if lam2 > 0.0:
+            if lambda2[x] > 0.0:
                 # Compute similarity measures
-                lam1 = lambda1[x]; lam2 = lam2*lam2
+                lam1 = lambda1[x]; lam2 = lambda2[x]
                 Rb2 =     exp(lam1/lam2*(-1/(2*BETA*BETA))) # exp(-Rb^2/(2*beta^2)); Rb = lambda1 / lambda2
                 S2  = 1.0-exp((lam1+lam2)*c) # 1-exp(-S^2/(2*c^2));   S = sqrt(sum(lambda_i^2))
                 # Compute vessel-ness
