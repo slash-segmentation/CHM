@@ -23,10 +23,10 @@ class Haar(Filter):
     the area before division (which is unnecessary due to the area never being 0) so it is more
     accurate.
     
-    The scale flag causes the output data to be multiplied by 3 then shifted up by 0.5, resulting
-    in most data being in the range 0 to 1 with a mean of 0.5 (the unscaled theoretical range is
-    -1 to 1, but the vast majority of data is only from -0.3 to 0.3). It defaults to the opposite
-    of the compat flag.
+    The scale flag causes the output data to be multiplied by 0.625 then shifted up by 0.5,
+    resulting in most data being in the range 0 to 1 with a mean of 0.5 (the unscaled theoretical
+    range is -1 to 1, but the vast majority of data is only from -0.8 to 0.8). It defaults to the
+    opposite of the compat flag.
 
     Uses intermediate memory of O(im.size). While technically it is multi-threaded, it doesn't
     really help much.
@@ -48,5 +48,5 @@ class Haar(Filter):
         im, region = get_image_region(im, 8, region, nthreads=nthreads)
         ii = cc_cmp_II(im) # INTERMEDIATE: im.shape + (16,16)
         out = cc_Haar_features(ii, 16, out, nthreads, self.__compat)
-        if self.__scale: out *= 3; out += 0.5
+        if self.__scale: out *= 0.625; out += 0.5
         return out
