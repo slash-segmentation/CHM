@@ -181,8 +181,9 @@ def hog_entire(ndarray im not None, int filt_width=15, bint compat=True, ndarray
 DEF CELL_SIZE=8
 DEF BLOCK_SIZE=2
 DEF NBINS=9
-DEF UNSIGNED_ANGLES=True
-DEF NORM='L2-hys' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
+DEF UNSIGNED_ANGLES=True # both MATLAB and scikits HOG use unsigned angles
+DEF NORM='L2-norm' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
+# original MATLAB HOG uses L2-hys with a clipping at 0.2 while scikits HOG uses L2-norm
 DEF CLIP_VAL=0.2 # only used if NORM is 'L2-hys'
 DEF NFEATURES=BLOCK_SIZE*BLOCK_SIZE*NBINS
 
@@ -270,7 +271,7 @@ cdef void __gradients(double[:,::contiguous] im, intp a, intp b, double[:,:,::1]
             obin = __gradient(im, y, x, &mag)
             for i in xrange(i_start, i_end):
                 for j in xrange(j_start, j_end):
-                    hist[i,j,obin] += mag # TODO: BAD PARALLEL MEMORY ACCESS HERE
+                    hist[i,j,obin] += mag
 
 cdef inline intp __gradient(double[:,::contiguous] im, intp y, intp x, double* mag) nogil:
     """
