@@ -183,7 +183,7 @@ DEF BLOCK_SIZE=2
 DEF NBINS=9
 DEF UNSIGNED_ANGLES=True # both MATLAB and scikits HOG use unsigned angles
 DEF NORM='L2-hys' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
-# original MATLAB HOG uses L2-hys with a clipping at 0.2 while scikits HOG uses L2-norm
+# original MATLAB HOG uses L2-hys with a clipping at 0.2 while scikits HOG uses L1-norm
 DEF CLIP_VAL=0.2 # only used if NORM is 'L2-hys'
 DEF NFEATURES=BLOCK_SIZE*BLOCK_SIZE*NBINS
 
