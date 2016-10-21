@@ -7,8 +7,8 @@ C++. Improved speed, added multi-threading, and increased accuracy. Additionally
 version was created (named hog_new) which runs faster and implements the algorithm much more
 accurately than the MATLAB version.
 
-Most of the MATLAB code is in a separate C++ file. The new Cython version is completely in this
-file.
+Most of the MATLAB version code is in a separate C++ file. The new Cython version is completely in
+this file.
 
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
@@ -182,7 +182,7 @@ DEF CELL_SIZE=8
 DEF BLOCK_SIZE=2
 DEF NBINS=9
 DEF UNSIGNED_ANGLES=True # both MATLAB and scikits HOG use unsigned angles
-DEF NORM='L2-norm' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
+DEF NORM='L2-hys' # must be one of 'L2-hys', 'L2-norm', 'L1-norm', or 'L1-sqrt'
 # original MATLAB HOG uses L2-hys with a clipping at 0.2 while scikits HOG uses L2-norm
 DEF CLIP_VAL=0.2 # only used if NORM is 'L2-hys'
 DEF NFEATURES=BLOCK_SIZE*BLOCK_SIZE*NBINS
@@ -280,13 +280,14 @@ cdef inline intp __gradient(double[:,::contiguous] im, intp y, intp x, double* m
     """
     cdef double dx = im[y,x+1] - im[y,x-1]
     cdef double dy = im[y+1,x] - im[y-1,x]
-    mag[0] = sqrt(dx*dx + dy*dy)
+    mag[0] = sqrt(dx*dx + dy*dy) # Unnecessary: / (CELL_SIZE * CELL_SIZE)
     cdef double ornt
     IF UNSIGNED_ANGLES:
-        #ornt = atan2(dy, dx); ornt %= M_PI
-        #ornt = atan2(dy, dx); ornt += (ornt<0)*M_PI
         if dx == 0: ornt = 0 if y == 0 else M_PI/2
         else: ornt = atan(dy/dx); ornt += (ornt<0)*M_PI
+        # Slower but more straight forward ways to calculate the unsigned orientation:
+        #ornt = atan2(dy, dx); ornt %= M_PI
+        #ornt = atan2(dy, dx); ornt += (ornt<0)*M_PI
         return <intp>(ornt*NBINS/M_PI)
     ELSE:
         ornt = atan2(dy, dx) + M_PI
@@ -347,7 +348,7 @@ ELSE:
         """
         cdef intp i
         cdef double norm = 0.0
-        for i in xrange(NFEATURES): norm += block[i]
+        for i in xrange(NFEATURES): norm += abs(block[i])
         if norm != 0.0:
             norm = 1.0 / norm
             for i in xrange(NFEATURES):
