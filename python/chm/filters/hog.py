@@ -36,9 +36,9 @@ class HOG(Filter):
     benefit of being much faster (about 30-35x faster) but takes more memory. While the compat mode
     uses minimal intermediate memory the non-compat mode uses O(9*im.size) in temporary memory.
     
-    The scale flag causes the output data to be multiplied by 3.75, resulting in most data being in
-    the range 0 to 1 with a mean of 0.5 (the unscaled theoretical range is 0 to 1, but the vast
-    majority of data is only from 0 to 0.265). It defaults to the opposite of the compat flag.
+    The scale flag causes the output data to be multiplied by 3.375, resulting in most data being in
+    the range 0 to 1 with a mean of approximately 0.5 (the unscaled theoretical range is 0 to 1, but
+    the vast majority of data is only from 0 to 0.3). It defaults to the opposite of the compat flag.
     
     Note that the original MATLAB function used float32 values for many intermediate values so the
     outputs from this function are understandably off by up to 1e-7 even in compat mode.
@@ -61,5 +61,5 @@ class HOG(Filter):
             out = hog_entire(im, 15, True, out, nthreads)
         else:
             out = hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding
-        if self.__scale: out *= 3.75
+        if self.__scale: out *= 3.375
         return out
