@@ -25,6 +25,8 @@ class Model(object):
     __metaclass__ = ABCMeta
     def __init__(self, path, model):
         self._path = path
+        assert(not hasattr(self, '_nstages') or self._nstages == len(model))
+        assert(not hasattr(self, '_nlevels') or self._nlevels == len(model[0]) - 1)
         self._nstages = len(model)
         self._nlevels = len(model[0]) - 1
         self._model = model
@@ -108,10 +110,10 @@ class MatlabModel(Model):
     def __init__(self, path):
         from os.path import join
         from pysegtools.general.matlab import openmat
+        nstages,nlevels = int(self.__params['Nstage'].data[0]), int(self.__params['Nlevel'].data[0])
+        self._nstages, self._nlevels = nstages, nlevels
         self.__params = openmat(join(path, 'param.mat'), 'r')
-        model = Model.nested_list(int(self.__params['Nstage'].data[0]),
-                                  int(self.__params['Nlevel'].data[0]),
-                                  lambda s,l:AndOrNetSubModel.loadmat(self, path, s, l))
+        model = Model.nested_list(nstages, nlevels, lambda s,l:AndOrNetSubModel.loadmat(self, path, s, l))
         super(MatlabModel, self).__init__(path, model)
     def __contains__(self, name): return name in self.__params
     def _get_param(self, name):
@@ -147,8 +149,7 @@ class PythonModel(Model):
         self._path = path
         if info is None:
             with open(path, 'rb') as f: info = pickle.load(f)
-            self._nstages = info['nstages']
-            self._nlevels = info['nlevels']
+            self._nstages, self._nlevels = info['nstages'], info['nlevels']
             model = [[AndOrNetSubModel.load(self, abspath(join(folder,sm))) for sm in sms]
                      for sms in info['submodels']]
         else:
@@ -449,11 +450,12 @@ class AndOrNetSubModel(SubModel):
         from os.path import join
         path = join(path, 'MODEL_level%d_stage%d.mat'%(level,stage))
         with openmat(path, 'r') as mat: info = mat_nice(mat['model'])
-        smtype = AndOrNetSubModel_SB if model['discriminants'].dtype == float32 else AndOrNetSubModel
+        disc,info = info['discriminants'], {n:info[n] for n in info.dtype.names if n != 'discriminants'}
+        smtype = AndOrNetSubModel_SB if disc.dtype == float32 else AndOrNetSubModel
         assert(smtype._nGrp == info['nGroup'] and smtype._nDPG == info['nDiscriminantPerGroup'])
         f, cf = MatlabModel.get_filters()
         sm = smtype(model, stage, level, f, cf)
-        sm._load(info.pop('discriminants')) #pylint: disable=no-member
+        sm._load(disc) #pylint: disable=no-member
         sm._info = info
         return sm
     @staticmethod
