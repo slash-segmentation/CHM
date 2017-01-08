@@ -178,7 +178,7 @@ def replace_sym_padding(im, padding, region=None, full_padding=None, nthreads=1)
           __is_sym(im_pad[::-1], pB), __is_sym(im_pad.T[::-1], pR))
 
     # If all sides have symmetrical padding (or no padding), just 0 pad all sides
-    if all(zs): return fast_pad(im[T:B,L:R], padding, 'constant', nthreads)
+    if all(zs): return get_image_region(im[T:B,L:R], padding, None, 'constant', nthreads)
     
     # If no sides have symmetrical padding, just extract the image region
     if not any(zs): return get_image_region(im, full_padding, region, 'constant', nthreads)
@@ -307,10 +307,8 @@ def fast_pad(X, pad_width, mode, nthreads=1, constant_values=0, reflect_type='ev
     """
     Equivilent to:
         return np.pad(X, pad_width, mode)
-    with the bulk of the work possibily parallelized and even when not it is much faster.
-    
-    However the `pad_width` must be fully specified (as in a 2-element tuple of values for each
-    axis) and only the following modes are supported:
+    with the bulk of the work possibily parallelized and even when not it is much faster and only
+    the following modes are supported:
      * 'constant'   ('constant_values' keyword is supported)
      * 'edge'
      * 'reflect'    ('even' type only)
