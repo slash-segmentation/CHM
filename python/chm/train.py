@@ -136,14 +136,14 @@ def __downsample_images(ims, lbls, masks, contexts, clabels, nthreads):
     Downsample the images, labels, and contexts when going from one level to the next. This
     operates on the lists in-place.
     """
-    from .utils import MyDownSample1, MyMaxPooling1
-    ims[:]  = [MyDownSample1(im,  None, nthreads) for im  in ims ]
-    lbls[:] = [MyMaxPooling1(lbl, None, nthreads) for lbl in lbls]
+    from .utils import MyDownSample, MyMaxPooling
+    ims[:]  = [MyDownSample(im,  1, nthreads=nthreads) for im  in ims ]
+    lbls[:] = [MyMaxPooling(lbl, 1, nthreads=nthreads) for lbl in lbls]
     if masks is not None:
-        masks[:] = [MyMaxPooling1(mask, None, nthreads) for mask in masks]
+        masks[:] = [MyMaxPooling(mask, 1, nthreads=nthreads) for mask in masks]
     if len(clabels[0]) == 0: contexts[:] = [[] for _ in ims]
     for i,clbl in enumerate(clabels): contexts[i].append(clbl[-1])
-    contexts[:] = [[MyDownSample1(c, None, nthreads) for c in cntxts] for cntxts in contexts]
+    contexts[:] = [[MyDownSample(c, 1, nthreads=nthreads) for c in cntxts] for cntxts in contexts]
 
 def __extract_features(submodel, ims, lbls, masks, contexts, nthreads):
     """

@@ -385,7 +385,7 @@ def __run_chm_test_procs(mems, model, regions, ntasks, nthreads):
     from multiprocessing import JoinableQueue, Process
     from itertools import izip
     from numpy import copyto
-    from .utils import MyDownSample1
+    from .utils import MyDownSample
     print("Running CHM test with %d task%s and %d thread%s per task" %
           (ntasks, 's' if ntasks > 1 else '', nthreads, 's' if nthreads > 1 else ''))
     nthreads_full = ntasks*nthreads
@@ -410,9 +410,9 @@ def __run_chm_test_procs(mems, model, regions, ntasks, nthreads):
             copyto(out_tmp, outs[0])
         else:
             # Downsample image and calculate contexts
-            im = MyDownSample1(im, ims[level], nthreads_full)
-            for c,o in izip(contexts[level-1], contexts[level]): MyDownSample1(c, o, nthreads_full)
-            MyDownSample1(outs[level-1], contexts[level][-1], nthreads_full)
+            im = MyDownSample(im, 1, ims[level], None, nthreads_full)
+            for c,o in izip(contexts[level-1], contexts[level]): MyDownSample(c, 1, o, None, nthreads_full)
+            MyDownSample(outs[level-1], 1, contexts[level][-1], None, nthreads_full)
             #for i,c in enumerate(contexts[level]): __save('cntxt-%d-%d.png'%(level,i), c)
         #__save('im-%d.png'%(level), im)
         #print(im.min(), im.max())
@@ -548,7 +548,7 @@ def testCHM(im, model, nthreads=1):
     # CHANGED: the 'savingpath' (now called model) can now either be the path of the folder
     # containing the models or it can be an already loaded model
     # CHANGED: dropped Nstage, Nlevel, NFeatureContexts arguments - these are included in the model
-    from .utils import MyDownSample1, MyUpSample
+    from .utils import MyDownSample, MyUpSample
     from .model import Model
     model = Model.load(model)
     nstages = model.nstages
@@ -562,9 +562,9 @@ def testCHM(im, model, nthreads=1):
                        [MyUpSample(c,i,nthreads=nthreads)[:sh[0],:sh[1]] for i,c in enumerate(clabels)]
             clabels = []
         else:
-            imx = MyDownSample1(imx, None, nthreads)
-            contexts = [] if level == 1 else [MyDownSample1(c, None, nthreads) for c in contexts]
-            contexts.append(MyDownSample1(clabels[-1], None, nthreads))
+            imx = MyDownSample(imx, 1, nthreads=nthreads)
+            contexts = [] if level == 1 else [MyDownSample(c, 1, nthreads=nthreads) for c in contexts]
+            contexts.append(MyDownSample(clabels[-1], 1, nthreads=nthreads))
         X = sm.filter(imx, contexts, nthreads=nthreads)
         if stage == nstages and level == 0: del im, imx, contexts
         clabels.append(sm.evaluate(X, nthreads))

@@ -140,9 +140,9 @@ ctypedef ptype (*p2func)(ptype* block, intp stride) nogil
 def max_pooling(in_np, int L, ptype[:,::contiguous] out, int nthreads=1):
     """
     Decreases the 2D array size by 2**L. For example if L == 1 the 2D array each dimension is
-    halved in size. The downsampling uses max-pooling. The Python functions MyMaxPooling or
-    MyMaxPooling1 should be used as they check the inputs, take care of various edge cases (like
-    L==0), allocate the output appropiately if necessary, and support the region argument.
+    halved in size. The downsampling uses max-pooling. The Python function MyMaxPooling should be
+    used as they check the inputs, take care of various edge cases (like L==0), allocate the
+    output appropiately if necessary, and support the region argument.
     
     Special cases:
         L==1 is made faster (~10%) than without the special code

@@ -63,10 +63,6 @@ def MyUpSample(im, L, out=None, region=None, nthreads=1):
     copy_flat(out, im, nthreads)
     return out
 
-    # Old method: (not complete)
-    #from numpy import repeat
-    #return repeat(repeat(im, N, axis=0), N, axis=1)
-
 def MyDownSample(im, L, out=None, region=None, nthreads=1):
     """
     Decreases the image size by 2**L. So if L == 0, image is returned unchanged, if L == 1 the
@@ -77,7 +73,7 @@ def MyDownSample(im, L, out=None, region=None, nthreads=1):
     To match the filters it supports out, region, and nthreads arguments. This can be done in-place
     where out and im overlap.
     """
-    # CHANGED: only supports 2D
+    # CHANGED: only supports 2D although the underlying imresize_fast supports 3D
     from .imresize import imresize_fast # built exactly for our needs
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
     if L == 0:
@@ -85,20 +81,8 @@ def MyDownSample(im, L, out=None, region=None, nthreads=1):
         copy(out, im, nthreads)
         return out
     im = pad_to_even(im, nthreads)
-    if L==1 and out is not None: return imresize_fast(im, out, nthreads)
+    if L==1: return imresize_fast(im, out, nthreads)
     return MyDownSample(imresize_fast(im, None, nthreads), L-1, out, None, nthreads)
-
-    # Old method: (not complete)
-    #from numpy import vstack, hstack
-    #from imresize import imresize
-    #if nr&1: im, nr = vstack((im, im[-1:,:,...])), nr+1
-    #if nc&1: im, nc = hstack((im, im[:,-1:,...])), nc+1
-    #return MyDownSample(imresize(im, (nr//2, nc//2)), L-1, out, None, nthreads)
-
-def MyDownSample1(im, out=None, nthreads=1):
-    """Equivalent to MyDownSample(..., L=1, ..., region=None, ...)"""
-    from .imresize import imresize_fast
-    return imresize_fast(pad_to_even(im, nthreads), out, nthreads)
 
 def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     """
@@ -108,29 +92,7 @@ def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     To match the filters it supports out, region, and nthreads arguments.
     """    
     # CHANGED: only supports 2D (the 3D just did each layer independently [but all at once])
-    
-    # Original method, directly converted
-    #from numpy import maximum, zeros, vstack, hstack
-    #if L == 0: return im
-    #nr,nc = im.shape # this part could be re-done with fast-pad or a slightly modified pad_to_even
-    #if nr&1: im = vstack((im, zeros((1,nc), im.dtype)))
-    #if nc&1: im = hstack((im, zeros((nr,1), im.dtype)))
-    #im = maximum(maximum(im[0::2,0::2],im[0::2,1::2]),
-    #             maximum(im[1::2,0::2],im[1::2,1::2]))
-    #return MyMaxPooling(im, L-1)
-    
-    ## Using blockviews, ~4 times faster
-    #sz = 2 << (L-1)
-    #nR,nC = im.shape
-    #eR = nR&(sz-1); eC = nC&(sz-1) # the size of the not-block fitting edges
-    #oR = nR >> L;   oC = nC >> L   # the main part of out, not including the partial edges
-    #if out is None: out = empty(((nR+sz-1)>>L, (nC+sz-1)>>L), dtype=im.dtype)
-    #if oR and oC: __bv(im,            (sz, sz)).max(2).max(2, out=out[:oR,:oC])
-    #if eR and oC: __bv(im[-eR:,   :], (eR, sz)).max(2).max(2, out=out[-1:,:oC])
-    #if oR and eC: __bv(im[   :,-eC:], (sz, eC)).max(2).max(2, out=out[:oR,-1:])
-    #if eR and eC: __bv(im[-eR:,-eC:], (eR, eC)).max(2).max(2, out=out[-1:,-1:])
-    
-    # Using Cython, ~4-5 times even faster than blockviews and is parallelized
+    # Using Cython, ~4-5 times faster than blockviews and is parallelized, and ~16-20 faster than original
     from numpy import empty
     from ._utils import max_pooling #pylint: disable=no-name-in-module
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
@@ -146,31 +108,6 @@ def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
         # Cython doesn't handle boolean arrays very well, so view it as unsigned chars
         max_pooling['npy_bool'](im.astype('u1', copy=False), L, out.astype('u1', copy=False), nthreads)
     else: max_pooling(im, L, out, nthreads)
-    return out
-
-#def __bv(im, bs):
-#    """
-#    Gets the image as a set of blocks. Any blocks that don't fit in are simply dropped (on bottom
-#    and right edges). The blocks are made into additional axes (axis=2 and 3).
-#    """
-#    from numpy.lib.stride_tricks import as_strided
-#    shape   = (im.shape[0]//bs[0],  im.shape[1]//bs[1])  + bs
-#    strides = (im.strides[0]*bs[0], im.strides[1]*bs[1]) + im.strides
-#    return as_strided(im, shape=shape, strides=strides)
-
-def MyMaxPooling1(im, out=None, nthreads=1):
-    """Equivalent to MyMaxPooling(..., L=1, ..., region=None, ...)"""
-    # NOTE: now that the Cython code always checks for L==1 and optimizes this function is not
-    # really needed as it doesn't really have any speed up over MyMaxPooling
-    from numpy import empty
-    from ._utils import max_pooling #pylint: disable=no-name-in-module
-    sh = ((im.shape[0]+1)>>1, (im.shape[1]+1)>>1)
-    if out is None: out = empty(sh, dtype=im.dtype)
-    elif out.shape != sh or out.dtype != im.dtype: raise ValueError('Invalid output array')
-    if im.dtype == bool:
-        # Cython doesn't handle boolean arrays very well, so view it as unsigned chars
-        max_pooling['npy_bool'](im.astype('u1', copy=False), 1, out.astype('u1', copy=False), nthreads)
-    else: max_pooling(im, 1, out, nthreads)
     return out
 
 
