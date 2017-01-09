@@ -110,9 +110,9 @@ class MatlabModel(Model):
     def __init__(self, path):
         from os.path import join
         from pysegtools.general.matlab import openmat
+        self.__params = openmat(join(path, 'param.mat'), 'r')
         nstages,nlevels = int(self.__params['Nstage'].data[0]), int(self.__params['Nlevel'].data[0])
         self._nstages, self._nlevels = nstages, nlevels
-        self.__params = openmat(join(path, 'param.mat'), 'r')
         model = Model.nested_list(nstages, nlevels, lambda s,l:AndOrNetSubModel.loadmat(self, path, s, l))
         super(MatlabModel, self).__init__(path, model)
     def __contains__(self, name): return name in self.__params
