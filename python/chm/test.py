@@ -46,8 +46,8 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
         used for a short period of time) and divide the rest of the CPUs among the tasks
         if only one is given, the other is calculated using its value
     hist_eq is whether the image should be exact histogram equalized to the training data set
-        default is False since this is a time intesive process and is not parallelized (make sure to
-        pre-process the data!)
+        default is False since this is a time intesive process and is not parallelized (make sure
+        to pre-process the data!)
         can also set to 'approx' which is decent and much faster than the exact histogram
         equalization used, but it is still not parallelized (even though it could be...)
     ignore_bad_tiles is whether invalid tiles in the tiles argument cause an exception or are
@@ -226,12 +226,12 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
 
 def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthreads=None, hist_eq=False, ignore_bad_tiles=False):
     """
-    Parse the arguments of the CHM_test function.
+    Parse the arguments of the CHM_test function. See that function for the argument definitions.
 
     im is returned as-is, unwrapped from an ImageSource, and/or histogram equalized.
     The model is loaded and returned as a Model object.
     tilesize is returned as a tuple that is in H,W order (even though it is given in W,H order).
-    tiles is returned as a Nx2 array in y,x order and sorted (even though it is given in x,y order).
+    tiles is returned as a Nx2 array in y,x order & sorted (even though it is given in x,y order).
     ntasks and nthreads are adjusted as necessary.
     """
     from collections import Sequence
@@ -445,8 +445,8 @@ def __save(name, im):
 def __wait_for_queue(q, stage, level, total_tiles, processes):
     """
     Waits for all items currently on the queue to be completed. If able, progress updates are
-    outputed to stdout. This is dependent on two undocumented attributes of the JoinableQueue class.
-    If they are not available, no updates are produced.
+    outputed to stdout. This is dependent on two undocumented attributes of the JoinableQueue
+    class. If they are not available, no updates are produced.
 
     If a processes crashes, this will raise an error after terminating the rest of the processes.
     """
@@ -552,7 +552,7 @@ def __run_chm_test_proc(mems, model, nthreads, q):
         finally: q.task_done()
 
 def __get_level0_contexts_func(shape, out_tmp, outs, model, nthreads):
-    """Get a function for calculating the contexts and context region for stage!=1 level 0 tiles."""
+    """Get a function for calculating the contexts and context region for stage!=1 level 0."""
     padding = model.context_filter.padding
     scales = [1<<lvl for lvl in xrange(1, len(outs))]
     IH, IW = shape
@@ -602,8 +602,8 @@ def testCHM(im, model, nthreads=1):
 
 def CHM_test_max_mem(tilesize, model):
     """
-    Gets the theoretical maximum memory usage for CHM-test for a given tile size and a model, plus a
-    small fudge factor that is larger than any additional random overhead that might be needed.
+    Gets the theoretical maximum memory usage for CHM-test for a given tile size and a model, plus
+    a small fudge factor that is larger than any additional random overhead that might be needed.
 
         tilesize a tuple of height and width for the size of a tile
         model    the model that will be used during testing
@@ -612,12 +612,12 @@ def CHM_test_max_mem(tilesize, model):
         (476+57*(Nlevel+1))*8*tilesize + 200*8*tilesize + 20*8*tilesize
     Where 476 is the number of filter features, 57 is the number of context features generated
     at each level, 8 is the size of a double-precision floating point, 200 is number of
-    discriminants used at level = 0 (when there are the most context features), and 20 is the number
-    of discriminants per group at that level.
+    discriminants used at level = 0 (when there are the most context features), and 20 is the
+    number of discriminants per group at that level.
 
-    Theoretical maximum memory usage is 7.31 GB (for 1000x1000 tiles and 4 levels). In practice I am
-    seeing this +0.03 GB which is not too much overhead, probably estimating 100 MB overhead would
-    be good enough in all cases.
+    Theoretical maximum memory usage is 7.31 GB (for 1000x1000 tiles and 4 levels). In practice I
+    am seeing this +0.03 GB which is not too much overhead, probably estimating 100 MB overhead
+    would be good enough in all cases.
 
     Note: this now asks the model for it's evaluation memory per pixel, adds 100 bytes per pixel,
     then multiplies by the number of pixels.
