@@ -1,9 +1,8 @@
 #!/usr/bin/env python2
 """
-CHM Image Testing
-Runs CHM testing phase on an image. Can also be run as a command line program with arguments.
+CHM Image Testing - Runs CHM testing on an image. Can also be run as a command line program.
 
-Jeffrey Bush, 2015-2016, NCMIR, UCSD
+Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
 
 from __future__ import division
@@ -54,9 +53,9 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
     ignore_bad_tiles is whether invalid tiles in the tiles argument cause an exception or are
         silently ignored, default is to throw an exception
     """
-    from ctypes import c_uint8, c_double, memmove
+    from ctypes import c_double
     from multiprocessing import RawArray
-    from numpy import float64, uint8, frombuffer, minimum, hstack, array, copyto
+    from numpy import float64, frombuffer, minimum, hstack, array
     from .utils import im2double
 
     im, model, tilesize, tiles, ntasks, nthreads = \
@@ -79,12 +78,9 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
         if (tilesize%2).any(): tiles = __rm_dup_tiles(tiles // 2)
         else:                  tilesize = tilesize // 2
         regions[level] = hstack((tiles*tilesize, minimum((tiles+1)*tilesize, sh_arr)))
-    
-    im_sm = RawArray(c_uint8, full_sz) # TODO: or double
-    im_shared = frombuffer(im_sm, uint8).reshape(full_sh) # TODO: or float64
-    # TODO: im2double(im, im_shared, full_rgn, nthreads_full)
-    # TODO: use utils.copy
-    copyto(im_shared, im.astype(uint8, copy=False))
+    im_sm = RawArray(c_double ,full_sz)
+    im_shared = frombuffer(im_sm, float64).reshape(full_sh)
+    im2double(im, im_shared, full_rgn, nthreads_full)
     del im, im_shared
 
     ##if I have full_rgn, then:
@@ -95,7 +91,8 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
     #   im_sm requires 4.657 GiB
     #   ds_sm requires 4.657 GiB
     #   out_sms requires 6.203 GiB (4.657 + 1.164 + 0.291 + 0.073 + 0.018)
-    #   TOTAL: 15.516 GiB (4.657 + 4.657 + 6.203)
+    #   TOTAL: 15.516 GiB
+    #   A close estimation is 80/3*npixs (which is actually exact for an infinite number of levels)
 
     # Calculate all of the downsampled shapes and sizes
     shapes = __gen_shapes(sh, model.nlevels)
@@ -227,7 +224,6 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
 ##
 ##    return regions
 
-
 def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthreads=None, hist_eq=False, ignore_bad_tiles=False):
     """
     Parse the arguments of the CHM_test function.
@@ -256,6 +252,8 @@ def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nt
         tilesize = (int(tilesize[1]), int(tilesize[0]))
     else:
         tilesize = (int(tilesize), int(tilesize))
+    if tilesize[0] > im.shape[0]: tilesize = (im.shape[0], tilesize[1])
+    if tilesize[1] > im.shape[1]: tilesize = (tilesize[0], im.shape[1])
         
     # Deal with hist eq
     if hist_eq:
@@ -264,13 +262,14 @@ def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nt
             im = (histeq if hist_eq == 'approx' else histeq_exact)(im, model['hgram'])
         else:
             from warnings import warn
-            warn('training data histogram not included in model, make sure you manually perform histogram equalization on the testing data.')
+            warn('training data histogram not included in model, you must manually perform histogram equalization on the data')
 
     # Get the list of tiles to process
     tiles = __get_tiles(im, tilesize, tiles, ignore_bad_tiles)
     
     # Get ntasks and nthreads
-    ntasks, nthreads = __get_ntasks_and_nthreads(ntasks, nthreads, model, tilesize, len(tiles))
+    total_pixels = im.shape[0]*im.shape[1] # TODO: take into account clipping
+    ntasks, nthreads = __get_ntasks_and_nthreads(ntasks, nthreads, model, tilesize, len(tiles), total_pixels)
 
     return im, model, tilesize, tiles, ntasks, nthreads
 
@@ -302,16 +301,16 @@ def __rm_dup_tiles(tiles):
     """Removes duplicate tiles from a list of tiles. Returns them sorted."""
     from numpy import concatenate
     tiles = __sort_tiles(tiles)
-    return tiles.compress(concatenate(([True], (tiles[1:] != tiles[:-1]).all(axis=1))), 0)
+    return tiles.compress(concatenate(([True], (tiles[1:] != tiles[:-1]).any(axis=1))), 0)
 
-def __get_ntasks_and_nthreads(ntasks, nthrds, model, tilesize, max_ntasks):
+def __get_ntasks_and_nthreads(ntasks, nthrds, model, tilesize, max_ntasks, total_pixels):
     """
     Gets the ntasks and nthreads arguments for CHM_test. Tries to maximize the number of tasks
     running based on the amount of memory, then maximize then number of threads based on the number
     of CPUs.
     """
     from psutil import cpu_count, virtual_memory
-    base_mem = 0 # TODO: get expected amount of shared memory
+    base_mem = 80/3*total_pixels # expected amount of shared memory
     task_mem = CHM_test_max_mem(tilesize, model)//2
     ncpus = cpu_count(True) # we use the logical number of CPUs, not physical
     if ntasks is None and nthrds is None:
@@ -350,7 +349,7 @@ def __get_arrays(im_sm, out_sms, ds_sm, sh):
     each level, and a list of contexts for each level (where "each level" means all Nlevel+1
     levels), and the temporary context when reaching level=0.
     """
-    from numpy import frombuffer, float64, uint8
+    from numpy import frombuffer, float64
     shapes = __gen_shapes(sh, len(out_sms)-1)
 
     # im_sm is full-sized - it is only used for the original full-sized image
@@ -366,8 +365,8 @@ def __get_arrays(im_sm, out_sms, ds_sm, sh):
     sizes = [sh[0]*sh[1] for sh in shapes]
     sh_sz = zip(shapes, sizes)
     
-    ims = [frombuffer(im_sm, uint8, sizes[0]).reshape(shapes[0])]+ \
-          [frombuffer(ds_sm, uint8, sz).reshape(sh) for sh,sz in sh_sz[1:]] # TODO: float64
+    ims = [frombuffer(im_sm, float64, sizes[0]).reshape(shapes[0])]+ \
+          [frombuffer(ds_sm, float64, sz).reshape(sh) for sh,sz in sh_sz[1:]]
     outs = [frombuffer(o_sm, float64).reshape(sh) for o_sm,sh in zip(out_sms, shapes)]
     
     f64sz = outs[0].itemsize
@@ -384,8 +383,8 @@ def __run_chm_test_procs(mems, model, regions, ntasks, nthreads):
     """
     from multiprocessing import JoinableQueue, Process
     from itertools import izip
-    from numpy import copyto
-    from .utils import MyDownSample
+    from time import sleep
+    from .utils import MyDownSample, copy
     print("Running CHM test with %d task%s and %d thread%s per task" %
           (ntasks, 's' if ntasks > 1 else '', nthreads, 's' if nthreads > 1 else ''))
     nthreads_full = ntasks*nthreads
@@ -398,32 +397,39 @@ def __run_chm_test_procs(mems, model, regions, ntasks, nthreads):
     args = (mems, model, nthreads, q)
     processes = [Process(target=__run_chm_test_proc, name="CHM-test-%d"%p, args=args) for p in xrange(ntasks)]
     for p in processes: p.daemon = True; p.start()
+    sleep(0)
         
-    # Go through each stage
-    for m in model:
-        stage, level = m.stage, m.level
-        #print("Preparing for stage %d level %d..." % (stage, level))
-        if level == 0:
-            # Reset image and copy the level 0 output to temporary
-            im = ims[0]
-            # TODO: use utils.copy
-            copyto(out_tmp, outs[0])
-        else:
-            # Downsample image and calculate contexts
-            im = MyDownSample(im, 1, ims[level], None, nthreads_full)
-            for c,o in izip(contexts[level-1], contexts[level]): MyDownSample(c, 1, o, None, nthreads_full)
-            MyDownSample(outs[level-1], 1, contexts[level][-1], None, nthreads_full)
-            #for i,c in enumerate(contexts[level]): __save('cntxt-%d-%d.png'%(level,i), c)
-        #__save('im-%d.png'%(level), im)
-        #print(im.min(), im.max())
+    try:
+        # Go through each stage
+        for m in model:
+            stage, level = m.stage, m.level
+            if level == 0:
+                # Reset image and copy the level 0 output to temporary
+                im = ims[0]
+                copy(out_tmp, outs[0], nthreads_full)
+            else:
+                # Downsample image and calculate contexts
+                im = MyDownSample(im, 1, ims[level], None, nthreads_full)
+                for c,o in izip(contexts[level-1], contexts[level]): MyDownSample(c, 1, o, None, nthreads_full)
+                MyDownSample(outs[level-1], 1, contexts[level][-1], None, nthreads_full)
+                #for i,c in enumerate(contexts[level]): __save('cntxt-%d-%d.png'%(level,i), c) ##
+            #__save('im-%d.png'%(level), im) ##
+            #print(im.min(), im.max()) ##
 
-        # Load the queue and wait
-        for region in regions[level]: q.put_nowait((stage, level, tuple(region)))
-        __wait_for_queue(q, stage, level, len(regions[level]), processes)
-        #__save('out-%d-%d.png'%(stage,level), outs[level])
+            # Load the queue and wait
+            for region in regions[level]: q.put_nowait((stage, level, tuple(region)))
+            __wait_for_queue(q, stage, level, len(regions[level]), processes)
+            #__save('out-%d-%d.png'%(stage,level), outs[level]) ##
+    except:
+        __clear_queue(q)
+        __kill_processes(processes)
+        raise
 
     # Tell all processes we are done and make sure they all actually terminate
     for _ in xrange(ntasks): q.put_nowait(None)
+    q.close()
+    q.join()
+    q.join_thread()
     for p in processes: p.join()
 
     # Done! Return the output image
@@ -479,12 +485,29 @@ def __wait_for_queue(q, stage, level, total_tiles, processes):
     __check_processes(processes)
 
 def __check_processes(processes):
-    """Checks that all processes are still alive, and if not, kills the rest"""
+    """Raises an error if any process is not alive"""
     if any(not p.is_alive() for p in processes):
-        for p in processes:
-            if p.is_alive(): p.terminate()
         raise RuntimeError('A process has crashed so we are giving up')
 
+def __kill_processes(processes, timeout=0.1):
+    """Interrupts, waits, then kills all processes that are still alive."""
+    import os, signal, time
+    sig = getattr(signal, 'CTRL_C_EVENT', signal.SIGINT) # on Windows need to send signal.CTRL_C_EVENT
+    for p in processes:
+        if p.is_alive(): os.kill(p.pid, sig)
+    for p in processes: p.join(timeout)
+    for p in processes:
+        if p.is_alive(): p.terminate()
+        p.join()
+        
+def __clear_queue(q):
+    """Clears a Queue object."""
+    from Queue import Empty
+    q.close()
+    try:
+        while True: q.get_nowait()
+    except Empty: pass
+        
 def __run_chm_test_proc(mems, model, nthreads, q):
     """
     Runs a single CHM test sub-process. The first argument is a tuple to expand as the arguments to
@@ -518,8 +541,14 @@ def __run_chm_test_proc(mems, model, nthreads, q):
             contexts, cntxt_rgn = get_contexts(region)
             X = mod.filter(im, contexts, None, region, cntxt_rgn, nthreads)
             del contexts
+            
+            #if stage == 1:
+            #    from numpy import save
+            #    save('features-%d-%d-(%d,%d).npy'%(stage,level,region[0],region[1]), X)
+            
             out[region[0]:region[2],region[1]:region[3]] = mod.evaluate(X, nthreads)
             del X
+        except KeyboardInterrupt: break 
         finally: q.task_done()
 
 def __get_level0_contexts_func(shape, out_tmp, outs, model, nthreads):
@@ -718,7 +747,7 @@ def __chm_test_usage(err=None):
                 Accepts any 2D image accepted by `imstack` for reading.
   output_file   The output file or directory to save to.
                 Accepts any 2D image accepted by `imstack` for writing.
-	
+
 Optional Arguments:
   -m model_dir  The folder that contains the model data. Default is ./temp/.
                 For MATLAB models this folder contains param.mat and
