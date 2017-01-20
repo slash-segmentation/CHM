@@ -60,7 +60,7 @@ setup(name='chm',
           zip_safe=False, # I don't think this code would work when running from inside a zip file due to the dynamic-load and dynamic-cython systems
           ext_modules = cythonize([
               create_ext('chm._utils'),
-              create_ext('chm._train', inc=[np_rand], lib=[np_rand]), #libraries=[':mtrand.so']
+              create_ext('chm.__ldnn', inc=[np_rand], lib=[np_rand]), #libraries=[':mtrand.so']
               create_ext('chm.__imresize'),
               create_ext('chm.filters._correlate'),
               create_ext('chm.filters._haar'),
