@@ -1,18 +1,20 @@
 Current major issues to address:
 	TRAIN:	using non-compat Gabor and SIFT filters causes issues
-	TEST:	tiling has some seem effects even though it shouldn't
-			I have done a lot to reduce this (originally I was getting things -/+200, now just -/+32)
+	TEST:	deadlock on leaving first parallel block when re-running CHM-test
 	FILTER: SIFT is performing sub-optimally (both in time and accuracy)
+	FILTER: SIFT has a potential divide-by-zero
+    FILTER: SIFT has some very very minor seem effects, possibly due ot the MATLAB compat mode
 	FILTER: higher levels have much-reduced accuracy compared to MATLAB
 			even inten - thus does MyDownSample have issues?
-	FILTER: correlate_xy (used by Edge, Frangi, and SIFT) currently can't do multithreaded in-place
+	FILTER: correlate_xy (used by Edge, Frangi, and eventually SIFT) currently can't do multithreaded in-place
+			it is possible that pyfftw would be better than correlate_xy anyways
 
 Current planned optimizations:
 	TEST:	when doing a tile-subset only copy the surrounding region into shared memory
 			also, only downsample that region
 	FILTER:	optimize SIFT more
-	UTIL:	optimize/multi-thread compress, numpy.pad, MyMaxPooling, and/or im2double
-	TRAIN:	multi-thread learning?
+	UTIL:	optimize/multi-thread compress and/or im2double
+	TRAIN:	multi-thread ldnn:init_weights, ldnn:gradient_descent, ldnn:gradient_descent_dropout?
 	TRAIN:	save histogram?
 	TRAIN:	subsample?
 	FILTER/TEST/TRAIN: see if any algorithms would still benefit from being made into CUDA vareties
