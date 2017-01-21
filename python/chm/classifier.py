@@ -11,8 +11,15 @@ from __future__ import print_function
 
 from abc import ABCMeta, abstractproperty, abstractmethod
 class Classifier(object):
+    """
+    Represents a classifier, taking a feature vectors and learning a binary classifications for
+    them and eventually applying this to no feature vectors to determine their classifications.
+    """
     __metaclass__ = ABCMeta    
 
+    def __nonzero__(self): return self.learned
+    def __bool__(self): return self.learned
+    
     @abstractproperty
     def learned(self):
         """Returns True if the classifier has been learned."""
@@ -20,7 +27,7 @@ class Classifier(object):
 
     @abstractproperty
     def features(self):
-        """Number of features learned on or None if not learned yet."""
+        """Number of features learned on (including extra_features) or None if not learned yet."""
         return None
     
     @property
@@ -30,6 +37,14 @@ class Classifier(object):
         in the last rows of the feature matrices given to evaluate and learn.
         """
         return 0
+    
+    @abstractmethod
+    def copy(self):
+        """
+        Creates a new copy of this classifier object with the same parameters but in an un-learned
+        state.
+        """
+        return None
     
     @abstractmethod
     def evaluate(self, X, nthreads=1):

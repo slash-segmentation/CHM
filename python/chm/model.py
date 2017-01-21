@@ -28,7 +28,7 @@ class Model(object):
         self._path = path = abspath(path)
         if not isfile(path): raise ValueError('path')
         if model is None:
-            with open(path, 'w') as f: info = f.read()
+            with open(path, 'r') as f: info = f.read()
             info = ModelDecoder().decode(info, path=dirname(path))
             self._nstages,self._nlevels,model = info['nstages'],info['nlevels'],info['submodels']
         assert(len(model[-1]) == 1 and len(model[0]) > 0 and all(len(sm) == len(model[0]) for sm in model[1:-1]))
@@ -61,8 +61,8 @@ class Model(object):
     
     def save(self, path=None):
         """
-        Save the model. If a path is given, that is used. Otherwise the originally loaded path (or
-        last path saved to) is used.
+        Save the model. If a path is given, that is used. Otherwise the originally loaded path or
+        last path saved to is used.
         """
         if path is not None: self._path = path
         Model._save(self._path, self._info)
@@ -103,9 +103,9 @@ class Model(object):
         blank.
 
         If `restart` is True, then the model is re-loaded if it already exists, all submodels that
-        are blank are deleted along with any stages or levels that are not part of the model
-        anymore or need to be re-done due to a change in number of stages or levels. Then blank
-        submodels are added as necessary which are given the filters and context filters specified.
+        are not learned are removed along with any stages or levels that are not part of the model
+        anymore or need to be re-done due to a change in number of stages or levels. Then un-learned
+        submodels are created as necessary from the given filters and context filters specified.
         """
         from os.path import abspath, exists
         from .filters import Filter
@@ -123,20 +123,54 @@ class Model(object):
             cntxt_fltr = Intensity.Stencil(7)
         cntxt_fltr = cls.__expand(nstages, nlevels, cntxt_fltr, Filter)
         
-        # TODO: handle restart!
-        
-        # Create submodels and info
-        model = Model.nested_list(nstages, nlevels, lambda s,l:
-            SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l]))
-        info = {'nstages':nstages,'nlevels':nlevels,'submodels':model}
-        info.update(extra_info)
+        if restart:
+            # (Re-)Create submodels and info
+            info = cls.__check_submodels(path, nstages, nlevels)
+            sms = info['submodels']
+            model = Model.nested_list(nstages, nlevels, lambda s,l:
+                (SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l])
+                if s > len(model) or l >= len(model[s-1]) or model[s-1][l] is None else sms[s-1][l]))
+            info.update({'nstages':nstages,'nlevels':nlevels,'submodels':model})
+            
+        else:
+            # Create submodels and info
+            model = Model.nested_list(nstages, nlevels, lambda s,l:
+                SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l]))
+            info = {'nstages':nstages,'nlevels':nlevels,'submodels':model}
 
         # Create save the data
+        info.update(extra_info)
         cls._save(path, info)
 
         # Load the model
         return cls(path)
     
+    @classmethod
+    def __check_submodels(cls, path, nstgs, nlvls):
+        """
+        Loads all of the submodels for a model while restarting, reseting submodels that cannot be
+        used while restarting. The `nstgs` and `nlvls` are the new number of stages and levels. The
+        `path` is the path to the model file itself. Returns the loaded info from the model with
+        some submodels possibly reset.
+        """
+        from os.path import dirname
+        try:
+            with open(path, 'r') as f: info = f.read()
+        except IOError: return None
+        info = ModelDecoder().decode(info, path=dirname(path))
+        if not isinstance(info, dict) or not all(k in info for k in ('submodels', 'nstages', 'nlevels')): return None
+        sms = info['submodels']
+        max_stg = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
+        reset = False
+        for s,sm in enumerate(sms):
+            for l,sm in enumerate(sm):
+                if sm is None or sm.stage-1 != s or sm.level != l:
+                    print('Corrupted model - completely replacing')
+                    return None
+                reset = reset or s+1 > max_stg or l > nlvls or (s+1 == nstgs and l > 0) or not sm.classifier.learned
+                if reset: sms[s][l] = None # TODO: sms[s][l].copy() instead?
+        return info
+
     @staticmethod
     def __expand(nstages, nlevels, x, clazz):
         """
@@ -264,6 +298,8 @@ class SubModel(object):
     def classifier(self):
         """Returns the classifier used for this model."""
         return self.__classifier
+    def __nonzero__(self): return bool(self.classifier)
+    def __bool__(self): return bool(self.classifier)
 
     @property
     def features(self):

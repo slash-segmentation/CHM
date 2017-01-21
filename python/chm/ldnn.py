@@ -12,7 +12,7 @@ As a shortcut the biases b_ij are lumped into the weights w_ijk and an extra "fe
 the feature vector X that is always 1.
 
 Several of these methods were in C code before but have been converted into Python because it is
-either faster or no significant difference. Several are in the Cython model _ldnn.
+either faster or no significant difference. Several are in the Cython module __ldnn.
 
 Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
