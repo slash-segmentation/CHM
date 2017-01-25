@@ -4,7 +4,7 @@ CHM Image Training
 Runs CHM training phase on a set of images. Can also be run as a command line program with
 arguments.
 
-Jeffrey Bush, 2015-2016, NCMIR, UCSD
+Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
 
 from __future__ import division
@@ -20,9 +20,19 @@ __all__ = ["CHM_train"]
 #    X[:,start:end].reshape((-1, im.shape))[0].flags.c_contiguous
 # is True for order='C' but the equivelent is False for order='F'
 
-def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
+def CHM_train(ims, lbls, model, masks=None, nthreads=None):
     """
+    CHM_train - CHM Image Training
     
+    Inputs:
+        ims         ImageStack or a list of ImageSource objects to train on
+        lbls        ImageStack or a list of ImageSource objects of the ground-truth data 
+        model       Model object that has been created but not completely learned
+        masks       ImageStack or a list of ImageSource objects of the pixels to use from the
+                    training data, by default uses all pixels
+        nthreads    number of threads to use, defaulting to the number of physical CPUs/cores
+    
+    Returns the final set of labels calculated.
     """
     from itertools import izip
     from psutil import cpu_count
@@ -45,7 +55,7 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
     lbls0  = [lbl.data>0 for lbl in lbls]
     masks0 = None if masks is None else [mask.data>0 for mask in masks]
 
-    # Get paramters
+    # Get parameters
     shapes = __get_all_shapes(shapes, model.nlevels)
     if nthreads is None: nthreads = cpu_count(True)
 
@@ -62,45 +72,58 @@ def CHM_train(ims, lbls, model=None, masks=None, nthreads=None):
         else:
             __downsample_images(ims, lbls, masks, contexts, clabels, nthreads)
 
-        if sm.loaded:
-            __print('  Skipping... (already completed)')
-            __load_clabels(sm, clabels)
+        if sm.classifier.learned and __load_clabels(sm, clabels):
+            __print('Skipping... (already completed)', 1)
             continue
 
         ##### Feature Extraction #####
-        __print('  Extracting features...')
+        __print('Extracting features...', 1)
         X_full, Y, M = __extract_features(sm, ims, lbls, masks, contexts, nthreads)
 
         ##### Learning the classifier #####
-        __print('  Learning...')
-        if M is None:
-            # Convert to Fortran-ordered
-            X = empty(X_full.shape, order='F')
-            copy(X, X_full, nthreads)
+        if not sm.classifier.learned:
+            __print('Learning...', 1)
+            if M is None:
+                # Convert to Fortran-ordered
+                X = empty(X_full.shape, order='F')
+                copy(X, X_full, nthreads)
+            else:
+                # Compress and convert to Fortran-ordered
+                # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
+                X = empty((X_full.shape[0], M.sum()), order='F')
+                X_full.compress(M, 0, X)
+            #__subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
+            del M
+            sm.learn(X, Y, nthreads)
+            del X, Y
+            model.save() # TODO: this didn't seem to work...
         else:
-            # Compress and convert to Fortran-ordered
-            # OPT: parallelize compress
-            X = empty((X_full.shape[0], M.sum()), order='F')
-            X_full.compress(M, 0, X)
-        #__subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
-        del M
-        sm.learn(X, Y, nthreads)
-        del X, Y
+            __print('Skipping learning... (already complete)', 1)
 
         ##### Generate the outputs #####
-        __print('  Generating outputs...')
+        __print('Generating outputs...', 1)
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)
 
-    ########## Return final labels ##########
-    __print('Complete!')
-    return [clbl[0] for clbl in clabels]
+    ########## Cleanup and return final labels ##########
+    __print('Complete!', 1)
+    from os import name
+    from shutil import rmtree
+    del ims, ims0, lbls, lbls0, masks, masks0, contexts
+    clabels = [clbl[0] for clbl in clabels]
+    if os.name == 'nt': clabels = [clbl.copy() for clbl in clabels] # On Windows we cannot remove memory-mapped files
+    # We delete all of these files since they only take a few minutes to recreate and it is unusual to need them at all
+    rmtree(__get_temp_folder(sm), onerror=lambda f,p,e:print("! Failed to remove temporary file %s"%(p)))
+    return clabels
     
-def __print(s):
-    """Like print(...) but pre-pends the current timestamp and forces a flush."""
+def __print(s, depth=0):
+    """
+    Like print(...) but pre-pends the current timestamp, spaces dependent on the depth, and forces
+    a flush.
+    """
     import sys, datetime
-    print('%s %s'%(str(datetime.datetime.utcnow())[:19], s))
+    print('%s %s%s'%(str(datetime.datetime.utcnow())[:19], '  '*depth, s))
     sys.stdout.flush()
     
 def __get_all_shapes(shapes, nlvls):
@@ -140,6 +163,7 @@ def __downsample_images(ims, lbls, masks, contexts, clabels, nthreads):
     ims[:]  = [MyDownSample(im,  1, nthreads=nthreads) for im  in ims ]
     lbls[:] = [MyMaxPooling(lbl, 1, nthreads=nthreads) for lbl in lbls]
     if masks is not None:
+        # TODO: instead of max-pooling for masks should down-sample be done then cutoff at 0.5?
         masks[:] = [MyMaxPooling(mask, 1, nthreads=nthreads) for mask in masks]
     if len(clabels[0]) == 0: contexts[:] = [[] for _ in ims]
     for i,clbl in enumerate(clabels): contexts[i].append(clbl[-1])
@@ -185,7 +209,7 @@ def __subsample(X, Y, n=3000000, nthreads=1): # TODO: increase this for real pro
 
     Returns the possibly subsampled X and Y.
     """
-    # OPT: use nthreads, check and improve speed 
+    # OPT: use nthreads, check and improve speed (possibly similar to LDNN's kmeans downsampling)
     npixs = len(Y)
     if npixs <= 2*n: return X, Y
 
@@ -210,12 +234,15 @@ def __subsample(X, Y, n=3000000, nthreads=1): # TODO: increase this for real pro
 
 def __generate_outputs(submodel, X, shapes, nthreads):
     """Generates the outputs of the feature vector X from images that have the given shapes."""
-    from os.path import exists, join
-    from os import mkdir
+    from os.path import isdir, join
+    from os import makedirs
+    from errno import EEXIST
     from numpy import save
     start = 0
     folder = __get_output_folder(submodel)
-    if not exists(folder): mkdir(folder)
+    try: makedirs(folder)
+    except OSError as ex: 
+        if ex.errno != EEXIST or not isdir(folder): raise
     for i,sh in enumerate(shapes):
         path = join(folder, '%03d.npy'%i)
         end = start + sh[0]*sh[1]
@@ -226,21 +253,30 @@ def __load_clabels(submodel, clabels):
     """
     Loads the clabels for the current submodel into the clabels list. These are loaded as
     memory-mapped arrays from NPY files. The clabels list is a list-of-list with the first index
-    being the image index and the second being the level.
+    being the image index and the second being the level. If the clabels are not available,
+    returns False.
     """
     from numpy import load, ndarray
-    from os.path import join
+    from os.path import join, isfile
     folder = __get_output_folder(submodel)
+    for i in xrange(len(clabels)):
+        path = join(folder, '%03d.npy'%i)
+        if not isfile(path): return False
     for i in xrange(len(clabels)):
         path = join(folder, '%03d.npy'%i)
         # Load as a memory-mapped array viewed as an ndarray
         # (should be using 'r' mode but then Cython typed memoryviews reject it)
         clabels[i].append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
-
+    return True
+        
 def __get_output_folder(submodel):
     """Get the folder where outputs are written to for a specific submodel."""
-    from os.path import join, dirname
-    return join(dirname(submodel.model.path), 'output-%d-%d'%(submodel.stage, submodel.level))
+    from os.path import join
+    return join(__get_temp_folder(submodel.model), '%d-%d'%(submodel.stage, submodel.level))
+
+def __get_temp_folder(model):
+    """Get the folder where all temporary outputs are written to for a model."""
+    return model.path+'-temp'
 
 def __chm_train_main():
     """The CHM train command line program"""
@@ -256,7 +292,7 @@ def __chm_train_main():
         FileImageStack.create_cmd(output, [__adjust_output(o,dt) for o in out], True).close()
 
 def __adjust_output(out, dt):
-    """Adjusts the output array to match the given data type."""
+    """Adjusts the output array to match the given data type, scalling unsigned integral types."""
     from numpy import iinfo, dtype
     if dtype(dt).kind == 'u':
         out *= iinfo(dt).max
@@ -273,6 +309,7 @@ def __chm_train_main_parse_args():
     from pysegtools.images.io import FileImageStack
     from .filters import FilterBank, Haar, HOG, Edge, Gabor, SIFT, Intensity
     from .model import Model
+    from .ldnn import LDNN
 
     from numpy import uint8, uint16, uint32, float32, float64
     dt_trans = {'u8':uint8, 'u16':uint16, 'u32':uint32, 'f32':float32, 'f64':float64}
@@ -287,7 +324,7 @@ def __chm_train_main_parse_args():
     lbls = FileImageStack.open_cmd(argv[2])
 
     # Get defaults for optional arguments
-    path = './temp/'
+    path = 'model'
     nstages, nlevels = 2, 4
     # TODO: Gabor and SIFT should not need compat mode here!
     fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor(True)),
@@ -343,7 +380,8 @@ def __chm_train_main_parse_args():
         else: __chm_train_usage("Invalid argument %s" % o)
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
     fltrs = FilterBank(fltrs.values()) #pylint: disable=redefined-variable-type
-    model = Model.create(path, nstages, nlevels, fltrs, cntxt_fltr, restart)
+    classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l)))
+    model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, restart)
     return (ims, lbls, model, masks, output, dt, nthreads)
 
 def __get_filter(f):
@@ -383,7 +421,9 @@ def __chm_train_usage(err=None):
   images must be the same size.
 
 Optional Arguments:
-  -m model_dir  The folder where the model data is save to. Default is ./temp/.
+  -m model      The file where the model data is saved to. Default is model.
+                Note that a few other files will be saved alongside this file as
+                well.
   -S nstages    The number of stages of training to perform. Must be >=2.
                 Default is 2.
   -L nlevels    The number of levels of training to perform. Must be >=1.
