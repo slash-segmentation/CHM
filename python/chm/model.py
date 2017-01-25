@@ -24,12 +24,12 @@ class Model(object):
     dictionary. Additional files may be saved with it containing various other pieces of data.
     """
     def __init__(self, path, model=None, info=None):
-        from os.path import abspath, dirname, isfile
+        from os.path import abspath, isfile
         self._path = path = abspath(path)
         if not isfile(path): raise ValueError('path')
         if model is None:
-            with open(path, 'r') as f: info = f.read()
-            info = ModelDecoder().decode(info, path=dirname(path))
+            with open(path, 'rb') as f: info = f.read()
+            info = ModelDecoder().decode(info, path=path)
             self._nstages,self._nlevels,model = info['nstages'],info['nlevels'],info['submodels']
         assert(len(model[-1]) == 1 and len(model[0]) > 0 and all(len(sm) == len(model[0]) for sm in model[1:-1]))
         #pylint: disable=access-member-before-definition
@@ -69,9 +69,8 @@ class Model(object):
     
     @staticmethod
     def _save(path, info):
-        from os.path import dirname
-        info = ModelEncoder(separators=(',',':')).encode(info, path=dirname(path), comp=True)
-        with open(path, 'w') as f: f.write(info)
+        info = ModelEncoder(separators=(',',':')).encode(info, path=path, comp=True)
+        with open(path, 'wb') as f: f.write(info)
 
     @classmethod
     def load(cls, path):
@@ -153,11 +152,10 @@ class Model(object):
         `path` is the path to the model file itself. Returns the loaded info from the model with
         some submodels possibly reset.
         """
-        from os.path import dirname
         try:
-            with open(path, 'r') as f: info = f.read()
+            with open(path, 'rb') as f: info = f.read()
         except IOError: return None
-        info = ModelDecoder().decode(info, path=dirname(path))
+        info = ModelDecoder().decode(info, path=path)
         if not isinstance(info, dict) or not all(k in info for k in ('submodels', 'nstages', 'nlevels')): return None
         sms = info['submodels']
         max_stg = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
@@ -188,11 +186,11 @@ class Model(object):
         x = list(x)
         if isinstance(x[0], clazz):
             # a filter/classifier for each level, but same set for all stages
-            if len(x) != nlevels: raise ValueError('wrong number of filters/classifiers')
+            if len(x) != nlevels+1: raise ValueError('wrong number of filters/classifiers')
             return [[dup(X) for X in x] for _ in xrange(nstages-1)] + [[dup(x[0])]]
         # a list of lists of filters/classifiers
         x = [list(y) if isinstance(y, Iterable) else [y] for y in x]
-        if len(x) != nstages or any(len(y) != nlevels for y in x[:-1]) or len(x[-1]) != 1:
+        if len(x) != nstages or any(len(y) != nlevels+1 for y in x[:-1]) or len(x[-1]) != 1:
             raise ValueError('wrong number of filters/classifiers')
         return x
     
@@ -367,7 +365,7 @@ class SubModel(object):
         Evaluates the feature matrix X with the model (matrix is features by pixels). The
         classifier must have been loaded or learned before this is called.
         """
-        if not self.classifier.loaded: raise ValueError('Model no loaded/learned')
+        if not self.classifier.learned: raise ValueError('Model no loaded/learned')
         import gc
         gc.collect() # evaluation is very memory intensive, make sure we are ready
         from numpy import float64
@@ -382,7 +380,7 @@ class SubModel(object):
         Learns the feature matrix X (features by pixels) with Y as the labels with a length of
         pixels.
         """
-        if self.classifier.loaded: raise ValueError('Model already loaded/learned')
+        if self.classifier.learned: raise ValueError('Model already loaded/learned')
         import gc
         gc.collect() # learning is very memory intensive, make sure we are ready
         from numpy import float64
@@ -412,6 +410,7 @@ class ModelEncoder(json.JSONEncoder):
         from numpy import ndarray, save
         from .filters import Filter
         from .classifier import Classifier
+        from os.path import basename
         if isinstance(o, ndarray):
             if o.size <= 1024:
                 # Arrays with only 1024 elements are saved as lists
@@ -428,7 +427,7 @@ class ModelEncoder(json.JSONEncoder):
             path += '.npy'
             self.__count += 1
             save(path, o)
-            return {'__npy__':path}
+            return {'__npy__':basename(path)}
         if isinstance(o, SubModel):
             self.__stage,self.__level,self.__count = o.stage,o.level,0
             return {'__submodel__':self.__get_obj(o)}
@@ -477,13 +476,13 @@ class ModelDecoder(json.JSONDecoder):
     def __get_obj(base, mod, cls, attr):
         from importlib import import_module
         c = import_module(mod)
-        for c in cls.split('.'): c = getattr(c, cls)
+        for cn in cls.split('.'): c = getattr(c, cn)
         if not issubclass(c, base): raise TypeError('Unknown or bad '+base.__name__+' in model')
-        o = cls.__new__(c)
+        o = c.__new__(c)
         getattr(o, '__setstate__', o.__dict__.update)(attr)
         return o
     def decode(self, s, _w=None, path=None): #pylint: disable=arguments-differ
-        if s[:2] in ('x\x01','x\x9C','x\xDA'):
+        if s[:2] in (b'x\x01',b'x\x9C',b'x\xDA'):
             from zlib import decompress
             s = decompress(s)
         if path is not None: self.__path = path
@@ -492,7 +491,7 @@ class ModelDecoder(json.JSONDecoder):
         if path is not None: self.__path = None
         return o
     def raw_decode(self, s, idx=0, path=None): #pylint: disable=arguments-differ
-        if s[:2] in ('x\x01','x\x9C','x\xDA'):
+        if s[:2] in (b'x\x01',b'x\x9C',b'x\xDA'):
             from zlib import decompress
             s = decompress(s)
         if path is not None: self.__path = path
