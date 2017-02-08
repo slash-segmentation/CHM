@@ -87,7 +87,7 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
     #full_sh = full_rgn[2] - full_rgn[0], full_rgn[3] - full_rgn[1]
     #full_sz = full_sh[0] * full_sh[1]
     
-    #for a 25k by 25k image:
+    #for a 25k by 25k image with 4 levels:
     #   im_sm requires 4.657 GiB
     #   ds_sm requires 4.657 GiB
     #   out_sms requires 6.203 GiB (4.657 + 1.164 + 0.291 + 0.073 + 0.018)
@@ -100,6 +100,7 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
     
     # Allocate shared memory for the output/clabels, downsampled images, and contexts of all sizes
     # The ds_sm is used for several purposes
+    # TODO: can these RawArrays be memmapped to a file?
     out_sms = [RawArray(c_double, sz) for sz in sizes]
     ds_sm   = RawArray(c_double, full_sz)
 
@@ -608,7 +609,7 @@ def CHM_test_max_mem(tilesize, model):
         tilesize a tuple of height and width for the size of a tile
         model    the model that will be used during testing
 
-    This is caclulated using the following formula:
+    This is calculated using the following formula:
         (476+57*(Nlevel+1))*8*tilesize + 200*8*tilesize + 20*8*tilesize
     Where 476 is the number of filter features, 57 is the number of context features generated
     at each level, 8 is the size of a double-precision floating point, 200 is number of
@@ -619,7 +620,7 @@ def CHM_test_max_mem(tilesize, model):
     am seeing this +0.03 GB which is not too much overhead, probably estimating 100 MB overhead
     would be good enough in all cases.
 
-    Note: this now asks the model for it's evaluation memory per pixel, adds 100 bytes per pixel,
+    Note: this now asks the model for its evaluation memory per pixel, adds 100 bytes per pixel,
     then multiplies by the number of pixels.
     """
     from numpy import asarray
