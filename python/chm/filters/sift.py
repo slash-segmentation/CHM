@@ -1,7 +1,7 @@
 """
 SIFT Filter. Partially implemented in Cython for speed and multi-threading.
 
-Jeffrey Bush, 2015-2016, NCMIR, UCSD
+Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
 
 from __future__ import division
@@ -18,14 +18,23 @@ class SIFT(Filter):
     
     def __call__(self, im, out=None, region=None, nthreads=1):
         from scipy.ndimage.filters import correlate1d
-        from ._base import get_image_region, round_u8_steps
-        half_patch_sz = (SIFT.__patch_sz // 2) - 1
-        im, region = get_image_region(im, half_patch_sz, region, 'constant', nthreads=nthreads) # OPT: +3? for multiple correlate1d's
+        from ._base import get_image_region, replace_sym_padding, round_u8_steps
+        if self.__compat:
+            # In compatibility mode, instead of symmetric reflections we pad with 0s
+            im, region = replace_sym_padding(im, 7, region, 15, nthreads)
+        else:
+            im, region = get_image_region(im, 15, region, nthreads=nthreads)
         gauss_filter = SIFT.__gauss_filter
         im = correlate1d(im, gauss_filter, 0, mode='nearest') # INTERMEDIATE: im.shape
         im = correlate1d(im, gauss_filter, 1, mode='nearest') # TODO: TEMPORARY: im.shape
         if self.__compat: round_u8_steps(im)
-        return SIFT.__dense_sift(im, out, nthreads)
+        im = SIFT.__dense_sift(im, None, nthreads)
+        region = (region[0]-7, region[1]-7, region[2]-7, region[3]-7)
+        im = im[:, region[0]:region[2], region[1]:region[3]]
+        if out is not None:
+            from numpy import copyto
+            copyto(out, im)
+        return im
 
     @staticmethod
     def __dense_sift(im, out, nthreads):
@@ -39,6 +48,7 @@ class SIFT(Filter):
         from ._sift import orientations, neighborhoods, normalize #pylint: disable=no-name-in-module
 
         # TODO: don't precompute division?
+        # TODO: this sometimes causes a divide-by-zero
         im *= 1/im.max() # can modify im here since it is always the padded image
 
         H, W = im.shape
@@ -102,7 +112,7 @@ class SIFT(Filter):
     #__alpha = 9 # parameter for attenuation of angles (must be odd) [hard coded]
     __weight_x = None
     __weight_x_origin = None
-    __filter_padding = (__patch_sz // 2) - 1
+    __filter_padding = 15 #(__patch_sz // 2) - 1 TODO: dynamically calculate this again
     __filter_features = __num_bins*__num_bins*__num_angles
 
     @staticmethod

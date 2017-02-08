@@ -2,10 +2,10 @@
 #cython: boundscheck=False, wraparound=False, initializedcheck=False, cdivision=True
 
 """
-SIFT filter parts implemented in Cython. SIFT was originally in MATLAB but the last step was
+SIFT filter parts implemented in Cython. SIFT was originally in MATLAB but various steps were
 converted to Cython because it was slow and can benefit from multi-threading.
 
-Jeffrey Bush, 2015-2016, NCMIR, UCSD
+Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
 
 from __future__ import division

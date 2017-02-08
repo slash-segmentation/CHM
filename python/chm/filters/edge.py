@@ -1,7 +1,7 @@
 """
 Edge detection filter.
 
-Jeffrey Bush, 2015-2016, NCMIR, UCSD
+Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
 
 from __future__ import division
@@ -50,6 +50,7 @@ class Edge(Filter):
         imx = correlate_xy(im, Edge.__kernel[0], Edge.__kernel[1], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
         imy = correlate_xy(im, Edge.__kernel[1], Edge.__kernel[0], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
         hypot(imx, imy, imx, nthreads)
+        region = (region[0]-3, region[1]-3, region[2]-3, region[3]-3) # the correlation shifts the image 3 pixels to the top/left
         if self.__scale: imx *= 0.75
         return Edge.__inten(imx, out=out, region=region, nthreads=nthreads)
 

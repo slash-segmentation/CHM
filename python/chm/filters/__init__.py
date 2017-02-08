@@ -45,7 +45,7 @@ from .intensity import Intensity
 #
 # Other optimizations/fixes:
 #   Gabor don't precompute division?
-#   SIFT  **lots of work needed
+#   SIFT  **lots of work needed including avoiding a divide-by-zero
 #   Inten all DOUBLE_PTR_R and DOUBLE_PTR_CR should be aligned (A) but doing so causes illegal
 #         argument core dumps...
 #   Inten test when L_rad != R_rad to make sure it is right
