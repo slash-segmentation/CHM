@@ -93,7 +93,7 @@ def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     """    
     # CHANGED: only supports 2D (the 3D just did each layer independently [but all at once])
     # Using Cython, ~4-5 times faster than blockviews and is parallelized, and ~16-20 faster than original
-    from numpy import empty
+    from numpy import empty, uint8
     from ._utils import max_pooling #pylint: disable=no-name-in-module
     if region is not None: im = im[region[0]:region[2], region[1]:region[3]]
     if L == 0:
@@ -106,7 +106,7 @@ def MyMaxPooling(im, L, out=None, region=None, nthreads=1):
     elif out.shape != sh or out.dtype != im.dtype: raise ValueError('Invalid output array')
     if im.dtype == bool:
         # Cython doesn't handle boolean arrays very well, so view it as unsigned chars
-        max_pooling['npy_bool'](im.astype('u1', copy=False), L, out.astype('u1', copy=False), nthreads)
+        max_pooling['npy_bool'](im.view(uint8), L, out.view(uint8), nthreads)
     else: max_pooling(im, L, out, nthreads)
     return out
 
