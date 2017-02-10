@@ -14,17 +14,17 @@ __all__ = ["CHM_test", # operates over an entire image by breaking it into tiles
            "testCHM",  # operates on an entire image
            "CHM_test_max_mem"] # gives the expected amount of memory testCHM will use
 
-def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthreads=None, hist_eq=False, ignore_bad_tiles=False):
+def CHM_test(im, model, tilesize=None, tiles=None, ntasks=None, nthreads=None, ignore_bad_tiles=False):
     """
     CHM_test - CHM Image Testing
-    Breaks an image into multiple tiles, runs testCHM on each tile, and combines the results all
+    Breaks an image into multiple tiles, runs CHM-test on each tile, and combines the results all
     back into a single image which it returns. This is optimized for parallelization of a single
     image by loading the image and various other items into shared memory and spawning subprocesses
     that each use the shared resources but work on their own tiles.
     
     im is a single image slice - the entire image as a numpy array, it may also be given as a
         pysegtools.image.ImageSource
-    model is the path to the model folder which contains the model, default is "temp"
+    model is the path to the model or a Model object
     tilesize is the size of the tiles to process, either a:
             * a single integer for both width and height
             * a tuple of integers for width and height
@@ -36,20 +36,15 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
         they go from 0,0 to ((im.shape[1]-1) // tilesize[0], (im.shape[0]-1) // tilesize[1])
         default is all tiles
         if not processing all tiles, the resulting image will be black wherever a tile was skipped
-    ntasks is how many separate tasks to run in parallel, each processing a single tile of the image
+    ntasks is how many separate tasks to run in parallel, each processing a tile of the image
     nthreads is how many threads to use per task
         in general, each additional parallel task takes up a lot of memory (up to 7.5 GB for
-        1000x1000 with Nlevel=4) while each additional CPU per task does not really increase memory
+        1024x1024 with Nlevel=4) while each additional CPU per task does not really increase memory
         usage, however running two tasks in parallel each with 1 CPU is faster than giving a single
         task two CPUs.
         default is to run twice as many tasks as can fit in memory (since the max memory is only
         used for a short period of time) and divide the rest of the CPUs among the tasks
         if only one is given, the other is calculated using its value
-    hist_eq is whether the image should be exact histogram equalized to the training data set
-        default is False since this is a time intesive process and is not parallelized (make sure
-        to pre-process the data!)
-        can also set to 'approx' which is decent and much faster than the exact histogram
-        equalization used, but it is still not parallelized (even though it could be...)
     ignore_bad_tiles is whether invalid tiles in the tiles argument cause an exception or are
         silently ignored, default is to throw an exception
     """
@@ -59,7 +54,7 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
     from .utils import im2double
 
     im, model, tilesize, tiles, ntasks, nthreads = \
-        __parse_args(im, model, tilesize, tiles, ntasks, nthreads, hist_eq, ignore_bad_tiles)
+        __parse_args(im, model, tilesize, tiles, ntasks, nthreads, ignore_bad_tiles)
     nthreads_full = ntasks*nthreads
 
     # Move the image into shared memory (as floating-point)
@@ -225,11 +220,11 @@ def CHM_test(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthrea
 ##
 ##    return regions
 
-def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nthreads=None, hist_eq=False, ignore_bad_tiles=False):
+def __parse_args(im, model, tilesize=None, tiles=None, ntasks=None, nthreads=None, ignore_bad_tiles=False):
     """
     Parse the arguments of the CHM_test function. See that function for the argument definitions.
 
-    im is returned as-is, unwrapped from an ImageSource, and/or histogram equalized.
+    im is returned as-is or unwrapped from an ImageSource
     The model is loaded and returned as a Model object.
     tilesize is returned as a tuple that is in H,W order (even though it is given in W,H order).
     tiles is returned as a Nx2 array in y,x order & sorted (even though it is given in x,y order).
@@ -256,15 +251,6 @@ def __parse_args(im, model="./temp/", tilesize=None, tiles=None, ntasks=None, nt
     if tilesize[0] > im.shape[0]: tilesize = (im.shape[0], tilesize[1])
     if tilesize[1] > im.shape[1]: tilesize = (tilesize[0], im.shape[1])
         
-    # Deal with hist eq
-    if hist_eq:
-        if 'hgram' in model:
-            from pysegtools.images.filters.hist import histeq, histeq_exact
-            im = (histeq if hist_eq == 'approx' else histeq_exact)(im, model['hgram'])
-        else:
-            from warnings import warn
-            warn('training data histogram not included in model, you must manually perform histogram equalization on the data')
-
     # Get the list of tiles to process
     tiles = __get_tiles(im, tilesize, tiles, ignore_bad_tiles)
     
@@ -611,10 +597,10 @@ def CHM_test_max_mem(tilesize, model):
 
     This is calculated using the following formula:
         (476+57*(Nlevel+1))*8*tilesize + 200*8*tilesize + 20*8*tilesize
-    Where 476 is the number of filter features, 57 is the number of context features generated
-    at each level, 8 is the size of a double-precision floating point, 200 is number of
-    discriminants used at level = 0 (when there are the most context features), and 20 is the
-    number of discriminants per group at that level.
+    Where 476 is the number of filter features, 57 is the number of context features generated at
+    each level, 8 is the size of a double-precision floating point, 200 is number of discriminants
+    used at level = 0 (when there are the most context features), and 20 is the number of
+    discriminants per group at that level.
 
     Theoretical maximum memory usage is 7.31 GB (for 1000x1000 tiles and 4 levels). In practice I
     am seeing this +0.03 GB which is not too much overhead, probably estimating 100 MB overhead
@@ -630,7 +616,7 @@ def CHM_test_max_mem(tilesize, model):
     for lvl in xrange(1, model.nlevels+1):
         if not (tilesize%2).any(): tilesize = tilesize // 2
         sizes[lvl] = tilesize[0]*tilesize[1]
-    return max((m.evaluation_memory+100)*sizes[m.level] for m in model) # the +100 bytes/pixel is a fudge-factor
+    return max((m.classifier.evaluation_memory+100)*sizes[m.level] for m in model) # the +100 bytes/pixel is a fudge-factor
 
 
 def __chm_test_main():
@@ -639,12 +625,11 @@ def __chm_test_main():
     from pysegtools.images.io import FileImageSource
 
     # Parse Arguments
-    im_path, output, model, tilesize, tiles, ntasks, nthreads, hist_eq, dt = \
-             __chm_test_main_parse_args()
+    im_path, output, model, tilesize, tiles, ntasks, nthreads, dt = __chm_test_main_parse_args()
 
     # Process input and save to an output
     im = FileImageSource.open(im_path, True)
-    out = CHM_test(im, model, tilesize, tiles, ntasks, nthreads, hist_eq, True)
+    out = CHM_test(im, model, tilesize, tiles, ntasks, nthreads, True)
     if dtype(dt).kind == 'u':
         out *= iinfo(dt).max
         out.round(out=out)
@@ -663,17 +648,21 @@ def __chm_test_main_parse_args():
     dt_trans = {'u8':uint8, 'u16':uint16, 'u32':uint32, 'f32':float32, 'f64':float64}
 
     # Parse and minimally check arguments
-    if len(argv) < 3: __chm_test_usage()
-    if len(argv) > 3 and argv[3][0] != "-":
-        __chm_test_usage("You provided more than 2 required arguments")
+    if len(argv) < 4: __chm_test_usage()
+    if len(argv) > 4 and argv[3][0] != "-":
+        __chm_test_usage("You provided more than 3 required arguments")
+
+    # Check the model
+    model = argv[1]
+    if not os.path.exists(model): __chm_test_usage("Model cannot be found")
 
     # Check the input image
-    im_path = argv[1]
+    im_path = argv[2]
     if not FileImageSource.openable(im_path, True):
         __chm_test_usage("Input image is of unknown type")
 
     # Check the output image
-    output = argv[2]
+    output = argv[3]
     if output == '': output = '.' #pylint: disable=redefined-variable-type
     output_ended_with_slash = output[-1] == '/'
     output = os.path.abspath(output)
@@ -690,22 +679,17 @@ def __chm_test_main_parse_args():
         __chm_test_usage("Output image is of unknown type")
 
     # Get defaults for optional arguments
-    model = './temp/'
     tilesize = None
     tiles = []
     dt = uint8
-    hist_eq = False
     ntasks = None
     nthreads = None
 
     # Parse the optional arguments
-    try: opts, _ = getopt(argv[3:], "hm:t:T:n:N:d:")
+    try: opts, _ = getopt(argv[4:], "ht:T:n:N:d:")
     except GetoptError as err: __chm_test_usage(err)
     for o, a in opts:
-        if o == "-m":
-            model = a
-            if not os.path.isdir(model): __chm_test_usage("Model folder is not a directory")
-        elif o == "-t":
+        if o == "-t":
             try:
                 if 'x' in a: W,H = [int(x,10) for x in a.split('x', 1)]
                 else:        W = H = int(a,10)
@@ -717,7 +701,6 @@ def __chm_test_main_parse_args():
             except ValueError: __chm_test_usage("Tile position must be two positive integers seperated by a comma")
             if C < 0 or R < 0: __chm_test_usage("Tile position must be two positive integers seperated by a comma")
             tiles.append((C,R))
-        elif o == "-H": hist_eq = True
         elif o == "-d":
             a = a.lower()
             if a not in dt_trans: __chm_test_usage("Data type must be one of u8, u16, u32, f32, or f64")
@@ -733,7 +716,7 @@ def __chm_test_main_parse_args():
         else: __chm_test_usage("Invalid argument %s" % o)
     if len(tiles) == 0: tiles = None
 
-    return im_path, output, model, tilesize, tiles, ntasks, nthreads, hist_eq, dt
+    return im_path, output, model, tilesize, tiles, ntasks, nthreads, dt
 
 def __chm_test_usage(err=None):
     import sys
@@ -743,23 +726,21 @@ def __chm_test_usage(err=None):
     from . import __version__
     print("""CHM Image Testing Phase.  %s
     
-%s <input> <output> <optional arguments>
-  input_file    The input image to read.
+%s model input output <optional arguments>
+  model         The path to the model. For MATLAB models this is a folder that
+                contains param.mat and MODEL_level#_stage#.mat. For Python
+                models this a file that is alongside several and files like
+                model_name-LDNN-#-#.npy.
+  input         The input image to read.
                 Accepts any 2D image accepted by `imstack` for reading.
-  output_file   The output file or directory to save to.
+  output        The output file or directory to save to.
                 Accepts any 2D image accepted by `imstack` for writing.
 
 Optional Arguments:
-  -m model_dir  The folder that contains the model data. Default is ./temp/.
-                For MATLAB models this folder contains param.mat and
-                MODEL_level#_stage#.mat. For Python models this contains model,
-                model-#-#, and model-#-#.npy.
-  -t tile_size  Set the tile size to use as WxH. By default the tile size is the
-                the same size as the training images (which is believed to be
-                optimal for accuracy). Old models do not include the size of the
-                training images and then 1024x1024 is used if not given. Note
-                that for speed and memory it is optimal if this is a multiple of
-                2^Nlevel of the model.
+  -t tile_size  Set the tile size to use as WxH. By default the tile size is
+                1024x1024 except for MATLAB models for which the size of the
+                training images is used. Note that for speed and memory it is
+                optimal if this is a multiple of 2^Nlevel of the model.
   -T C,R        Specifies that only the given tiles be processed by CHM while
                 all others simply output black. Each tile is given as C,R (e.g.
                 2,1 would be the tile in the third column and second row). Can
@@ -767,9 +748,6 @@ Optional Arguments:
                 are defined by multiples of tile_size. A tile position out of
                 range will be ignored. If not included then all tiles will be
                 processed.
-  -H            Histogram-equalize the testing images to the training image
-                histogram (if provided in the model). If not used, the testing
-                data should already be properly equalized.
   -d type       Set the output type of the data, one of u8 (default), u16, u32,
                 f32, or f64; the output image type must support the data type.
   -n ntasks     How many separate tasks to run in parallel. Each task processes

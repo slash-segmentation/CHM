@@ -51,9 +51,7 @@ the dependent Python packages. On Linux machines, setting this up would look lik
 
     # Install some of the dependencies
     # Note: these can be skipped but greatly speeds up the other commands
-    pip install numpy
-    pip install cython
-    pip install scipy
+    pip install numpy cython scipy
     
     # Install the devel pysegtools (and all dependencies)
     git clone git@github.com:slash-segmentation/segtools.git
@@ -79,21 +77,22 @@ CHM Test
 --------
 Basic usage is:
 
-    python -m chm.test input-image output-image <options>
+    python -m chm.test model input-image output-image <options>
     
 General help will be given if no arguments (or invalid arguments) are provided
 
     python -m chm.test
     
+The model must be a directory of a MATLAB model or a Python model file. For MATLAB models the
+folder contains param.mat and MODEL_level#_stage#.mat. For Python models the file will be next to
+several files like model_name-LDNN_#-#.npy. *The MATLAB command line made this optional but now it
+is mandatory.*
+
 The CHM test program takes a single 2D input image, calculates the labels according to a model,
 and saves the labels to the 2D output image. The images can be anything supported by the `imstack`
 program for 2D images. The output-image can given as a directory in which case the input image
-filename and type are used. *The MATLAB command line allowed multiple files.*
-
-By default this assumes the model data is stored in ./temp/. Typically this will be stored
-somewhere else and using the `-m` option this can be set to any folder. The folder can contain
-either a MATLAB model or a Python model. For MATLAB models the folder contains param.mat and
-MODEL_level#_stage#.mat. For Python models the folder contains model, model-#-#, and model-#-#.npy.
+filename and type are used. *The MATLAB command line allowed multiple files however now only a
+single image is allowed, to process more images you must write a loop in bash or similar.*
 
 The CHM test program splits the input image into a bunch of tiles and operates on each tile
 separately. The size of the tiles to process can be given with `-t #x#`, e.g. `-t 512x512`. For
@@ -101,18 +100,13 @@ MATLAB models that include the training image size, that is used as the default.
 the default used is 1024x1024. For speed and memory it is likely optimal if the tile size is a
 multiple of 2^Nlevel of the model (typically Nlevel<=4, so should be a multiple of 16). *The MATLAB
 command line called this option `-b`. Additionally, the MATLAB command line program overlapped
-tiles (specified with `-o`) which is no longer ever done.*
+tiles (specified with `-o`) which is no longer needed.*
 
 Instead of computing labels for every tile, individual tiles can be specified using `-T #,#`, e.g.
 `-T 0,2` computes the tile in the first column, third row. This option can be specified any number
 of times to cause multiple tiles to be calculted. All tiles not calculated will output as black
 (0). Any tile indices out of range are simply ignored. *The MATLAB command line called this option
 `-t` and indexing started at 1 instead of 0.*
-
-For MATLAB models that include the source histogram, the input images can automatically be
-histogram-equalized to it by specifying `-H`. Python models do not include this information and in
-general this should be done in a separate process anyways. *The MATLAB command line did histogram
-equalization by default and was turned off with `-h`.*
 
 By default the output image data is saved as single-byte grayscale data (0-255). The output data
 type can be changed with `-d type` where `type` is one of `u8` (8-bit integer from 0-255), `u16`
@@ -133,14 +127,15 @@ tasks. If only one of `-n` or `-N` is given, the other is derived based on it. *
 line only had the option to be multithreaded or not with `-s`.*
 
 *The MATLAB command line option `-M` is completely gone as there is no need for MATLAB or MCR to be
-installed*
+installed. It also did histogram equalization by default. This is no longer supported at all and
+should be done separately.*
 
 
 CHM Train
 ---------
 Basic usage is:
 
-    python -m chm.train input-images label-images <options>
+    python -m chm.train model inputs labels <options>
 
 General help will be given if no arguments (or invalid arguments) are provided
 
@@ -150,30 +145,32 @@ The CHM train program takes a set of input images and labels and creates a model
 test. The model created from Python cannot be used with the MATLAB CHM test program. The input
 images are specified as a single argument for anything that can be given to `imstack -L` (the value
 may need to be enclosed in quotes to make it a single argument). They must be grayscale images. The
-labels work similarily. Anything that is 0 is considered background while anything else is
-considered a positive label. The inputs and labels are match up in the order they are given and
-paired images must be the same size.
+labels work similarily except that anything that is 0 is considered background while anything else
+is considered a positive label. The inputs and labels are matched up in the order they are given
+and paired images must be the same size.
 
-By default this stores the model data in ./temp/. This can be set to a different directory using
-the `-m`. If the option `-r` is also specified and this folder already contains (part of) a Python
-model, then the model is run in 'restart' mode. In restart mode, the previous model is examained
-and as much of it is reused as possible. This is useful for when a previous attempt failed partway
-through or when desiring to add additional stages or levels to a model. If the filters are changed
-from the original model, any completed stages/levels will not use the new filters but new
-stages/levels will. The input images and labels must be the same when restarting.
+The model is given as a path to a file for where to save the model to. Additional files will be
+created next to that file that have a similar name. These files must be kept with the model file
+itself. If the option `-r` is also specified and the path already contains (part of) a Python model,
+then the model is run in 'restart' mode. In restart mode, the previous model is examained and as
+much of it is reused as possible. This is useful for when a previous attempt failed partway through
+or when desiring to add additional stages or levels to a model. If the filters are changed from the
+original model, any completed stages/levels will not use the new filters but new stages/levels will.
+The input images and labels must be the same when restarting.
 
-**Note:** the model folder can become fairly large (100+ MiB), however most of this is only needed
-if you plan to ever 'restart' the model. If not, all `output-#-#` directories within the model
-directory can be removed. After removing them, the models should only be 10-20 MiB. This is true
-for Python and MATLAB models.
+**Note:** while the training process is running several temporary files are saved in a folder that
+has the same path as the model but with "-temp" appended to it. If the training process crashes
+(for example due to insufficient memory) then this folder will not be cleaned up automatically. It
+can be manually removed and will be recreated as necessary if running in restart mode. It can
+become fairly large (100+ MiB). Without this folder models should only be 10-20 MiB.
 
 The default number of stages and levels are 2 and 4 respectively. They can be set using `-S #` and
 `-L #` respectively. The number of stages must be at least 2 while the number of levels must be at
 least 1. Each additional stage will require very large amounts of time to compute, both while
 training and testing. Additional levels don't add too much additional time to training or testing,
 but do increase both. Typically, higher number of levels are required with larger structures and do
-not contribute much for smaller structures. Some testing has shown that more than 2 levels is
-pointless - at least for non-massive structures.
+not contribute much for smaller structures. Some testing has shown that using more than 2 levels
+does not contribute much to increased quality - at least for non-massive structures.
 
 The filters used for generating features are, by default, the same used by the MATLAB CHM train but
 without extra compatibility. The filters can be adjusted using the `-f` option in various ways. The
@@ -189,13 +186,11 @@ from the previous stages and levels to generate additional features. This filter
 with `-c`, e.g. `-c intensity-stencil-7` specifies the default filter used. This only supports a
 single filter, so `+`, `-`, or a list of filters cannot be given.
 
-The training algorithm requires also running the testing algorithm internally. Normally this is
-saved as a series of NPY files for quick access to the data, but these files are not very useful
-as an image format. To save them in a more useable format, the option `-o` can be given. The option
-takes anything that can be given to `imstack -S` although quotes may be required to make it a
-single argument. This means that if you want to see the results of running CHM test on the training
-data you can get it for free. Like CHM test, this support the `-d` argument to specify the data
-type used to save the data.
+The training algorithm requires also running the testing algorithm internally. If desired these
+results can be saved using the option `-o`. This option takes anything that can be given to 
+`imstack -S` although quotes may be required to make it a single argument. This means that if you
+want to see the results of running CHM test on the training data you can get it for free. Like CHM
+test, this supports the `-d` argument to specify the data type used to save the data.
 
 If not all of the training data should be used, a set of mask images can be provided to select
 which pixels will be considered during training. This is done with `-M masks` where `masks` can be
@@ -205,7 +200,7 @@ Any non-zero pixel in the mask will be used to train with. Note that all pixels,
 covered by the mask, are considered for generation of the features.
 
 *The MATLAB command line option `-M` is completely gone as there is no need for MATLAB or MCR to be
-installed*
+installed. Additionally the option `-m` is now mandatory and listed first.*
 
 
 Filters
@@ -226,10 +221,10 @@ to the MATLAB output. Technically it is slightly less accurate, but the numbers 
 Computes the HOG (histogram of oriented gradients) features of the image.
 
 The original MATLAB function used float32 values for many intermediate values so the outputs from
-this filter are understandably off by up to 1e-7. The improved accuracy is used for MATLAB or
+this filter are understandably off by up to 1e-7. The improved accuracy is used for MATLAB or 
 Python models since it just adds more accuracy.
 
-*TODO: more details - reference and parameters used*
+*TODO: more details - reference and parameters used and the new HOG*
 
 ### Edge
 
@@ -278,6 +273,7 @@ simplified in this way, otherwise a much higher accuracy version is used.
 *TODO*
 
 ### Intensity
+
 Computes the neighborhood/intensity features of the image. Basically, moves the image around and
 uses the shifted images values. Supports square or stencil neighborhoods of any radius >=1. In
 compatibility mode these are always fixed to a particular type (stencil) and radius (10).
