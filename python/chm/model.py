@@ -460,9 +460,9 @@ class ModelDecoder(json.JSONDecoder):
             return array(data, dt) if isinstance(data, list) else \
                    fromstring(b64decode(data), dt).reshape(o['shape'])
         if '__npy__' in o:
-            from os.path import join, normpath
+            from os.path import join, normpath, dirname
             from numpy import load
-            return load(o['__npy__'] if self.__path is None else normpath(join(self.__path, o['__npy__'])), 'r')
+            return load(o['__npy__'] if self.__path is None else normpath(join(dirname(self.__path), o['__npy__'])), 'r')
         if '__submodel__' in o:
             return ModelDecoder.__get_obj(SubModel, *o['__submodel__'])
         if '__filter__' in o:
