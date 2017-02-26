@@ -468,7 +468,7 @@ def descent_do(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W,
                     W_ij[k] -= rate*p_ij[k]
 
 def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
-                             const intp niters, const double rate, const double momentum, disp=None):
+                             const intp niters, const double rate, const double momentum, target, disp=None):
     """
     This is an optimized version of gradient descent that always has dropout=0.5 and batchsz=1. See
     chm.ldnn.gradient_descent for more information about the other parameters.
@@ -493,7 +493,9 @@ def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
     
     # Variables
     cdef intp i, p
-    cdef double totalerror
+    cdef double totalerror, y, lower_target, upper_target, target_diff
+    lower_target,upper_target = target
+    target_diff = upper_target-lower_target
     
     for i in xrange(niters):
         with nogil:
@@ -503,7 +505,8 @@ def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
                 shuffle(i_order)
                 shuffle(j_order)
                 x[:] = X[:,order[p]] # copying here greatly increases overall speed 
-                totalerror += _grad_desc_do(x, 0.1 + 0.8*<bint>Y[order[p]], W, prevs, i_order[:N2], j_order[:M2], s, g, rate, momentum)
+                y = lower_target + target_diff*<bint>Y[order[p]]
+                totalerror += _grad_desc_do(x, y, W, prevs, i_order[:N2], j_order[:M2], s, g, rate, momentum)
         total_error[i] = sqrt(totalerror/P)
         if disp is not None: disp('Iteration #%d error=%f' % (i+1,total_error[i]))
     return total_error

@@ -37,14 +37,16 @@ class LDNN(Classifier):
         batchsz   if not using dropout then this is the size of the batches to process
         niters    number of iterations of gradient descent to run
         rate      the step size or learning rate of gradient descent
+        target    target values to prevent oversatuation of sigmoid function
+                  see LeCun, Bottou, Orr, Muller 1998 section 4.5
         momentum  the momentum of the learning process of gradient descent
     """
     __weights = None # combined w_ijk and b_ij values, shaped like NxMx(n+1)
     __params = None
     
-    _def_params_L0S1 = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'momentum':0.5}
-    _def_params_L0   = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':6, 'rate':0.005,'momentum':0.5}
-    _def_params      = {'N':24,'M':24,'dropout':True, 'batchsz':1,  'niters':15,'rate':0.025,'momentum':0.5}
+    _def_params_L0S1 = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
+    _def_params_L0   = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':6, 'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
+    _def_params      = {'N':24,'M':24,'dropout':True, 'batchsz':1,  'niters':15,'rate':0.025,'target':(0.1,0.9),'momentum':0.5}
     
     @classmethod
     def get_default_params(cls, stage, level):
@@ -198,7 +200,7 @@ def __load_cy_ldnn():
     ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
     try: import numpy.random.mtrand # this may just always work, but I don't know
     except ImportError: pass
-    from . import __ldnn
+    from . import __ldnn # pylint: disable=redefined-outer-name
     return __ldnn
 __ldnn = delayed(__load_cy_ldnn)
 
@@ -210,7 +212,7 @@ def filter_clustering_warnings(action='always'):
     import warnings
     warnings.simplefilter(action, __ldnn.ClusteringWarning)
 
-def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, momentum=0.5, disp=True): #pylint: disable=too-many-arguments
+def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
     """
     Calculate the initial weights using multilevel K-Means clustering on a subset of the data. The
     clusters are used according to the end of section 3 of Seyedhosseini et al 2013.
@@ -228,6 +230,7 @@ def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, mo
         batchsz     size of the mini-batches in gradient descent if dropout is False
         rate        gradient descent learning rate
         momentum    amount the previous gradient influences the next gradient
+        target      target values, default to 0.1 and 0.9, see LeCun et al 1998 section 4.5
         disp        display messages about progress
     
     Output:
@@ -236,10 +239,14 @@ def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, mo
     """
     if disp:
         __print('Number of training samples = %d'%X.shape[1])
-        __print('Clustering...')
+        __print('Calculating initial weights...')
     W = init_weights(X, Y, N, M, True)
-    if disp: __print('Gradient descent...')
-    gradient_descent(X, Y, W, niters, batchsz, dropout, rate, momentum, disp)
+    if disp:
+        __print('Initial error: %f'%calc_error(X,Y,W,target), 3)
+        __print('Gradient descent...')
+    gradient_descent(X, Y, W, niters, batchsz, dropout, rate, momentum, target, disp)
+    if disp:
+        __print('Final error: %f'%calc_error(X,Y,W,target), 3)
     return W
 
 def init_weights(X, Y, N, M, whiten=False, scipy=False):
@@ -286,7 +293,7 @@ def init_weights(X, Y, N, M, whiten=False, scipy=False):
     baises *= -0.5
     return weights
 
-def _calc_err(X, Y, W):
+def calc_error(X, Y, W, target=(0.1,0.9)):
     """
     Calculate the square root of the error of the model (eq 11 from Seyedhosseini et al 2013).
     
@@ -294,15 +301,19 @@ def _calc_err(X, Y, W):
         X   (n+1)xP matrix of feature vectors
         Y   P-length array of bool labels
         W   NxMx(n+1) matrix of weights and biases
+        
+    Parameters:
+        target  target values, default to 0.1 and 0.9, see LeCun et al 1998 section 4.5
     """
     from math import sqrt
-    Y = 0.8*Y
-    Y += 0.1
+    lower_target,upper_target = target
+    Y = (upper_target-lower_target)*Y
+    Y += lower_target
     Y -= f_(sigma_ij(W, X))
     Y *= Y
     return sqrt(Y.mean())
 
-def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005, momentum=0.5, disp=True):
+def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
     """
     Uses stochastic gradient descent with mini-batches and dropout to minimize the weights of
     the LDNN classifier using the training data provided. Parts of this are implemented in Cython.
@@ -325,9 +336,10 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
     Parameters:
         niters      number of times to go through all of the samples
         batchsz     size of the mini-batches
-        dropout   if True then perform input dropout at 50% according to Hinton et al. 2012
+        dropout     if True then perform input dropout at 50% according to Hinton et al. 2012
         rate        influence of gradient during each step, per sample
         momentum    amount the previous gradient influences the next gradient, per sample
+        target      target values, default to 0.1 and 0.9, see LeCun et al 1998 section 4.5
         disp        display messages about progress
     """
     #pylint: disable=too-many-locals
@@ -342,7 +354,7 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
     if dropout and batchsz == 1:
         # Use the optimized version for this situation
         disp = (lambda s:__print(s,3)) if disp else None
-        return __ldnn.gradient_descent_dropout(X, Y.view(int8), W, niters, rate, momentum, disp)
+        return __ldnn.gradient_descent_dropout(X, Y.view(int8), W, niters, rate, momentum, target, disp)
     
     # Matrix sizes
     (N,M,n),P = W.shape,len(Y)
@@ -363,14 +375,17 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
     else:
         cy_desc = __ldnn.descent
         desc = lambda:cy_desc(grads, prevs, W, rate, momentum)
-    
+
+    lower_target,upper_target = target
+    target_diff = upper_target-lower_target
+        
     for it in xrange(niters):
         shuffle(order)
         totalerror = 0.0
         f,g = f_full,g_full
         for p in xrange(0, P, batchsz):
             x = X[:,order[p:p+batchsz]] # x is always F-ordered even if X is C-ordered
-            y = 0.8*Y[order[p:p+batchsz]]; y+=0.1 # target 0.1 and 0.9 - see LeCun, Bottou, Orr, Muller 1998 section 4.5
+            y = target_diff*Y[order[p:p+batchsz]]; y+=lower_target # see LeCun, Bottou, Orr, Muller 1998 section 4.5
 
             # Calculate the sigmas, gs, and classifier (eqs 9 and 10 from Seyedhosseini et al 2013) 
             if dropout:
@@ -394,5 +409,5 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
             
         # Report total error for the iteration
         total_error[it] = sqrt(totalerror/P) # Similar to eq 11 from Seyedhosseini et al 2013 but slightly different
-        if disp: __print('Iteration #%d error=%f' % (it+1,total_error[it]), 3)
+        if disp: __print('Iteration #%d error: %f' % (it+1,total_error[it]), 3)
     return total_error
