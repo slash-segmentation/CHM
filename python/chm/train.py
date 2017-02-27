@@ -14,13 +14,7 @@ from __future__ import print_function
 
 __all__ = ["CHM_train"]
 
-# TODO: I know learning wants a Fortran-ordered matrix, what about filters?
-#    X[:,start:end].reshape((-1, im.shape)).flags.(c_|f_)contiguous
-# is False for order='F' or 'C', however:
-#    X[:,start:end].reshape((-1, im.shape))[0].flags.c_contiguous
-# is True for order='C' but the equivelent is False for order='F'
-
-def CHM_train(ims, lbls, model, masks=None, nthreads=None):
+def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
     """
     CHM_train - CHM Image Training
     
@@ -31,38 +25,24 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None):
         masks       ImageStack or a list of ImageSource objects of the pixels to use from the
                     training data, by default uses all pixels
         nthreads    number of threads to use, defaulting to the number of physical CPUs/cores
+        disp        if set to False will not display updates, defaults to True
     
     Returns the final set of labels calculated.
     """
-    from itertools import izip
     from psutil import cpu_count
-    from numpy import empty
-    from .utils import im2double, copy
 
-    # Basic checks of images, labels, and masks
-    if len(ims) < 1 or len(ims) != len(lbls): raise ValueError('You must provide at least 1 image set and equal numbers of training and label images')
-    if any(len(im.dtype) > 1 or im.dtype.kind not in ('iufb') for im in ims): raise ValueError('Images must be grayscale')
-    if any(len(lbl.dtype) > 1 or lbl.dtype.kind not in ('iufb') for lbl in lbls): raise ValueError('Labels must be grayscale')
-    shapes = [im.shape for im in ims]
-    if any(sh != lbl.shape for sh,lbl in izip(shapes,lbls)): raise ValueError('Labels must be the same shape as the corresponding images')
-    if masks is not None:
-        if len(ims) != len(masks): raise ValueError('The number of mask images must be equal to the number of training/label images')
-        if any(len(mask.dtype) > 1 or mask.dtype.kind not in ('iufb') for mask in masks): raise ValueError('Masks must be grayscale')
-        if any(sh != mask.shape for sh,mask in izip(shapes,masks)): raise ValueError('Masks must be the same shape as the corresponding images')
+    # Basic checks of images, labels, and masks and loads them for level 0
+    ims0,lbls0,masks0 = __check_and_load(ims, lbls, masks)
         
-    # Load the images and labels for level 0
-    ims0   = [im2double(im.data) for im in ims]
-    lbls0  = [lbl.data>0 for lbl in lbls]
-    masks0 = None if masks is None else [mask.data>0 for mask in masks]
-
     # Get parameters
-    shapes = __get_all_shapes(shapes, model.nlevels)
+    shapes = __get_all_shapes([im.shape for im in ims], model.nlevels)
     if nthreads is None: nthreads = cpu_count(True)
+    disp = __print if disp else lambda s,l=0:None
 
     ########## CHM Train Core ##########
     contexts, clabels = None, None # contexts and clabels are indexed by image-index then level
     for sm in model:
-        __print('Training stage %d level %d...'%(sm.stage,sm.level))
+        disp('Training stage %d level %d...'%(sm.stage,sm.level))
 
         ##### Update images, labels, contexts #####
         if sm.level == 0:
@@ -73,49 +53,60 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None):
             __downsample_images(ims, lbls, masks, contexts, clabels, nthreads)
 
         if sm.classifier.learned and __load_clabels(sm, clabels):
-            __print('Skipping... (already completed)', 1)
+            disp('Skipping... (already completed)', 1)
             continue
 
         ##### Feature Extraction #####
-        __print('Extracting features...', 1)
+        disp('Extracting features...', 1)
         X_full, Y, M = __extract_features(sm, ims, lbls, masks, contexts, nthreads)
 
         ##### Learning the classifier #####
         if not sm.classifier.learned:
-            __print('Learning...', 1)
-            if M is None:
-                # Convert to Fortran-ordered
-                X = empty(X_full.shape, order='F')
-                copy(X, X_full, nthreads)
-            else:
-                # Compress and convert to Fortran-ordered
-                # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
-                X = empty((X_full.shape[0], M.sum()), order='F')
-                X_full.compress(M, 0, X)
-            #__subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
+            disp('Learning...', 1)
+            # Apply masking and subsampling
+            # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
+            X,Y = (X_full,Y) if M is None else (X_full.compress(M, 0), Y.compress(M, 0))
+            #X,Y = __subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
             del M
-            sm.learn(X, Y, nthreads)
+            
+            sm.learn(X, Y, nthreads) # TODO: pass the disp method along with an increased indentation
             del X, Y
-            model.save() # TODO: this didn't seem to work...
-        else:
-            __print('Skipping learning... (already complete)', 1)
+            model.save() # TODO: don't re-save all previous models
+        else: disp('Skipping learning... (already complete)', 1)
 
         ##### Generate the outputs #####
-        __print('Generating outputs...', 1)
+        disp('Generating outputs...', 1)
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)
 
     ########## Cleanup and return final labels ##########
-    __print('Complete!', 1)
-    from os import name
-    from shutil import rmtree
+    disp('Complete!', 1)
     del ims, ims0, lbls, lbls0, masks, masks0, contexts
-    clabels = [clbl[0] for clbl in clabels]
-    if os.name == 'nt': clabels = [clbl.copy() for clbl in clabels] # On Windows we cannot remove memory-mapped files
-    # We delete all of these files since they only take a few minutes to recreate and it is unusual to need them at all
-    rmtree(__get_temp_folder(sm), onerror=lambda f,p,e:print("! Failed to remove temporary file %s"%(p)))
-    return clabels
+    return __cleanup_outputs(model, clabels)
+
+def __check_and_load(ims, lbls, masks=None):
+    """
+    Checks the images, labels, and masks for consistency. Raises a ValueError for any invalid inputs.
+    Finally loads all of these ready for level 0.
+    """
+    from itertools import izip
+    from .utils import im2double
+    # Check
+    if len(ims) < 1 or len(ims) != len(lbls): raise ValueError('You must provide at least 1 image set and equal numbers of training and label images')
+    if any(len(im.dtype) > 1 or im.dtype.kind not in ('iufb') for im in ims): raise ValueError('Images must be grayscale')
+    if any(len(lbl.dtype) > 1 or lbl.dtype.kind not in ('iufb') for lbl in lbls): raise ValueError('Labels must be grayscale')
+    shapes = [im.shape for im in ims]
+    if any(sh != lbl.shape for sh,lbl in izip(shapes,lbls)): raise ValueError('Labels must be the same shape as the corresponding images')
+    if masks is not None:
+        if len(ims) != len(masks): raise ValueError('The number of mask images must be equal to the number of training/label images')
+        if any(len(mask.dtype) > 1 or mask.dtype.kind not in ('iufb') for mask in masks): raise ValueError('Masks must be grayscale')
+        if any(sh != mask.shape for sh,mask in izip(shapes,masks)): raise ValueError('Masks must be the same shape as the corresponding images')
+    # Load
+    ims0   = [im2double(im.data) for im in ims]
+    lbls0  = [lbl.data>0 for lbl in lbls]
+    masks0 = None if masks is None else [mask.data>0 for mask in masks]
+    return ims0, lbls0, masks0
     
 def __print(s, depth=0):
     """
@@ -174,6 +165,7 @@ def __extract_features(submodel, ims, lbls, masks, contexts, nthreads):
     Extract all features from the images into a feature vector. Returns X (feature vector), Y
     (labels), and M (mask or None if no masks).
     """
+    #pylint: disable=too-many-locals
     from itertools import izip
     from numpy import empty
     from .utils import copy_flat
@@ -268,15 +260,30 @@ def __load_clabels(submodel, clabels):
         # (should be using 'r' mode but then Cython typed memoryviews reject it)
         clabels[i].append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
     return True
-        
+
+def __get_temp_folder(model):
+    """Get the folder where all temporary outputs are written to for a model."""
+    return model.path+'-temp'
+
 def __get_output_folder(submodel):
     """Get the folder where outputs are written to for a specific submodel."""
     from os.path import join
     return join(__get_temp_folder(submodel.model), '%d-%d'%(submodel.stage, submodel.level))
 
-def __get_temp_folder(model):
-    """Get the folder where all temporary outputs are written to for a model."""
-    return model.path+'-temp'
+def __cleanup_outputs(model, clabels):
+    """
+    Cleanup the outputs. These are all stored in a temporary folder next to the model. We delete all
+    of these files since they only take a few minutes to recreate and it is unusual to need them at all.
+    On Windows this requires copying the data in clabels since the memory-mapped files cannot be
+    deleted while in-use.
+    """
+    from os import name
+    from shutil import rmtree
+    from warnings import warn
+    clabels = [clbl[0] for clbl in clabels]
+    if name == 'nt': clabels = [clbl.copy() for clbl in clabels] # On Windows we cannot remove memory-mapped files
+    rmtree(__get_temp_folder(model), onerror=lambda f,p,e:warn("Failed to remove temporary file %s"%p))
+    return clabels
 
 def __chm_train_main():
     """The CHM train command line program"""
@@ -302,7 +309,6 @@ def __adjust_output(out, dt):
 def __chm_train_main_parse_args():
     """Parse the command line arguments for the CHM train command line program."""
     #pylint: disable=too-many-locals, too-many-branches, too-many-statements
-    import os.path
     from sys import argv
     from collections import OrderedDict
     from getopt import getopt, GetoptError
@@ -315,19 +321,21 @@ def __chm_train_main_parse_args():
     dt_trans = {'u8':uint8, 'u16':uint16, 'u32':uint32, 'f32':float32, 'f64':float64}
 
     # Parse and minimally check arguments
-    if len(argv) < 3: __chm_train_usage()
-    if len(argv) > 3 and argv[3][0] != "-":
-        __chm_train_usage("You provided more than 2 required arguments")
+    if len(argv) < 4: __chm_train_usage()
+    if len(argv) > 4 and argv[4][0] != "-":
+        __chm_train_usage("You provided more than 3 required arguments")
+        
+    # Get the model path
+    path = argv[1]
 
     # Open the input and label images
-    ims = FileImageStack.open_cmd(argv[1])
-    lbls = FileImageStack.open_cmd(argv[2])
+    ims = FileImageStack.open_cmd(argv[2])
+    lbls = FileImageStack.open_cmd(argv[3])
 
     # Get defaults for optional arguments
-    path = 'model'
     nstages, nlevels = 2, 4
-    # TODO: Gabor and SIFT should not need compat mode here!
-    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor(True)),
+    # TODO: SIFT should not need compat mode here!
+    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor()),
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
     masks = None
@@ -336,14 +344,10 @@ def __chm_train_main_parse_args():
     nthreads = None
 
     # Parse the optional arguments
-    try: opts, _ = getopt(argv[3:], "rm:S:L:f:c:M:o:d:n:N:")
+    try: opts, _ = getopt(argv[4:], "rS:L:f:c:M:o:d:n:N:")
     except GetoptError as err: __chm_train_usage(err)
     for o, a in opts:
-        if o == "-m":
-            path = a
-            if os.path.exists(path) and not os.path.isdir(path):
-                __chm_train_usage("Model folder exists and is not a directory")
-        elif o == "-S":
+        if o == "-S":
             try: nstages = int(a, 10)
             except ValueError: __chm_train_usage("Number of stages must be an integer >= 2")
             if nstages < 2: __chm_train_usage("Number of stages must be an integer >= 2")
@@ -410,20 +414,19 @@ def __chm_train_usage(err=None):
     from . import __version__
     print("""CHM Image Training Phase.  %s
 
-%s <input> <label> <optional arguments>
-  input         The input image(s) to read
+%s model inputs labels <optional arguments>
+  model         The file where the model data is saved to. Note that a few other
+                files will be saved alongside this file as well.
+  inputs        The input image(s) to read
                 Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.
-  label         The label/ground truth image(s) (0=background)
+  labels        The label/ground truth image(s) (0=background)
                 Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.
   The inputs and labels are matched up in the order they are given and paired
   images must be the same size.
 
 Optional Arguments:
-  -m model      The file where the model data is saved to. Default is model.
-                Note that a few other files will be saved alongside this file as
-                well.
   -S nstages    The number of stages of training to perform. Must be >=2.
                 Default is 2.
   -L nlevels    The number of levels of training to perform. Must be >=1.
