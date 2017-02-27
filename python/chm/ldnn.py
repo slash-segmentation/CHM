@@ -79,9 +79,6 @@ class LDNN(Classifier):
         from numpy import float64, ndarray
         assert(weights.shape[:2] == (self.__params['N'],self.__params['M']))
         self.__weights = weights.view(ndarray).astype(float64, copy=False)
-    def save_weights(self, path):
-        from numpy import save
-        save(path, self.__weights)
     @property
     def learned(self): return self.__weights is not None
     @property
@@ -103,7 +100,7 @@ class LDNN(Classifier):
         assert(self.__weights is None)
         from .utils import set_lib_threads
         set_lib_threads(nthreads)
-        self.__weights = learn(X, Y, **self.__params) # TODO: save?
+        self.__weights = learn(X, Y, **self.__params)
 
 def f_(s, dropout=False, out=None):
     """

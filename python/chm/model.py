@@ -12,8 +12,6 @@ from __future__ import print_function
         
 __all__ = ['Model', 'SubModel']
 
-import json
-
 class Model(object):
     """
     Represents an entire model, across all stages and levels. Has the properties path, nstages, and
@@ -28,8 +26,7 @@ class Model(object):
         self._path = path = abspath(path)
         if not isfile(path): raise ValueError('path')
         if model is None:
-            with open(path, 'rb') as f: info = f.read()
-            info = ModelDecoder().decode(info, path=path)
+            info = Model._load(path)
             self._nstages,self._nlevels,model = info['nstages'],info['nlevels'],info['submodels']
         assert(len(model[-1]) == 1 and len(model[0]) > 0 and all(len(sm) == len(model[0]) for sm in model[1:-1]))
         #pylint: disable=access-member-before-definition
@@ -64,14 +61,22 @@ class Model(object):
         Save the model. If a path is given, that is used. Otherwise the originally loaded path or
         last path saved to is used.
         """
-        if path is not None: self._path = path
-        Model._save(self._path, self._info)
+        Model._save(path or self._path, self._info)
     
     @staticmethod
     def _save(path, info):
-        info = ModelEncoder(separators=(',',':')).encode(info, path=path, comp=True)
-        with open(path, 'wb') as f: f.write(info)
+        from pysegtools.general import GzipFile
+        from json import dump
+        with GzipFile(path, 'wb') as f:
+            dump(info, f, separators=(',',':'), default=_json_save_hook)
 
+    @staticmethod
+    def _load(path):
+        from pysegtools.general import GzipFile
+        from json import load
+        with GzipFile(path, 'rb') as f:
+            return load(f, object_hook=_json_load_hook)
+   
     @classmethod
     def load(cls, path):
         """
@@ -152,10 +157,8 @@ class Model(object):
         `path` is the path to the model file itself. Returns the loaded info from the model with
         some submodels possibly reset.
         """
-        try:
-            with open(path, 'rb') as f: info = f.read()
+        try: info = Model._load(path)
         except IOError: return None
-        info = ModelDecoder().decode(info, path=path)
         if not isinstance(info, dict) or not all(k in info for k in ('submodels', 'nstages', 'nlevels')): return None
         sms = info['submodels']
         max_stg = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
@@ -391,110 +394,60 @@ class SubModel(object):
         if Y.dtype != bool: Y = Y > 0
         self.classifier.learn(X, Y, nthreads)
 
-class ModelEncoder(json.JSONEncoder):
-    """
-    Class for encoding a Model, SubModels, Filters, and Classifier objects into JSON. Besides the
-    standard objects the JSON encoder can handle this is able to encode SubModel, Filter, and
-    Classifier objects by encoding their FQN and their __dict__ or the result of __getstate__. Also
-    this is able to encode NumPy arrays. Arrays with less than 1024 elements are saved directly
-    into the JSON text. Arrays with less than 512 KiB of data are saved in base-64 encoded raw
-    data. Larger arrays are saved externally in a separate file. This also defaults to compressing
-    all of the JSON output to dramatically shrinking the size.
-    """
-    __path = None
-    __name = None
-    __stage = None
-    __level = None
-    __count = 0
-    def default(self, o): #pylint: disable=method-hidden
-        from numpy import ndarray, save
-        from .filters import Filter
-        from .classifier import Classifier
-        from os.path import basename
-        if isinstance(o, ndarray):
-            if o.size <= 1024:
-                # Arrays with only 1024 elements are saved as lists
-                return {'__ndarray__':o.tolist(),'dtype':o.dtype.str}
-            if o.nbytes < 512*1024:
-                # <0.5 MiB arrays are embedded directly in the JSON data
-                from base64 import b64encode
-                return {'__ndarray__': b64encode(o.tostring()),'dtype':o.dtype.str,'shape':o.shape}
-            # Larger arrays are saved in a separate file
-            path = self.__path or 'model'
-            if self.__name: path += '-' + self.__name
-            if self.__stage: path += '-%d-%d' % (self.__stage, self.__level)
-            if self.__count: path += '-%d' % self.__count
-            path += '.npy'
-            self.__count += 1
-            save(path, o)
-            return {'__npy__':basename(path)}
-        if isinstance(o, SubModel):
-            self.__stage,self.__level,self.__count = o.stage,o.level,0
-            return {'__submodel__':self.__get_obj(o)}
-        if isinstance(o, Filter):     return {'__filter__':    self.__get_obj(o)}
-        if isinstance(o, Classifier): return {'__classifier__':self.__get_obj(o)}
-        return super(ModelEncoder, self).default(o)
-    def __get_obj(self, o):
-        cls = o.__class__
-        name = self.__name = getattr(cls, '__qualname__', cls.__name__)
-        attr = getattr(o, '__getstate__', lambda:o.__dict__)()
-        return [cls.__module__, name, attr]
-    def encode(self, o, path=None, comp=True): #pylint: disable=arguments-differ
-        from zlib import compress
-        self.__path,self.__name,self.__stage,self.__level,self.__count = path,None,None,None,0
-        s = super(ModelEncoder, self).encode(o)
-        return compress(s) if comp else s
 
-class ModelDecoder(json.JSONDecoder):
-    """Class for decoding JSON into SubModels, Filters, and Classifier objects."""
-    __path = None
-    def __init__(self, **kwargs):
-        kwargs['object_hook'] = self.default
-        super(ModelDecoder, self).__init__(**kwargs)
-    def default(self, o):
-        if '__ndarray__' in o:
-            from numpy import array, fromstring, dtype
-            from base64 import b64decode
-            dt = dtype(o.get('dtype', '<f8'))
-            data = o['__ndarray__']
-            return array(data, dt) if isinstance(data, list) else \
-                   fromstring(b64decode(data), dt).reshape(o['shape'])
-        if '__npy__' in o:
-            from os.path import join, normpath, dirname
-            from numpy import load
-            return load(o['__npy__'] if self.__path is None else normpath(join(dirname(self.__path), o['__npy__'])), 'r')
-        if '__submodel__' in o:
-            return ModelDecoder.__get_obj(SubModel, *o['__submodel__'])
-        if '__filter__' in o:
-            from chm.filters import Filter
-            return ModelDecoder.__get_obj(Filter, *o['__filter__'])
-        if '__classifier__' in o:
-            from .classifier import Classifier
-            return ModelDecoder.__get_obj(Classifier, *o['__classifier__'])
-        return o
-    @staticmethod
-    def __get_obj(base, mod, cls, attr):
-        from importlib import import_module
-        c = import_module(mod)
-        for cn in cls.split('.'): c = getattr(c, cn)
-        if not issubclass(c, base): raise TypeError('Unknown or bad '+base.__name__+' in model')
-        o = c.__new__(c)
-        getattr(o, '__setstate__', o.__dict__.update)(attr)
-        return o
-    def decode(self, s, _w=None, path=None): #pylint: disable=arguments-differ
-        if s[:2] in (b'x\x01',b'x\x9C',b'x\xDA'):
-            from zlib import decompress
-            s = decompress(s)
-        if path is not None: self.__path = path
-        decode = super(ModelDecoder, self).decode
-        o = decode(s) if _w is None else decode(s, _w)
-        if path is not None: self.__path = None
-        return o
-    def raw_decode(self, s, idx=0, path=None): #pylint: disable=arguments-differ
-        if s[:2] in (b'x\x01',b'x\x9C',b'x\xDA'):
-            from zlib import decompress
-            s = decompress(s)
-        if path is not None: self.__path = path
-        o = super(ModelDecoder, self).raw_decode(s, idx)
-        if path is not None: self.__path = None
-        return o
+def _json_save_hook(o):
+    """
+    Function to use as default in json.dump/json.dumps for encoding a Model, SubModels, Filters,
+    and Classifier objects into JSON. Besides the standard objects the JSON encoder can handle this
+    is able to encode SubModel, Filter, and Classifier objects by encoding their FQN and their
+    __dict__ or the result of __getstate__. Also this is able to encode NumPy arrays. Arrays with
+    less than 1024 elements are saved directly into the JSON as lists. Otherwise arrays are saved
+    in base-64 encoded raw binary data.
+    """
+    from numpy import ndarray
+    from .filters import Filter
+    from .classifier import Classifier
+    if isinstance(o, ndarray):
+        if o.size <= 1024:
+            # Arrays with only 1024 elements are saved as lists
+            return {'__ndarray__':o.tolist(),'dtype':o.dtype.str}
+        # Embed raw data as a single base-64 string
+        from base64 import b64encode
+        return {'__ndarray__': b64encode(o.tobytes()),'dtype':o.dtype.str,'shape':o.shape}
+    if isinstance(o, SubModel):   return {'__submodel__':  __json_save_obj(o)}
+    if isinstance(o, Filter):     return {'__filter__':    __json_save_obj(o)}
+    if isinstance(o, Classifier): return {'__classifier__':__json_save_obj(o)}
+    raise TypeError('cannot convert object of '+type(o)+' to JSON')
+def __json_save_obj(o):
+    """For saving one of the SubModel, Filter, or Classifier objects."""
+    cls = o.__class__
+    name = getattr(cls, '__qualname__', cls.__name__)
+    attr = getattr(o, '__getstate__', lambda:o.__dict__)()
+    return [cls.__module__, name, attr]
+def _json_load_hook(o):
+    """
+    A JSON load object_hook that supports SubModel, Filter, Classifer, and NumPy array objects.
+    This matches the _json_save_hook function.
+    """
+    from chm.filters import Filter
+    from chm.classifier import Classifier
+    if '__ndarray__' in o:
+        from numpy import array, fromstring, dtype
+        from base64 import b64decode
+        dt = dtype(o.get('dtype', '<f8'))
+        data = o['__ndarray__']
+        return array(data, dt) if isinstance(data, list) else \
+               fromstring(b64decode(data), dt).reshape(o['shape'])
+    if '__submodel__'   in o: return __json_load_obj(SubModel,   *o['__submodel__'])
+    if '__filter__'     in o: return __json_load_obj(Filter,     *o['__filter__'])
+    if '__classifier__' in o: return __json_load_obj(Classifier, *o['__classifier__'])
+    return o
+def __json_load_obj(base, mod, cls, attr):
+    """For loading one of the SubModel, Filter, or Classifier objects."""
+    from importlib import import_module
+    c = import_module(mod)
+    for cn in cls.split('.'): c = getattr(c, cn)
+    if not issubclass(c, base): raise TypeError('Unknown or bad '+base.__name__+' in model')
+    o = c.__new__(c)
+    getattr(o, '__setstate__', o.__dict__.update)(attr)
+    return o
