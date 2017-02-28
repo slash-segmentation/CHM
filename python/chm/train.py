@@ -415,8 +415,8 @@ def __chm_train_usage(err=None):
     print("""CHM Image Training Phase.  %s
 
 %s model inputs labels <optional arguments>
-  model         The file where the model data is saved to. Note that a few other
-                files will be saved alongside this file as well.
+  model         The file where the model data is saved to. A temporary folder
+                will be alongside this file as well and deleted in the end.
   inputs        The input image(s) to read
                 Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.
@@ -450,7 +450,7 @@ Optional Arguments:
                 input and label along with each image being the same size. Any
                 non-zero pixel in the mask represent a point used for training,
                 either a positive or negative label.
-  -o ouput      Output the results of testing the model on the input data to the
+  -o output     Output the results of testing the model on the input data to the
                 given image. Accepts anything that is accepted by `imstack -S`
                 in quotes. The data is always calculated anyways so this just
                 causes it to be saved in a usable format.
@@ -462,9 +462,9 @@ Optional Arguments:
                 you do not need to give the same filters, stages, or levels. The
                 model will be adjusted as necessary.
   -N nthreads   How many threads to use. Default is to run as many threads as
-                there are CPUs. Note: only the extraction of features and
-                generation of outputs can use multiple threads and multiple
-                tasks are not supported."""
+                there are CPUs. Note: only the extraction of features, level 0
+                gradient descent and generation of outputs can use multiple
+                threads and multiple tasks are not supported at all."""
           % (__version__, __loader__.fullname), file=sys.stderr) #pylint: disable=undefined-variable
     sys.exit(0 if err is None else 1)
 
