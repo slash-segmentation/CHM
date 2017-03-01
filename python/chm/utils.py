@@ -464,6 +464,8 @@ def next_regular(target):
 
 
 ########## Set Library Threads ##########
+__set_num_thread_funcs = None
+__last_set_num_threads = None
 def set_lib_threads(nthreads):
     """
     Sets the maximum number of used threads used for various computational libraries, in particular
@@ -472,120 +474,106 @@ def set_lib_threads(nthreads):
     """
     global __set_num_thread_funcs, __last_set_num_threads #pylint: disable=global-statement
     if __set_num_thread_funcs is None:
+        # Establish the __set_num_thread_funcs to use
         import os, sys
         __set_num_thread_funcs = []
+
+        # First do a general search for all *blas* and *omp* libraries
+        import numpy, scipy, ._utils # Load these libraries so that BLAS and OpenMP libraries are loaded
+        __get_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
+        __get_set_num_threads_funcs('omp', ('omp_set_num_threads',))
+        
+        # Do system-specific additions
         if   sys.platform == 'win32':  __init_set_library_threads_win32()
         elif sys.platform == 'cygwin': __init_set_library_threads_cygwin()
         elif sys.platform == 'darwin': __init_set_library_threads_darwin()
-        elif os.name == 'posix':       __init_set_library_threads_posix()
+        elif os.name      == 'posix':  __init_set_library_threads_posix()
+            
+    # Set the number of threads
     nthreads = int(nthreads)
     if __last_set_num_threads is None or __last_set_num_threads != nthreads:
         for f in __set_num_thread_funcs:
             try: f(nthreads)
             except OSError: pass
     __last_set_num_threads = nthreads
-        
-__set_num_thread_funcs = None
-__last_set_num_threads = None
-def __add_set_num_threads_func(dll, func='omp_set_num_threads', ref=False):
+
+def __add_set_num_threads_funcs(name, funcs):
+    """
+    Adds C functions to the __set_num_thread_funcs list. The functions come from all libraries that have a
+    basename that are similar to `name` and have any of the names listed in `funcs` and are loaded into
+    this process. For example name is typically omp to match gomp, iomp5, vcomp#, cyggomp and blas to match
+    openblas, openblas64, or gotoblas2. This is likely to be significantly more robust then trying to add
+    each one individually and guarantees that the libraries are actually being used and not just some
+    library we find on the machine with that name. However it does require that the libraries be already
+    loaded into the process.
+    """
+    import ctypes
+    from psutil import Process
+    from os.path import basename
+    from itertools import product
+    
+    # Get the paths that contain the name given
+    paths = [mm.path for mm in Process().memory_maps() if name in basename(mm.path)]
+    
+    # Get the DLLs for those paths
+    dll_lookup = getattr(ctypes, 'windll', ctypes.cdll)
+    dlls = [getattr(dll_lookup, path) for path in paths]
+    
+    # Get the functions within those DLLs
+    funcs = [getattr(dll, fn) for dll,fn in product(dlls, funcs) if hasattr(dll, fn)]
+    for f in funcs:
+        f.restype = None
+        f.argtypes = (ctypes.c_int,)
+
+    # Add the functions to __set_num_thread_funcs
+
+def __add_set_num_threads_func(dll, func, ref=False):
     """
     Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll` (which
-    is sent to ctypes.utils.find_library if it does not already have an extension) called `func`
-    (which defaults to 'omp_set_num_threads'). If `ref` is True, then the function takes a pointer
-    to an int instead of just an int. Return True if the function was added, False otherwise.
+    is sent to ctypes.utils.find_library if it does not already have an extension) called `func`. If
+    `ref` is True, then the function takes a pointer to an int instead of just an int.
     """
     import os.path, ctypes, ctypes.util
     if '.' in dll: path = dll
     else:
         path = ctypes.util.find_library(dll)
-        if path is None: return False
+        if path is None: return
         if not os.path.isabs(path) and hasattr(ctypes.util, '_findLib_gcc'):
             # If the library was found on LIBRARY_PATH but not LD_LIBRARY_PATH the absolute path is removed...
             path = ctypes.util._findLib_gcc(dll) #pylint: disable=protected-access
     try: f = getattr(getattr(getattr(ctypes, 'windll', ctypes.cdll), path), func)
-    except (AttributeError, OSError): return False
+    except (AttributeError, OSError): return
     f.restype = None
     f.argtypes = (ctypes.POINTER(ctypes.c_int),) if ref else (ctypes.c_int,)
     __set_num_thread_funcs.append(f)
-    return True
 
 def __init_set_library_threads_win32():
-    """
-    Adds libiomp5md.dll for Intel MKL OpenMP, libgomp-1.dll for MingW, and vcomp###.dll for MSVC.
-    """
-    import sys
-    __add_set_num_threads_func('libiomp5md')
-    if 'GCC' in sys.version: __add_set_num_threads_func('libgomp-1')
-    elif 'MSC' in sys.version:
-        import re
-        msc_vers = {
-            # Mapping of _MSC_VER to runtime version number (msvcr###.dll)
-            # Below v1400 there is no OpenMP support (and there is no v13.0)
-            # Using this table is much faster than __win_get_msvcr_ver
-            1400:80, 1500:90, 1600:100, 1700:110, 1800:120, 1900:140, # '05, '08, '10, '12, '13, '15
-        }
-        try:
-            v = int(re.search(r'MSC v.(\d+) ', sys.version).group(1))
-            v = msc_vers[v] if v in msc_vers else __win_get_msvcr_ver('python27')
-            __add_set_num_threads_func('vcomp%d'%v)
-        except (AttributeError, ValueError): pass
-
-def __win_get_msvcr_ver(name):
-    """
-    Searches the imports of the DLL with the given name for a DLL like MSVCR###.dll and returns
-    the ### as an integer. Raises a ValueError if it cannot be found.
-    """
-    #pylint: disable=no-name-in-module
-    from ctypes import c_char_p, sizeof, cast, POINTER
-    from ctypes.wintypes import DWORD, LONG
-    try:
-        from win32api import LoadLibraryEx, FreeLibrary, error
-        from win32con import LOAD_LIBRARY_AS_DATAFILE
-    except ImportError: raise ValueError()
-    import re
-    try: lib = LoadLibraryEx(name, None, LOAD_LIBRARY_AS_DATAFILE)
-    except error: raise ValueError()
-    try:
-        LPDWORD = POINTER(DWORD)
-        off = cast(lib+60, POINTER(LONG))[0]
-        imp_data_dir = cast(lib+off+(144 if (sizeof(c_char_p)==8) else 128), LPDWORD)
-        off = lib+imp_data_dir[0]+12
-        rx = re.compile(r'^MSVCR(\d+).dll$', re.I)
-        for off in xrange(off, off+imp_data_dir[1], 20):
-            off = cast(off, LPDWORD)[0]
-            if off == 0: break
-            m = rx.match(cast(lib+off, c_char_p).value)
-            if m is not None: return int(m.group(1))
-        raise ValueError()
-    finally: FreeLibrary(lib)
+    """Does nothing - all libraries should be auto-added."""
+    pass
+    # Should be auto-added:
+    #   (libiomp5md|libgomp-1|vcomp###).omp_set_num_threads
+    #   openblas.(goto_set_num_threads|openblas_set_num_threads)
 
 def __init_set_library_threads_cygwin():
-    """Adds cyggomp-1.dll for GNU OpenMP along with OpenBLAS libraries."""
-    __add_set_num_threads_func('cyggomp-1.dll')
-    __add_set_num_threads_func('openblas', 'goto_set_num_threads')
-    __add_set_num_threads_func('openblas', 'openblas_set_num_threads')
+    """Does nothing - all libraries should be auto-added."""
+    pass
+    # Should be auto-added:
+    #   (cyggomp-1.dll).omp_set_num_threads
+    #   openblas.(goto_set_num_threads|openblas_set_num_threads)
 
 def __init_set_library_threads_darwin():
     """
-    Adds libiomp5.so for Intel MKL and libgomp.so for GNU OpenMP along with a method for setting the
-    number of threads for vecLib in the Apple Accelerate Library.
+    Adds function for setting the number of threads for vecLib in the Apple Accelerate Library.
     """
     import os
-    __add_set_num_threads_func('iomp5')
-    __add_set_num_threads_func('gomp')
     def set_veclib_max_threads(nthreads): os.environ['VECLIB_MAXIMUM_THREADS']=str(nthreads)
     __set_num_thread_funcs.append(set_veclib_max_threads)
+    # Should be auto-added: (iomp5|gomp).omp_set_num_threads'
 
 def __init_set_library_threads_posix():
-    """
-    Adds libiomp5.so for Intel MKL and libgomp.so for GNU OpenMP. Also searches for the MKL library
-    in various forms and OpenBLAS libraries.
-    """
-    __add_set_num_threads_func('iomp5')
-    __add_set_num_threads_func('gomp')
+    """Adds MKL library in various forms."""
     __add_set_num_threads_func('mkl.so', 'mkl_serv_set_num_threads')
     __add_set_num_threads_func('mkl_rt', 'MKL_Set_Num_Threads', True)
-    __add_set_num_threads_func('openblas', 'goto_set_num_threads')
-    __add_set_num_threads_func('openblas', 'openblas_set_num_threads')
-    __add_set_num_threads_func('openblas64', 'goto_set_num_threads')
-    __add_set_num_threads_func('openblas64', 'openblas_set_num_threads')
+    # Should be auto-added:
+    #   (iomp5|gomp).omp_set_num_threads
+    #   (openblas|openblas64).(goto_set_num_threads|openblas_set_num_threads)
