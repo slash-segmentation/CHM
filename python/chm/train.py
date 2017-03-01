@@ -71,7 +71,7 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
             
             sm.learn(X, Y, nthreads) # TODO: pass the disp method along with an increased indentation
             del X, Y
-            model.save() # TODO: don't re-save all previous models
+            model.save()
         else: disp('Skipping learning... (already complete)', 1)
 
         ##### Generate the outputs #####
