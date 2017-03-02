@@ -124,8 +124,8 @@ def get_image_region(im, padding=0, region=None, mode='symmetric', nthreads=1):
             bottom values should be one past the end just like normal
         mode is the padding mode, if padding is required, and defaults to symmetric
         ntheads is the number of threads used during any padding operations and defaults to 1
-    Besides returning the image, a new region is returned that is valid for the returned image to be
-    processed again.
+    Besides returning the image, a new region is returned that is valid for the returned image to
+    be processed again.
     """
     if region is None:
         region = (padding, padding, padding + im.shape[0], padding + im.shape[1]) # the new region
@@ -479,7 +479,7 @@ def set_lib_threads(nthreads):
         __set_num_thread_funcs = []
 
         # First do a general search for all *blas* and *omp* libraries
-        import numpy, scipy, chm._utils # Load these libraries so that BLAS and OpenMP libraries are loaded
+        import numpy, scipy.linalg. chm._utils # Load these libraries so that BLAS and OpenMP libraries are loaded
         __add_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
         __add_set_num_threads_funcs('omp', ('omp_set_num_threads',))
         
@@ -492,20 +492,26 @@ def set_lib_threads(nthreads):
     # Set the number of threads
     nthreads = int(nthreads)
     if __last_set_num_threads is None or __last_set_num_threads != nthreads:
+        print(__set_num_thread_funcs)
         for f in __set_num_thread_funcs:
             try: f(nthreads)
-            except OSError: pass
+            except OSError:
+                print('OSError in calling func')
+                pass
     __last_set_num_threads = nthreads
 
 def __add_set_num_threads_funcs(name, funcs):
     """
-    Adds C functions to the __set_num_thread_funcs list. The functions come from all libraries that have a
-    basename that are similar to `name` and have any of the names listed in `funcs` and are loaded into
-    this process. For example name is typically omp to match gomp, iomp5, vcomp#, cyggomp and blas to match
-    openblas, openblas64, or gotoblas2. This is likely to be significantly more robust then trying to add
-    each one individually and guarantees that the libraries are actually being used and not just some
-    library we find on the machine with that name. However it does require that the libraries be already
-    loaded into the process.
+    Adds C functions to the __set_num_thread_funcs list. The functions come from all libraries that
+    have a basename that are similar to `name` and have any of the names listed in `funcs` and are
+    loaded into this process. For example name is typically omp to match gomp, iomp5, vcomp#,
+    cyggomp and blas to match openblas, openblas64, or gotoblas2. This is likely to be
+    significantly more robust then trying to add each one individually and guarantees that the
+    libraries are actually being used and not just some library we find on the machine with that
+    name. However it does require that the libraries be already loaded into the process.
+    
+    This may find additional matching librarys such as _decomp_update when given OMP, but since
+    that library does not contain a function named omp_set_num_threads it will still be ignored.
     """
     import ctypes
     from psutil import Process
@@ -518,6 +524,7 @@ def __add_set_num_threads_funcs(name, funcs):
     # Get the DLLs for those paths
     dll_lookup = getattr(ctypes, 'windll', ctypes.cdll)
     dlls = [getattr(dll_lookup, path) for path in paths]
+    print(dlls)
     
     # Get the functions within those DLLs
     funcs = [getattr(dll, fn) for dll,fn in product(dlls, funcs) if hasattr(dll, fn)]
@@ -526,12 +533,13 @@ def __add_set_num_threads_funcs(name, funcs):
         f.argtypes = (ctypes.c_int,)
 
     # Add the functions to __set_num_thread_funcs
+    __set_num_thread_funcs.extend(funcs)
 
 def __add_set_num_threads_func(dll, func, ref=False):
     """
     Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll` (which
-    is sent to ctypes.utils.find_library if it does not already have an extension) called `func`. If
-    `ref` is True, then the function takes a pointer to an int instead of just an int.
+    is sent to ctypes.utils.find_library if it does not already have an extension) called `func`.
+    If `ref` is True, then the function takes a pointer to an int instead of just an int.
     """
     import os.path, ctypes, ctypes.util
     if '.' in dll: path = dll

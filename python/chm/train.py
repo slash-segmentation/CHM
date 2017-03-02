@@ -29,14 +29,12 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
     
     Returns the final set of labels calculated.
     """
-    from psutil import cpu_count
-
     # Basic checks of images, labels, and masks and loads them for level 0
     ims0,lbls0,masks0 = __check_and_load(ims, lbls, masks)
         
     # Get parameters
     shapes = __get_all_shapes([im.shape for im in ims], model.nlevels)
-    if nthreads is None: nthreads = cpu_count(True)
+    nthreads = __get_nthreads(nthreads)
     disp = __print if disp else lambda s,l=0:None
 
     ########## CHM Train Core ##########
@@ -87,8 +85,8 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
 
 def __check_and_load(ims, lbls, masks=None):
     """
-    Checks the images, labels, and masks for consistency. Raises a ValueError for any invalid inputs.
-    Finally loads all of these ready for level 0.
+    Checks the images, labels, and masks for consistency. Raises a ValueError for any invalid
+    inputs. Finally loads all of these ready for level 0.
     """
     from itertools import izip
     from .utils import im2double
@@ -107,7 +105,19 @@ def __check_and_load(ims, lbls, masks=None):
     lbls0  = [lbl.data>0 for lbl in lbls]
     masks0 = None if masks is None else [mask.data>0 for mask in masks]
     return ims0, lbls0, masks0
-    
+
+def __get_nthreads(nthreads):
+    """
+    Gets the number of threads to use and calls set_lib_threads to set underlying library threads.
+    If nthreads is None or 0 the result is min(ncpus, 4) otherwise the result is
+    min(ncpus, nthreads) where ncpus is the physical number of CPUs.
+    """
+    from psutil import cpu_count
+    from .utils import set_lib_threads
+    nthreads = min(cpu_count(False), nthreads or 4)
+    set_lib_threads(nthreads)
+    return nthreads
+
 def __print(s, depth=0):
     """
     Like print(...) but pre-pends the current timestamp, spaces dependent on the depth, and forces
@@ -272,10 +282,10 @@ def __get_output_folder(submodel):
 
 def __cleanup_outputs(model, clabels):
     """
-    Cleanup the outputs. These are all stored in a temporary folder next to the model. We delete all
-    of these files since they only take a few minutes to recreate and it is unusual to need them at all.
-    On Windows this requires copying the data in clabels since the memory-mapped files cannot be
-    deleted while in-use.
+    Cleanup the outputs. These are all stored in a temporary folder next to the model. We delete
+    all of these files since they only take a few minutes to recreate and it is unusual to need
+    them at all. On Windows this requires copying the data in clabels since the memory-mapped files
+    cannot be deleted while in-use.
     """
     from os import name
     from shutil import rmtree
@@ -461,10 +471,9 @@ Optional Arguments:
                 inputs and labels as before for the model to make sense. However
                 you do not need to give the same filters, stages, or levels. The
                 model will be adjusted as necessary.
-  -N nthreads   How many threads to use. Default is to run as many threads as
-                there are CPUs. Note: only the extraction of features, level 0
-                gradient descent and generation of outputs can use multiple
-                threads and multiple tasks are not supported at all."""
+  -N nthreads   How many threads to use. Default is at most 4 threads or the
+                number of physical CPUs. Note: only some portions of training
+                are multithreaded and multiple tasks are not supported at all."""
           % (__version__, __loader__.fullname), file=sys.stderr) #pylint: disable=undefined-variable
     sys.exit(0 if err is None else 1)
 

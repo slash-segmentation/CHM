@@ -93,13 +93,9 @@ class LDNN(Classifier):
         return itmsz*(n+N*(M+1))
     def evaluate(self, X, nthreads=1):
         assert(self.__weights is not None)
-        from .utils import set_lib_threads
-        set_lib_threads(nthreads)
         return f_(sigma_ij(self.__weights, X), self.__params.get('dropout', False))
     def learn(self, X, Y, nthreads=1):
         assert(self.__weights is None)
-        from .utils import set_lib_threads
-        set_lib_threads(nthreads)
         self.__weights = learn(X, Y, **self.__params)
 
 def f_(s, dropout=False, out=None):
@@ -316,8 +312,8 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
     the LDNN classifier using the training data provided. Parts of this are implemented in Cython.
     
     As a special case when batchsz=1 and dropout=True a pure Cython version is used which is about
-    10x faster. This could mostly be mitigated if special versions of the sigma_ij and f_g functions
-    were made that were optimized for single samples.
+    10x faster. This could mostly be mitigated if special versions of the sigma_ij and f_g
+    functions were made that were optimized for single samples.
     
     Inputs:
         X   (n+1)xP matrix of feature vectors where n is the number of features and P is the number
