@@ -510,6 +510,10 @@ def __run_chm_test_proc(mems, model, nthreads, q):
     for im in ims: im.flags.writeable = False
     for c in cntxts:
         for c in c: c.flags.writeable = False
+            
+    # Set the number of base library threads
+    from chm.util import set_lib_threads
+    set_lib_threads(nthreads)
 
     # Process the queue
     prev_level = -1
