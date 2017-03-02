@@ -492,12 +492,9 @@ def set_lib_threads(nthreads):
     # Set the number of threads
     nthreads = int(nthreads)
     if __last_set_num_threads is None or __last_set_num_threads != nthreads:
-        print(__set_num_thread_funcs)
         for f in __set_num_thread_funcs:
             try: f(nthreads)
-            except OSError:
-                print('OSError in calling func')
-                pass
+            except OSError: pass
     __last_set_num_threads = nthreads
 
 def __add_set_num_threads_funcs(name, funcs):
@@ -524,7 +521,6 @@ def __add_set_num_threads_funcs(name, funcs):
     # Get the DLLs for those paths
     dll_lookup = getattr(ctypes, 'windll', ctypes.cdll)
     dlls = [getattr(dll_lookup, path) for path in paths]
-    print(dlls)
     
     # Get the functions within those DLLs
     funcs = [getattr(dll, fn) for dll,fn in product(dlls, funcs) if hasattr(dll, fn)]
