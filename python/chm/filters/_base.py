@@ -78,9 +78,7 @@ class FilterBank(Filter):
         super(FilterBank, self).__init__(max(f.padding for f in filters), sum(f.features for f in filters))
         self.__filters = filters
     def __call__(self, im, out=None, region=None, nthreads=1):
-        from ..utils import im2double
-
-        from chm.util import set_lib_threads
+        from ..utils import im2double, set_lib_threads
         set_lib_threads(nthreads)
         
         # Pad/region the image

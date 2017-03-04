@@ -512,7 +512,7 @@ def __run_chm_test_proc(mems, model, nthreads, q):
         for c in c: c.flags.writeable = False
             
     # Set the number of base library threads
-    from chm.util import set_lib_threads
+    from .util import set_lib_threads
     set_lib_threads(nthreads)
 
     # Process the queue
