@@ -653,7 +653,7 @@ def __chm_test_main_parse_args():
 
     # Parse and minimally check arguments
     if len(argv) < 4: __chm_test_usage()
-    if len(argv) > 4 and argv[3][0] != "-":
+    if len(argv) > 4 and argv[4][0] != "-":
         __chm_test_usage("You provided more than 3 required arguments")
 
     # Check the model

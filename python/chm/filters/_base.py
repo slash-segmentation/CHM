@@ -80,6 +80,9 @@ class FilterBank(Filter):
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ..utils import im2double
 
+        from chm.util import set_lib_threads
+        set_lib_threads(nthreads)
+        
         # Pad/region the image
         P = self._padding
         im = im2double(get_image_region(im, P, region, nthreads=nthreads)[0])
