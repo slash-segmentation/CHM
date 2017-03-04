@@ -478,8 +478,10 @@ def set_lib_threads(nthreads):
         import os, sys
         __set_num_thread_funcs = []
 
-        # First do a general search for all *blas* and *omp* libraries
-        import numpy, scipy.linalg, chm._utils # Load these libraries so that BLAS and OpenMP libraries are loaded
+        # Load these libraries so that BLAS and OpenMP libraries are loaded
+        import numpy, scipy.linalg, chm._utils # pylint: disable=unused-variable
+        
+        # Do a general search for all *blas* and *omp* libraries
         __add_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
         __add_set_num_threads_funcs('omp', ('omp_set_num_threads',))
         

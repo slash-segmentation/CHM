@@ -478,10 +478,11 @@ def __check_processes(processes):
 
 def __kill_processes(processes, timeout=0.1):
     """Interrupts, waits, then kills all processes that are still alive."""
-    import os, signal, time
+    import signal, time
+    from os import kill
     sig = getattr(signal, 'CTRL_C_EVENT', signal.SIGINT) # on Windows need to send signal.CTRL_C_EVENT
     for p in processes:
-        if p.is_alive(): os.kill(p.pid, sig)
+        if p.is_alive(): kill(p.pid, sig)
     for p in processes: p.join(timeout)
     for p in processes:
         if p.is_alive(): p.terminate()
@@ -512,7 +513,7 @@ def __run_chm_test_proc(mems, model, nthreads, q):
         for c in c: c.flags.writeable = False
             
     # Set the number of base library threads
-    from .util import set_lib_threads
+    from .utils import set_lib_threads
     set_lib_threads(nthreads)
 
     # Process the queue
