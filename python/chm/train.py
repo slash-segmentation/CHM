@@ -66,8 +66,8 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
             X,Y = (X_full,Y) if M is None else (X_full.compress(M, 0), Y.compress(M, 0))
             #X,Y = __subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
             del M
-            
-            sm.learn(X, Y, nthreads) # TODO: pass the disp method along with an increased indentation
+            # Note: always use 1 for nthreads during learning
+            sm.learn(X, Y, 1) # TODO: pass the disp method along with an increased indentation
             del X, Y
             model.save()
         else: disp('Skipping learning... (already complete)', 1)
@@ -108,15 +108,11 @@ def __check_and_load(ims, lbls, masks=None):
 
 def __get_nthreads(nthreads):
     """
-    Gets the number of threads to use and calls set_lib_threads to set underlying library threads.
-    If nthreads is None or 0 the result is min(ncpus, 4) otherwise the result is
-    min(ncpus, nthreads) where ncpus is the physical number of CPUs.
+    Gets the number of threads to use. If nthreads is None or 0 the result is min(ncpus, 4)
+    otherwise the result is min(ncpus, nthreads) where ncpus is the physical number of CPUs.
     """
     from psutil import cpu_count
-    from .utils import set_lib_threads
-    nthreads = min(cpu_count(False), nthreads or 4)
-    set_lib_threads(nthreads)
-    return nthreads
+    return min(cpu_count(False), nthreads or 4)
 
 def __print(s, depth=0):
     """
@@ -471,9 +467,10 @@ Optional Arguments:
                 inputs and labels as before for the model to make sense. However
                 you do not need to give the same filters, stages, or levels. The
                 model will be adjusted as necessary.
-  -N nthreads   How many threads to use. Default is at most 4 threads or the
-                number of physical CPUs. Note: only some portions of training
-                are multithreaded and multiple tasks are not supported at all."""
+  -N nthreads   How many threads to use for feature extraction and output
+                generation. Default is at most 4 threads or the number of 
+                physical CPUs. Learning is never multithreaded and multiple
+                tasks are not supported at all."""
           % (__version__, __loader__.fullname), file=sys.stderr) #pylint: disable=undefined-variable
     sys.exit(0 if err is None else 1)
 
