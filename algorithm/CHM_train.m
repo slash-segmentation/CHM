@@ -1,4 +1,4 @@
-function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart)
+function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart, nthreads)
 % CHM_train   CHM Image Training Phase Script
 %   CHM_train(trainpath, labelpath, [savingpath='./temp'], [Nstage=2], [Nstage=4], [restart=0])
 %
@@ -26,6 +26,9 @@ if nargin < 3; savingpath = fullfile('.', 'temp'); end
 if nargin < 4; Nstage = 2; end
 if nargin < 5; Nlevel = 4; end
 if nargin < 6; restart = 0; end
+if nargin < 7; nthreads = 0; end
+
+if nthreads ~= 0; maxNumCompThreads(nthreads); end
 
 if ~ismcc && ~isdeployed
     % Add path to functions required for feature extraction (already included in compiled version)
@@ -112,7 +115,11 @@ param.Nfeatcontext = Nfeatcontext;
 param.Nlevel = Nlevel;
 
 opened_pool = 0;
-try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
+try; if nthreads ~= 1 && usejava('jvm') && ~isempty(which('parpool'));
+    if nthreads ~= 0; pool = parpool('local',nthreads);
+    else; pool = parpool('local'); end;
+    opened_pool = 1;
+end; catch ex; end;
 
 % Train the CHM
 rng('shuffle'); % Comment this line out to get consitent results
@@ -124,4 +131,4 @@ for s = Nstage_start:Nstage
     Nlevel_start = 0;
 end
 
-if opened_pool; matlabpool close; end
+if opened_pool; delete(pool); end
