@@ -116,6 +116,9 @@ param.Nlevel = Nlevel;
 
 opened_pool = 0;
 try; if nthreads ~= 1 && usejava('jvm') && ~isempty(which('parpool'));
+    ps = parallel.Settings;
+    idleTimeout = ps.Pool.IdleTimeout;
+    ps.Pool.IdleTimeout = Inf;
     if nthreads ~= 0; pool = parpool('local',nthreads);
     else; pool = parpool('local'); end;
     opened_pool = 1;
@@ -131,4 +134,7 @@ for s = Nstage_start:Nstage
     Nlevel_start = 0;
 end
 
-if opened_pool; delete(pool); end
+if opened_pool;
+    ps.Pool.IdleTimeout = idleTimeout;
+    delete(pool);
+end
