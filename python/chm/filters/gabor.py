@@ -106,7 +106,7 @@ class Gabor(Filter):
     # functions take the master image and number of threads and return a funcion that will do the
     # actual convolution itself between the image and a kernel.
     @staticmethod
-    def __get_convolve_numpy(im, nthreads): ##pylint: disable=unused-argument
+    def __get_convolve_numpy(im, nthreads_):
         # INTERMEDIATE:
         #     2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)
         #     2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)    [during call to conv]
@@ -272,7 +272,7 @@ class Gabor(Filter):
         return x_theta
 
     @staticmethod
-    def __get_normalizations(filters):
+    def __get_normalizations():
         """
         Calculates the inverse of the normalization factors for each of the filters. Currently this
         uses the real filter threshold at 0 and applies both the real and imaginary filters to it
@@ -294,8 +294,8 @@ class Gabor(Filter):
                 24.1,28.4,32.6,28.9,33.2,37.5,32.5,37.4,42.0,26.3,31.5,36.4,20.8,25.1,29.8,21.1,25.2,29.8,
                 24.1,28.4,32.6,28.9,33.2,37.5,32.5,37.4,42.0,26.3,31.5,36.4,20.8,25.1,29.8,21.1,25.2,29.8])
         #from numpy import empty, sqrt, divide
-        #norms = empty(len(filters))
-        #for i,(GF1,GF2) in enumerate(filters):
+        #norms = empty(len(Gabor.__filters))
+        #for i,(GF1,GF2) in enumerate(Gabor.__filters):
         #    x = (GF1>=0).astype(float) # TODO: make this better
         #    IF1,IF2 = (x*GF1).sum(),(x*GF2).sum() # no need to actually do convolution
         #    norms[i] = IF1*IF1+IF2*IF2
@@ -304,7 +304,7 @@ class Gabor(Filter):
     @staticmethod
     def __static_init__():
         Gabor.__filters = Gabor.__get_filters()
-        Gabor.__normalizations = Gabor.__get_normalizations(Gabor.__filters)[:,None,None]
+        Gabor.__normalizations = Gabor.__get_normalizations()[:,None,None]
         Gabor.__padding = max(len(GF[0]) // 2 for GF in Gabor.__filters)
         if _have_pyfftw:
             from os.path import join
