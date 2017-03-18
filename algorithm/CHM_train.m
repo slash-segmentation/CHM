@@ -8,7 +8,8 @@ function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart, nt
 %       Only need to keep MODEL_level#_stage#.mat and param.mat files in that folder.
 %   Nstage is the number of stages to train with, must be >=2
 %   Nlevel is the number of levels to train with, must be >=1
-%   restart is if the model should be able to restart a previous model
+%   restart is if the model should be able to restart a previous modeli
+%   nthreads is the number of threads to use for computational and pools by default uses all available
 %
 % traingpath and labelpath are either cell-strings or single character strings of comma-seperated lists of the following:
 %   path to a folder            - all PNGs and TIFFs in that folder
@@ -21,7 +22,7 @@ function CHM_train(trainpath, labelpath, savingpath, Nstage, Nlevel, restart, nt
 %       pattern has * in it which means any number of any characters
 %       example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
 
-if nargin < 2 || nargin > 6; error('CHM_train must have 2 to 6 input arguments'); end
+if nargin < 2 || nargin > 7; error('CHM_train must have 2 to 7 input arguments'); end
 if nargin < 3; savingpath = fullfile('.', 'temp'); end
 if nargin < 4; Nstage = 2; end
 if nargin < 5; Nlevel = 4; end
