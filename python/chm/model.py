@@ -385,7 +385,7 @@ def __add_class_names():
     from .filters import Filter
     from .classifier import Classifier
     add_class_name('__submodel__', SubModel)
-    add_class_name('__filter__', SubModel)
-    add_class_name('__classifier__', SubModel)
+    add_class_name('__filter__', Filter)
+    add_class_name('__classifier__', Classifier)
 __add_class_names()
 del __add_class_names

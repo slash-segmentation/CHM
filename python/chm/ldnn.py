@@ -102,7 +102,7 @@ class LDNN(Classifier):
         assert(self.__weights is not None)
         from .utils import set_lib_threads
         set_lib_threads(nthreads)
-        return test(self.__weights, X, self.__params.get('dropout', False)
+        return test(self.__weights, X, self.__params.get('dropout', False))
     def learn(self, X, Y, nthreads=1):
         assert(self.__weights is None)
         from .utils import set_lib_threads
