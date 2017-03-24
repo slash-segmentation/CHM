@@ -31,7 +31,7 @@ def downsample(intp min, double[:,:] X, char[::1] Y, intp downsample=10):
         n_trues = Y.sum()
         if n_trues < min:
             raise ValueError('Not enough data - either increase the data size or lower the number of levels (%d < %d)' % (n_trues,k))
-        if n_trues <= min*downsample:
+        if n_trues <= min*downsample or downsample == 1:
             out = empty((n_trues, X.shape[0]))
             if X.flags.c_contiguous: X.compress(Y, 1, out.T)
             else:                    X.T.compress(Y, 0, out)
@@ -58,6 +58,7 @@ def downsample(intp min, double[:,:] X, char[::1] Y, intp downsample=10):
     cdef intp m = X.shape[0], n = X.shape[1], n_trues = 0, skip = downsample, i, j = 0
     
     assert(Y.shape[0] == n)
+    assert(downsample >= 1)
 
     # Count the number of trues: n_trues = Y.sum()
     for i in xrange(n): n_trues += <bint>Y[i] # get the number of True values
@@ -65,7 +66,7 @@ def downsample(intp min, double[:,:] X, char[::1] Y, intp downsample=10):
         raise ValueError('Not enough data - either increase the data size or lower the number of levels (%d < %d)' % (n_trues,min))
     
     # X.take(flatnonzero(Y), 1)  (possibly downsampled)
-    cdef bint ds = n_trues > min*downsample
+    cdef bint ds = downsample > 1 and n_trues > min*downsample
     cdef intp n_out = (n_trues+downsample-1)//downsample if ds else n_trues
     cdef double[:,::1] data = PyArray_EMPTY(2, [n_out, m], NPY_DOUBLE, False)
     if ds:
@@ -101,17 +102,19 @@ def stddev(double[:,::1] X):
         for j in xrange(M): stds[j] = sqrt(stds[j]/N)
     return stds.base
 
-def run_kmeans(intp k, X, Y, bint whiten=False, bint scipy=False):
+def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False):
     """
     Downsample, possibly 'whiten', and run k-means on the data.
 
     Inputs:
-        X       m-by-n matrix where m is the number of features and n is the number of samples
-        Y       n-length array of bool labels
+        X        m-by-n matrix where m is the number of features and n is the number of samples
+        Y        n-length array of bool labels
         
     Parameters:
-        k       number of clusters to make
-        whiten  scale each feature vector in X to have a variance of 1 before running k-means
+        k        number of clusters to make
+        downsmpl amount of downsampling to perform on the data before clustering
+        repeats  times to repeat running k-means looking for a better solution
+        whiten   scale each feature vector in X to have a variance of 1 before running k-means
 
     Returns:
         means   k-by-m matrix, cluster means/centroids
@@ -120,9 +123,10 @@ def run_kmeans(intp k, X, Y, bint whiten=False, bint scipy=False):
     from numpy import int8
     
     assert(X.ndim == 2 and Y.ndim == 1 and X.shape[1] == Y.shape[0] and Y.dtype == bool and X.dtype == float)
+    assert(downsmpl >= 1 and repeats >= 1)
     
-    # Downsample the data (always creates a copy)
-    data = downsample(k, X, Y.view(int8))
+    # Downsample the data (always creates a transposed copy that is C-ordered)
+    data = downsample(k, X, Y.view(int8), downsmpl)
     
     # 'Whiten' the data (make variance of each feature equal to 1)
     if whiten:
@@ -131,11 +135,12 @@ def run_kmeans(intp k, X, Y, bint whiten=False, bint scipy=False):
         data /= sd
     
     # Calculate clusters using kmeans
-    if scipy:
-        from scipy.cluster.vq import kmeans
-        clusters = kmeans(data, k)[0]
-    else:
-        clusters = kmeansML(k, data)
+    clusters,rms2 = kmeansML(k, data)
+    for _ in xrange(1, repeats):
+        new_clusters,new_rms2 = kmeansML(k, data)
+        if new_rms2 < rms2:
+            clusters = new_clusters
+            rms2 = new_rms2
 
     # Un-whiten the clusters
     if whiten: clusters *= sd
@@ -195,7 +200,7 @@ DEF KMEANS_ML_DTOL          = 0.0
 
 DEF KMEANS_ML_RATE          = 3
 DEF KMEANS_ML_MIN_N         = 50
-DEF KMEANS_ML_MAX_RETRIES   = 3
+DEF KMEANS_ML_MAX_RETRIES   = 3 # TODO: or 300?
 
 class ClusteringWarning(UserWarning): pass
 
@@ -216,6 +221,7 @@ cpdef kmeansML(intp k, double[:,::1] data):
 
     Returns:
         means   k-by-d matrix, cluster means/centroids
+        rms2    RMS^2 error of the clusters
 
     Originally by David R. Martin <dmartin@eecs.berkeley.edu> - October 2002
 
@@ -229,7 +235,7 @@ cpdef kmeansML(intp k, double[:,::1] data):
     cdef ndarray counts     = PyArray_EMPTY(1, &k, NPY_INTP, False)
     cdef ndarray temp       = PyArray_EMPTY(2, [k, n], NPY_DOUBLE, False)
     cdef double rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp)
-    return means
+    return means, rms2
 
 cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
                        intp[::1] membership, intp[::1] counts, double[:,::1] temp, int retry=1) except -1.0:
@@ -425,15 +431,15 @@ def gradient(double[::1] f, double[:,::1] g, double[:,:,::1] s, double[::1,:] x,
     grads[:,:,:] = 0.0
     cdef double c1, c2, c3
     cdef intp N = s.shape[0], M = s.shape[1], P = s.shape[2], n = x.shape[0], i, j, k, p
-    with nogil:
-        for p in xrange(P):
-            c1 = -2.0*(y[p]-f[p])*(1.0-f[p])
-            for i in xrange(N):
-                c2 = c1/(1.0-g[i,p])*g[i,p]
-                for j in xrange(M):
-                    c3 = c2*(1.0-s[i,j,p])
-                    for k in xrange(n):
-                        grads[i,j,k] += c3*x[k,p]
+    #with nogil: # TODO: decide if with nogil has any impact on single-threaded performance here
+    for p in xrange(P):
+        c1 = -2.0*(y[p]-f[p])*(1.0-f[p])
+        for i in xrange(N):
+            c2 = c1/(1.0-g[i,p])*g[i,p]
+            for j in xrange(M):
+                c3 = c2*(1.0-s[i,j,p])
+                for k in xrange(n):
+                    grads[i,j,k] += c3*x[k,p]
 
 def descent(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W, double rate, double momentum):
     """
@@ -441,12 +447,12 @@ def descent(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W, dou
     are the summed values instead of the averages. The rate and momentum values should be per-sample. 
     """
     cdef intp N = grads.shape[0], M = grads.shape[1], n = grads.shape[2], i, j, k
-    with nogil:
-        for i in xrange(N):
-            for j in xrange(M):
-                for k in xrange(n):
-                    prevs[i,j,k] = grads[i,j,k] + momentum*prevs[i,j,k]
-                    W[i,j,k] -= rate*prevs[i,j,k]
+    #with nogil: # TODO: decide if with nogil has any impact on single-threaded performance here
+    for i in xrange(N):
+        for j in xrange(M):
+            for k in xrange(n):
+                prevs[i,j,k] = grads[i,j,k] + momentum*prevs[i,j,k]
+                W[i,j,k] -= rate*prevs[i,j,k]
 
 def descent_do(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W,
                intp[::1] i_order, intp[::1] j_order, double rate, double momentum):
@@ -458,14 +464,14 @@ def descent_do(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W,
     """
     cdef intp Nd = grads.shape[0], Md = grads.shape[1], n = grads.shape[2], i, j, k
     cdef dbl_p W_ij, p_ij
-    with nogil:
-        for i in xrange(Nd):
-            for j in xrange(Md):
-                p_ij = &prevs[i_order[i],j_order[j],0]
-                W_ij = &W[i_order[i],j_order[j],0]
-                for k in xrange(n):
-                    p_ij[k] = grads[i,j,k] + momentum*p_ij[k]
-                    W_ij[k] -= rate*p_ij[k]
+    #with nogil: # TODO: decide if with nogil has any impact on single-threaded performance here
+    for i in xrange(Nd):
+        for j in xrange(Md):
+            p_ij = &prevs[i_order[i],j_order[j],0]
+            W_ij = &W[i_order[i],j_order[j],0]
+            for k in xrange(n):
+                p_ij[k] = grads[i,j,k] + momentum*p_ij[k]
+                W_ij[k] -= rate*p_ij[k]
 
 def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
                              const intp niters, const double rate, const double momentum, target, disp=None):

@@ -4,9 +4,9 @@ Logistic Disjunctive Normal Network (LDNN) Model implementation.
 This implements the algorithm as described in Seyedhosseini, Sajjadi, and Tasdizen (2013).
 
 This was originally in the MATLAB files LearnAndOrNetMEX, UpdateDiscriminants(_SB),
-EvaluateAndOrNetMEX, genOutput, genOutput(_SB). Most variables and functions have been renamed to
-match the paper, e.g. discriminants changed to w or weights. Some parts were removed, such as
-validation and regularization from LearnAndOrNetMEX (most of it had already been removed).
+EvaluateAndOrNetMEX, and genOutput(_SB). Most variables and functions have been renamed to match
+the paper, e.g. discriminants changed to w or weights. Some parts were removed, such as validation
+and regularization from LearnAndOrNetMEX (most of it had already been removed).
 
 As a shortcut the biases b_ij are lumped into the weights w_ijk and an extra "feature" is added to
 the feature vector X that is always 1.
@@ -16,6 +16,8 @@ either faster or no significant difference. Several are in the Cython module __l
 
 Jeffrey Bush, 2015-2017, NCMIR, UCSD
 """
+
+# TODO: make most of this its own package separate from CHM (already being used by GLIA)
 
 from __future__ import division
 from __future__ import unicode_literals
@@ -31,22 +33,27 @@ class LDNN(Classifier):
     descent with either mini-batches or the "dropout" method.
     
     There are several parameters that influence the classifier:
-        N         number of groups (number of ORs)
-        M         number of nodes/discriminants per group (number of ANDs)
-        dropout   if True then perform input dropout at 50% according to Hinton et al. 2012
-        batchsz   if not using dropout then this is the size of the batches to process
-        niters    number of iterations of gradient descent to run
-        rate      the step size or learning rate of gradient descent
-        target    target values to prevent oversatuation of sigmoid function
-                  see LeCun, Bottou, Orr, Muller 1998 section 4.5
-        momentum  the momentum of the learning process of gradient descent
+        N           number of groups (number of ORs)
+        M           number of nodes/discriminants per group (number of ANDs)
+        downsample  amount of downsampling to perform on the data for clustering
+        kmeans_rep  times to repeat running k-means clustering looking for a better solution
+        dropout     if True then perform input dropout at 50% according to Hinton et al. 2012
+        batchsz     if not using dropout then this is the size of the batches to process
+        niters      number of iterations of gradient descent to run
+        rate        the step size or learning rate of gradient descent
+        target      target values to prevent oversatuation of sigmoid function
+                    see LeCun, Bottou, Orr, Muller 1998 section 4.5
+        momentum    the momentum of the learning process of gradient descent
     """
     __weights = None # combined w_ijk and b_ij values, shaped like NxMx(n+1)
     __params = None
     
-    _def_params_L0S1 = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
-    _def_params_L0   = {'N':10,'M':20,'dropout':False,'batchsz':100,'niters':6, 'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
-    _def_params      = {'N':24,'M':24,'dropout':True, 'batchsz':1,  'niters':15,'rate':0.025,'target':(0.1,0.9),'momentum':0.5}
+    _def_params_L0S1 = {'N':10,'M':20,'downsample':10,'kmeans_rep':1,
+                        'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
+    _def_params_L0   = {'N':10,'M':20,'downsample':10,'kmeans_rep':1,
+                        'dropout':False,'batchsz':100,'niters':6, 'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
+    _def_params      = {'N':24,'M':24,'downsample':10,'kmeans_rep':1,
+                        'dropout':True, 'batchsz':1,  'niters':15,'rate':0.025,'target':(0.1,0.9),'momentum':0.5}
     
     @classmethod
     def get_default_params(cls, stage, level):
@@ -95,7 +102,7 @@ class LDNN(Classifier):
         assert(self.__weights is not None)
         from .utils import set_lib_threads
         set_lib_threads(nthreads)
-        return f_(sigma_ij(self.__weights, X), self.__params.get('dropout', False))
+        return test(self.__weights, X, self.__params.get('dropout', False)
     def learn(self, X, Y, nthreads=1):
         assert(self.__weights is None)
         from .utils import set_lib_threads
@@ -107,8 +114,8 @@ def f_(s, dropout=False, out=None):
     Calculate f = 1-prod(1-prod(sigma_ij)) from equation 10 in Seyedhosseini et al 2013.
     
     Inputs:
-        s       NxMxP matrix of sigma_ij values where N is the number of groups (ORs), M is the
-                number of nodes/discriminants per group (ANDs), and P is the number of pixels
+        s       NxMxS matrix of sigma_ij values where N is the number of groups (ORs), M is the
+                number of nodes/discriminants per group (ANDs), and S is the number of samples
         dropout Calculate 1-sqrt(prod(1-sqrt(prod(sigma_ij)))) [default is False]
     
     Returns a contiguous length-P array of the classifier results.
@@ -125,8 +132,8 @@ def f_g(s, out_f=None, out_g=None):
     Calculate g_i=prod(sigma_ij) and f=1-prod(1-g_i) from equation 10 in Seyedhosseini et al 2013.
     
     Inputs:
-        s    NxMxP matrix of sigma_ij values where N is the number of groups (ORs), M is the number
-             of nodes/discriminants per group (ANDs), and P is the number of pixels
+        s    NxMxS matrix of sigma_ij values where N is the number of groups (ORs), M is the number
+             of nodes/discriminants per group (ANDs), and S is the number of samples
     
     Returns a contiguous length-P array of the classifier results (f) and a C-contiguous NxP matrix
     of the intermediate g_i values.
@@ -144,10 +151,10 @@ def sigma_ij(W, X, out=None):
     
     Inputs:
         W   NxMx(n+1) matrix of weights representing all w_ijk and biases b_ij (in the final row).
-            n is the number of features, N is the number of groups (ORs), and M is the  of
+            n is the number of features, N is the number of groups (ORs), and M is the of
             nodes/discriminants per group (ANDs)
-        X   nxP or (n+1)xP matrix of pixels where P is the number of pixels. If it is (n+1)xP then
-            the last row will be filled with 1s by this method. Using an (n+1)xP input is faster.
+        X   nxS or (n+1)xS matrix of samples where S is the number of samples. If it is (n+1)xS then
+            the last row will be filled with 1s by this method. Using an (n+1)xS input is faster.
     
     Outputs:
         out NxMxP matrix of the sigma_ij values
@@ -160,10 +167,10 @@ def sigma_ij(W, X, out=None):
     #   mixed inputs (one input is C and the other is F) lie inbetween
     from numpy import exp, negative, divide, add
     N,M,n = W.shape # the n is actually n+1
-    n_,P = X.shape
+    n_,S = X.shape
     if out is not None:
-        if out.shape != (N,M,P): raise ValueError()
-        out = out.reshape(N*M, P)
+        if out.shape != (N,M,S): raise ValueError()
+        out = out.reshape(N*M, S)
     W = W.reshape(N*M, n)
     if n_ == n:
         X[-1].fill(1)
@@ -173,7 +180,7 @@ def sigma_ij(W, X, out=None):
         s += W[:,-1:]
     else: raise ValueError()
     del W,X
-    return divide(1.0, add(1.0, exp(negative(s, out=s), out=s), out=s), out=s).reshape(N, M, P)
+    return divide(1.0, add(1.0, exp(negative(s, out=s), out=s), out=s), out=s).reshape(N, M, S)
 
 def __print(s, depth=2):
     """
@@ -201,6 +208,24 @@ def __load_cy_ldnn():
     return __ldnn
 __ldnn = delayed(__load_cy_ldnn)
 
+def test(W, X, dropout=False):
+    """
+    Perform LDNN testing. This just uses sigma_ij and f_ functions.
+    
+    Inputs:
+        W   NxMx(n+1) matrix of weights representing all w_ijk and biases b_ij (in the final row).
+            n is the number of features, N is the number of groups (ORs), and M is the of
+            nodes/discriminants per group (ANDs)
+        X   nxS or (n+1)xS matrix of samples where S is the number of samples. If it is (n+1)xS then
+            the last row will be filled with 1s by this method. Using an (n+1)xS input is faster.
+        dropout is the weights were calculated using dropout [default is False]
+
+    Returns a contiguous length-P array of the classifier results.
+
+    It is best if W and X are contiguous, particularily C-contiguous.
+    """
+    return f_(sigma_ij(W, X), dropout)
+
 def filter_clustering_warnings(action='always'):
     """
     Set the filter action for ClusteringWarnings generated by K-means when there is an empty
@@ -209,20 +234,23 @@ def filter_clustering_warnings(action='always'):
     import warnings
     warnings.simplefilter(action, __ldnn.ClusteringWarning)
 
-def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
+def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,
+          dropout=False, niters=25, batchsz=1, rate=0.025, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
     """
     Calculate the initial weights using multilevel K-Means clustering on a subset of the data. The
     clusters are used according to the end of section 3 of Seyedhosseini et al 2013.
     
     Inputs:
-        X   (n+1)xP matrix of feature vectors where n is the number of features and P is the number
-            of pixels, the last row will be filled with 1s by this method, must be Fortran-ordered
-        Y   P-length array of bool labels
+        X   (n+1)xS matrix of feature vectors where n is the number of features and S is the number
+            of samples, the last row will be filled with 1s by this method, must be Fortran-ordered
+        Y   S-length array of bool labels
     
     Parameters:
         N           number of groups to create (ORs)
         M           number of nodes/discriminants per group to create (ANDs)
-        dropout   if True then perform input dropout at 50% according to Hinton et al. 2012
+        downsample  amount of downsampling to perform on the data for clustering
+        kmeans_rep  times to repeat running k-means clustering looking for a better solution
+        dropout     if True then perform input dropout at 50% according to Hinton et al. 2012
         niters      number of times to go through all of the samples during gradient descent
         batchsz     size of the mini-batches in gradient descent if dropout is False
         rate        gradient descent learning rate
@@ -237,7 +265,7 @@ def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, mo
     if disp:
         __print('Number of training samples = %d'%X.shape[1])
         __print('Calculating initial weights...')
-    W = init_weights(X, Y, N, M, True)
+    W = init_weights(X, Y, N, M, downsample, kmeans_rep, True)
     if disp:
         __print('Initial error: %f'%calc_error(X,Y,W,target), 3)
         __print('Gradient descent...')
@@ -246,20 +274,22 @@ def learn(X, Y, N=10, M=20, dropout=False, niters=15, batchsz=100, rate=0.01, mo
         __print('Final error: %f'%calc_error(X,Y,W,target), 3)
     return W
 
-def init_weights(X, Y, N, M, whiten=False, scipy=False):
+def init_weights(X, Y, N=5, M=5, downsample=1, kmeans_rep=5, whiten=False):
     """
     Calculate the initial weights using multilevel K-Means clustering on a subset of the data. The
     clusters are used according to the end of section 3 of Seyedhosseini et al 2013.
     
     Inputs:
-        X   (n+1)xP matrix of feature vectors where n is the number of features and P is the number
-            of pixels, the last row will be filled with 1s by this method
-        Y   P-length array of bool labels
+        X   (n+1)xS matrix of feature vectors where n is the number of features and S is the number
+            of samples, the last row will be filled with 1s by this method
+        Y   S-length array of bool labels
         
     Parameters:
         N   number of groups to create (ORs)
         M   number of nodes/discriminants per group to create (ANDs)
-        whiten  scale each feature vector in X to have a variance of 1 before running k-means
+        downsample  amount of downsampling to perform on the data before clustering
+        kmeans_rep  times to repeat running k-means clustering looking for a better solution
+        whiten      scale each feature vector in X to have a variance of 1 before running k-means
 
     Output:
         A C-contiguous NxMx(n+1) matrix of initial weights representing all w_ijk and biases b_ij
@@ -275,8 +305,8 @@ def init_weights(X, Y, N, M, whiten=False, scipy=False):
 
     # First bullet point on page 5 of Seyedhosseini et al 2013
     # Calculating C+ and C- using k-means
-    Cp = __ldnn.run_kmeans(N, X,  Y, whiten, scipy)
-    Cn = __ldnn.run_kmeans(M, X, ~Y, whiten, scipy)
+    Cp = __ldnn.run_kmeans(N, X,  Y, downsample, kmeans_rep, whiten)
+    Cn = __ldnn.run_kmeans(M, X, ~Y, downsample, kmeans_rep, whiten)
     
     # Second and third bullet points on page 5 of Seyedhosseini et al 2013
     # Calculating initial weights and biases
@@ -295,8 +325,8 @@ def calc_error(X, Y, W, target=(0.1,0.9)):
     Calculate the square root of the error of the model (eq 11 from Seyedhosseini et al 2013).
     
     Inputs:
-        X   (n+1)xP matrix of feature vectors
-        Y   P-length array of bool labels
+        X   (n+1)xS matrix of feature vectors
+        Y   S-length array of bool labels
         W   NxMx(n+1) matrix of weights and biases
         
     Parameters:
@@ -310,7 +340,7 @@ def calc_error(X, Y, W, target=(0.1,0.9)):
     Y *= Y
     return sqrt(Y.mean())
 
-def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
+def gradient_descent(X, Y, W, niters=25, batchsz=1, dropout=False, rate=0.025, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
     """
     Uses stochastic gradient descent with mini-batches and dropout to minimize the weights of
     the LDNN classifier using the training data provided. Parts of this are implemented in Cython.
@@ -320,9 +350,9 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
     functions were made that were optimized for single samples.
     
     Inputs:
-        X   (n+1)xP matrix of feature vectors where n is the number of features and P is the number
-            of pixels
-        Y   P-length array of bool labels
+        X   (n+1)xS matrix of feature vectors where n is the number of features and S is the number
+            of samples
+        Y   S-length array of bool labels
         
     Inputs/Outputs:
         W   NxMx(n+1) matrix of weights and biases, C-ordered
@@ -354,7 +384,7 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
         return __ldnn.gradient_descent_dropout(X, Y.view(int8), W, niters, rate, momentum, target, disp)
     
     # Matrix sizes
-    (N,M,n),P = W.shape,len(Y)
+    (N,M,n),S = W.shape,len(Y)
     N2,M2 = (N//2,M//2) if dropout else (N,M)
     
     # Allocate memory
@@ -380,9 +410,9 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
         shuffle(order)
         totalerror = 0.0
         f,g = f_full,g_full
-        for p in xrange(0, P, batchsz):
-            x = X[:,order[p:p+batchsz]] # x is always F-ordered even if X is C-ordered
-            y = target_diff*Y[order[p:p+batchsz]]; y+=lower_target # see LeCun, Bottou, Orr, Muller 1998 section 4.5
+        for s in xrange(0, S, batchsz):
+            x = X[:,order[s:s+batchsz]] # x is always F-ordered even if X is C-ordered
+            y = target_diff*Y[order[s:s+batchsz]]; y+=lower_target # see LeCun, Bottou, Orr, Muller 1998 section 4.5
 
             # Calculate the sigmas, gs, and classifier (eqs 9 and 10 from Seyedhosseini et al 2013) 
             if dropout:
@@ -390,21 +420,21 @@ def gradient_descent(X, Y, W, niters=15, batchsz=100, dropout=False, rate=0.005,
                 shuffle(j_order)
                 W_ = W[i_order[:N2,None],j_order[:M2],:]
             else: W_ = W
-            s = sigma_ij(W_, x)
-            if len(y) != batchsz: f,g = f_g(s) # the last mini-batch might not be full
-            else: f_g(s, f, g)
+            sij = sigma_ij(W_, x)
+            if len(y) != batchsz: f,g = f_g(sij) # the last mini-batch might not be full
+            else: f_g(sij, f, g)
 
             # Calculate error (part of eq 11 from Seyedhosseini et al 2013)
             yf2 = y-f; yf2 *= yf2
             totalerror += yf2.sum()
             
             # Calculate gradient (eqs 12 and 13 from Seyedhosseini et al 2013)
-            grad(f, g, s, x, y, grads) # implemented in Cython
+            grad(f, g, sij, x, y, grads) # implemented in Cython
             
             # Update weights with a gradient step across the minibatch
             desc() # implemented in Cython
             
         # Report total error for the iteration
-        total_error[it] = sqrt(totalerror/P) # Similar to eq 11 from Seyedhosseini et al 2013 but slightly different
+        total_error[it] = sqrt(totalerror/S) # Similar to eq 11 from Seyedhosseini et al 2013 but slightly different
         if disp: __print('Iteration #%d error: %f' % (it+1,total_error[it]), 3)
     return total_error
