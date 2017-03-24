@@ -26,7 +26,8 @@ class Model(object):
         self._path = path = abspath(path)
         if not isfile(path): raise ValueError('path')
         if model is None:
-            info = _json_load(path)
+            from pysegtools.general.json import load
+            info = load(path)
             self._nstages,self._nlevels,model = info['nstages'],info['nlevels'],info['submodels']
         assert(len(model[-1]) == 1 and len(model[0]) > 0 and all(len(sm) == len(model[0]) for sm in model[1:-1]))
         #pylint: disable=access-member-before-definition
@@ -57,7 +58,8 @@ class Model(object):
         last path saved to is used.
         """
         self._path = path or self._path
-        _json_save(self._path, self._info)
+        from pysegtools.general.json import save
+        save(self._path, self._info)
    
     @classmethod
     def load(cls, path):
@@ -96,6 +98,7 @@ class Model(object):
         from os.path import abspath, exists
         from .filters import Filter
         from .classifier import Classifier
+        from pysegtools.general.json import save
         
         # Basic argument validation
         path = abspath(path)
@@ -126,7 +129,7 @@ class Model(object):
 
         # Save the data
         info.update(extra_info)
-        _json_save(path, info)
+        save(path, info)
 
         # Load the model
         return cls(path)
@@ -139,7 +142,8 @@ class Model(object):
         `path` is the path to the model file itself. Returns the loaded info from the model with
         some submodels possibly reset.
         """
-        try: info = _json_load(path)
+        from pysegtools.general.json import load
+        try: info = load(path)
         except IOError: return None
         if not isinstance(info, dict) or not all(k in info for k in ('submodels', 'nstages', 'nlevels')): return None
         sms = info['submodels']
@@ -376,96 +380,12 @@ class SubModel(object):
         if Y.dtype != bool: Y = Y > 0
         self.classifier.learn(X, Y, nthreads)
 
-def _json_save(path, data):
-    """
-    Saves the data to a gzipped JSON file supporting SubModel, Filter, Classifier, and NumPy array
-    objects in addition to the standard dictionaries, lists, strings, numbers, and booleans.
-    """
-    from pysegtools.general import GzipFile
-    from json import dump
-    with GzipFile(path, 'wb') as f:
-        dump(data, f, separators=(',',':'), default=__json_save_hook)
-def __json_save_hook(o):
-    """
-    Function to use as default in json.dump/json.dumps for encoding a Model, SubModels, Filters,
-    and Classifier objects into JSON. Besides the standard objects the JSON encoder can handle this
-    is able to encode SubModel, Filter, and Classifier objects by encoding their FQN and their
-    __dict__ or the result of __getstate__. Also this is able to encode NumPy arrays. Arrays with
-    less than 1024 elements are saved directly into the JSON as lists. Otherwise arrays are saved
-    in base-64 encoded raw binary data.
-    """
-    # Weighting the difference between using lists and base-64 encoded data
-    # Storing arrays as lists:
-    # * Human readable
-    # * No byte order issues
-    # * Data readable in any environment with a JSON decoder 
-    # * Integer arrays likely to be much smaller
-    # * After compression close to the same size even for floating-point numbers
-    # * Might be closr in time in Python 3.x as it uses an improved json module
-    # Storing arrays as base-64 encoded binary data:
-    # * 30x faster for my example data (only ~150ms for all weights compared to ~4.2 secs)
-    # * 3.5x faster during compression example data (~1.5 secs compared to ~4.5 secs)
-    # * Significantly faster to read, compressed or decompressed
-    # * 50% of the size when uncompressed
-    # * 85% of the size when compressed
-    from numpy import ndarray
-    if isinstance(o, ndarray):
-        if o.size <= 1024:
-            # Arrays with only 1024 elements are saved as lists
-            return {'__ndarray__':o.tolist(),'dtype':o.dtype.str}
-        # Embed raw data as a single base-64 string
-        from base64 import b64encode
-        return {'__ndarray__': b64encode(o.tobytes()),'dtype':o.dtype.str,'shape':o.shape}
-    for name,base in __json_obj_names.iteritems():
-        if isinstance(o, base): return {name: __json_save_obj(o)}
-    raise TypeError('cannot convert object of '+type(o)+' to JSON')
-def __json_save_obj(o):
-    """For saving one of the SubModel, Filter, or Classifier objects."""
-    cls = o.__class__
-    name = getattr(cls, '__qualname__', cls.__name__)
-    attr = getattr(o, '__getstate__', lambda:o.__dict__)()
-    return [cls.__module__, name, attr]
-def _json_load(path):
-    """
-    Loads given gzipped JSON file supporting SubModel, Filter, Classifier, and NumPy array objects
-    in addition to the standard dictionaries, lists, strings, numbers, and booleans.
-    """
-    from pysegtools.general import GzipFile
-    from json import load
-    with GzipFile(path, 'rb') as f:
-        return load(f, object_hook=__json_load_hook)
-def __json_load_hook(o):
-    """
-    A JSON load object_hook that supports SubModel, Filter, Classifer, and NumPy array objects.
-    This matches the __json_save_hook function.
-    """
-    if '__ndarray__' in o:
-        from numpy import array, fromstring, dtype
-        dt = dtype(o.get('dtype', '<f8'))
-        dt_native = dt.newbyteorder('=')
-        data = o['__ndarray__']
-        if isinstance(data, list): return array(data, dt_native)
-        from base64 import b64decode
-        data = fromstring(b64decode(data), dt_native).reshape(o['shape'])
-        if dt.byteorder != '=': data = data.byteswap(True)
-        return data
-    return next((__json_load_obj(base, *o[name]) for name,base in __json_obj_names.iteritems() if name in o), o)
-def __json_load_obj(base, mod, cls, attr):
-    """For loading one of the SubModel, Filter, or Classifier objects."""
-    from importlib import import_module
-    c = import_module(mod)
-    for cn in cls.split('.'): c = getattr(c, cn)
-    if not issubclass(c, base): raise TypeError('Unknown or bad '+base.__name__+' in model')
-    o = c.__new__(c)
-    getattr(o, '__setstate__', o.__dict__.update)(attr)
-    return o
-def __load_json_obj_names():
-    from chm.filters import Filter
-    from chm.classifier import Classifier
-    return {
-        '__submodel__':   SubModel,
-        '__filter__':     Filter,
-        '__classifier__': Classifier,
-    }
-from pysegtools.general import delayed
-__json_obj_names = delayed(__load_json_obj_names, dict)
+def __add_class_names():
+    from pysegtools.general.json import add_class_name
+    from .filters import Filter
+    from .classifier import Classifier
+    add_class_name('__submodel__', SubModel)
+    add_class_name('__filter__', SubModel)
+    add_class_name('__classifier__', SubModel)
+__add_class_names()
+del __add_class_names
