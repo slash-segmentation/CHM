@@ -463,6 +463,89 @@ def next_regular(target):
     return match
 
 
+########## Calculating Accuracy ##########
+def calc_confusion_matrix(predicted, ground_truth):
+    """
+    Calculate the values of the confusion matrix, returning true positives, true negatives, false
+    positives, and false negatives comparing the results of the predicated and ground_truth images.
+    The arguments should be ImageStacks or lists of images. Each image is passed to ensure_binary
+    to make sure it is a boolean image type. If this is not desired make sure to process the images
+    first making sure they are already a boolean image type.
+    """
+    from itertools import izip
+    from pysegtools.images import ImageStack
+    TP,TN,FP,FN = 0,0,0,0
+    predicted = ImageStack.as_image_stack(predicted)
+    ground_truth = ImageStack.as_image_stack(ground_truth)
+    if len(predicted) != len(ground_truth):
+        raise ValueError("Not the same number of images in predicted and ground-truth sets")
+    for p,gt in izip(predicted, ground_truth):
+        p,gt = ensure_binary(p.data),ensure_binary(gt.data)
+        _p,_gt = ~p,~gt
+        TP += ( p &  gt).sum()
+        TN += (_p & _gt).sum()
+        FP += ( p & _gt).sum()
+        FN += (_p &  gt).sum()
+    return TP,TN,FP,FN
+def calc_accuracy(TP, TN, FP, FN):
+    """
+    Calculates and returns the accuracy as:
+        (TP+TN) / (TP+TN+FP+FN)
+    where TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
+    negatives of the confusion matrix.
+    """
+    return (TP+TN) / (TP+TN+FP+FN)
+def calc_fvalue(TP, TN, FP, FN):
+    """
+    Calculates and returns the F-Value as:
+        2*precision*recall / (precision+recall)
+    where:
+        precision = TP / (TP + FP)
+        recall    = TP / (TP + FN)
+    and TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
+    negatives of the confusion matrix (takes TN even though it isn't used to be consistent).
+    """
+    #pylint: disable=unused-argument
+    precision = TP / (TP + FP)
+    recall    = TP / (TP + FN)
+    return 2*precision*recall / (precision+recall)
+def calc_gmean(TP, TN, FP, FN):
+    """
+    Calculates and returns the G-mean as:
+        sqrt(recall*specificity)
+    where:
+        recall      = TP / (TP + FN)
+        specificity = TN / (TN + FP)
+    and TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
+    negatives of the confusion matrix.
+    """
+    from numpy import sqrt
+    recall      = TP / (TP + FN)
+    specificity = TN / (TN + FP)
+    return sqrt(recall*specificity)
+def ensure_binary(im):
+    """
+    Makes sure an image is a binary (boolean/logical) image. The following transformations are
+    performed based on the image data type and data:
+        if the image is already of bool type then it is returned as-is
+        if there is 1 unique value then it is assumed to be False
+        if there are 2 unique values the greater one is True and the lesser one is False
+        otherwise the image is thresholded at a value determined by Otsu's method
+    """
+    from numpy import unique, zeros, argmin
+    if im.dtype == bool: return im
+    unq = unique(im[0])
+    if len(unq) == 1:
+        match = im == unq[0]
+        if match.all(): return zeros(im.shape, bool)
+        unq = sorted(unq[0], im[argmin(match)])
+    if len(unq) == 2:
+        binary = im == unq[1]
+        if (im == unq[0] | binary).all(): return binary
+    from pysegtools.images.filters.threshold import threshold
+    return threshold(im)
+
+
 ########## Set Library Threads ##########
 __set_num_thread_funcs = None
 __last_set_num_threads = None

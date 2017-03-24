@@ -14,7 +14,7 @@ from __future__ import print_function
 
 __all__ = ["CHM_train"]
 
-def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
+def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, disp=True):
     """
     CHM_train - CHM Image Training
     
@@ -22,6 +22,8 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
         ims         ImageStack or a list of ImageSource objects to train on
         lbls        ImageStack or a list of ImageSource objects of the ground-truth data 
         model       Model object that has been created but not completely learned
+        subsamples  Maximum number a samples to allow for a single stage/level, half of this
+                    value is reserved for positive samples and half for negative samples
         masks       ImageStack or a list of ImageSource objects of the pixels to use from the
                     training data, by default uses all pixels
         nthreads    number of threads to use, defaulting to the number of physical CPUs/cores
@@ -64,9 +66,10 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
             # Apply masking and subsampling
             # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
             X,Y = (X_full,Y) if M is None else (X_full.compress(M, 0), Y.compress(M, 0))
-            #X,Y = __subsample(X, Y, 3000000, nthreads=nthreads) # TODO: use? increase this for real problems?
             del M
+            if subsamples is not False: X,Y = __subsample(X, Y, subsamples//2, nthreads=nthreads)
             # Note: always use 1 for nthreads during learning
+            # OPT: allow multiple threads for clustering?
             sm.learn(X, Y, 1) # TODO: pass the disp method along with an increased indentation
             del X, Y
             model.save()
@@ -77,9 +80,10 @@ def CHM_train(ims, lbls, model, masks=None, nthreads=None, disp=True):
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)
-
+        disp('Accuracy: %f, F-value: %f, G-mean: %f'%__calc_performance(clabels, lbls), 1)
+        
     ########## Cleanup and return final labels ##########
-    disp('Complete!', 1)
+    disp('Complete!')
     del ims, ims0, lbls, lbls0, masks, masks0, contexts
     return __cleanup_outputs(model, clabels)
 
@@ -197,7 +201,7 @@ def __cumsum(itr):
     total = 0
     for x in itr: total += x; yield total
     
-def __subsample(X, Y, n=3000000, nthreads=1): # TODO: increase this for real problems
+def __subsample(X, Y, n=3000000, nthreads=1):
     """
     Sub-sample the data. If the number of pixels is greater than 2*n then at most n rows are kept
     where Y is True and n rows from where Y is False. The rows kept are selected randomly.
@@ -207,7 +211,8 @@ def __subsample(X, Y, n=3000000, nthreads=1): # TODO: increase this for real pro
 
     Returns the possibly subsampled X and Y.
     """
-    # OPT: use nthreads, check and improve speed (possibly similar to LDNN's kmeans downsampling)
+    # OPT: use nthreads and improve speed (possibly similar to LDNN's kmeans downsampling)
+    # Currently takes just under a minute on a 12,500,000 element dataset that is reduced to 3,091,660
     npixs = len(Y)
     if npixs <= 2*n: return X, Y
 
@@ -250,21 +255,20 @@ def __generate_outputs(submodel, X, shapes, nthreads):
 def __load_clabels(submodel, clabels):
     """
     Loads the clabels for the current submodel into the clabels list. These are loaded as
-    memory-mapped arrays from NPY files. The clabels list is a list-of-list with the first index
+    memory-mapped arrays from NPY files. The clabels list is a list-of-lists with the first index
     being the image index and the second being the level. If the clabels are not available,
     returns False.
     """
     from numpy import load, ndarray
     from os.path import join, isfile
+    from itertools import izip
     folder = __get_output_folder(submodel)
-    for i in xrange(len(clabels)):
-        path = join(folder, '%03d.npy'%i)
-        if not isfile(path): return False
-    for i in xrange(len(clabels)):
-        path = join(folder, '%03d.npy'%i)
+    paths = [join(folder, '%03d.npy'%i) for i in xrange(len(clabels))]
+    if not all(isfile(path) for path in paths): return False
+    for clbl,path in izip(clabels, paths):
         # Load as a memory-mapped array viewed as an ndarray
         # (should be using 'r' mode but then Cython typed memoryviews reject it)
-        clabels[i].append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
+        clbl.append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
     return True
 
 def __get_temp_folder(model):
@@ -291,13 +295,26 @@ def __cleanup_outputs(model, clabels):
     rmtree(__get_temp_folder(model), onerror=lambda f,p,e:warn("Failed to remove temporary file %s"%p))
     return clabels
 
+def __calc_performance(clabels, lbls):
+    """
+    Calculates and returns the performance (pixel accuracy, F-value, and G-mean) of the clabels
+    (predicted) vs labels (ground-truth) image data.
+    """
+    from chm.utils import calc_confusion_matrix, calc_accuracy, calc_fvalue, calc_gmean
+    from pysegtools.images import ImageStack
+    from pysegtools.images.filters.threshold import ThresholdImageStack
+    predicted = ThresholdImageStack(ImageStack.as_image_stack([clbl[-1] for clbl in clabels]), 'auto-stack')
+    confusion_matrix = calc_confusion_matrix(predicted, lbls)
+    return calc_accuracy(*confusion_matrix), calc_fvalue(*confusion_matrix), calc_gmean(*confusion_matrix)
+
+
 def __chm_train_main():
     """The CHM train command line program"""
     # Parse Arguments
-    ims, lbls, model, masks, output, dt, nthreads = __chm_train_main_parse_args()
+    ims, lbls, model, subsamples, masks, output, dt, nthreads = __chm_train_main_parse_args()
 
     # Process input
-    out = CHM_train(ims, lbls, model, masks, nthreads)
+    out = CHM_train(ims, lbls, model, subsamples, masks, nthreads)
 
     # Save output
     if output is not None:
@@ -345,12 +362,13 @@ def __chm_train_main_parse_args():
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
     masks = None
+    subsamples = False
     output, dt = None, uint8
     restart = False
     nthreads = None
 
     # Parse the optional arguments
-    try: opts, _ = getopt(argv[4:], "rS:L:f:c:M:o:d:n:N:")
+    try: opts, _ = getopt(argv[4:], "rS:L:f:c:s:M:o:d:n:N:")
     except GetoptError as err: __chm_train_usage(err)
     for o, a in opts:
         if o == "-S":
@@ -371,6 +389,10 @@ def __chm_train_main_parse_args():
                 fltrs = OrderedDict((f,__get_filter(f)) for f in a.lower().split(','))
         elif o == "-c":
             cntxt_fltr = __get_filter(a.lower())
+        elif o == "-s":
+            try: subsamples = int(a, 10) # pylint: disable=redefined-variable-type
+            except ValueError: __chm_train_usage("Number of subsamples must be an integer >= 1000000")
+            if subsamples < 1000000: __chm_train_usage("Number of subsamples must be an integer >= 1000000")
         elif o == "-M":
             masks = FileImageStack.open_cmd(a)
         elif o == "-o":
@@ -392,7 +414,7 @@ def __chm_train_main_parse_args():
     fltrs = FilterBank(fltrs.values()) #pylint: disable=redefined-variable-type
     classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l)))
     model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, restart)
-    return (ims, lbls, model, masks, output, dt, nthreads)
+    return (ims, lbls, model, subsamples, masks, output, dt, nthreads)
 
 def __get_filter(f):
     """
@@ -456,6 +478,10 @@ Optional Arguments:
                 input and label along with each image being the same size. Any
                 non-zero pixel in the mask represent a point used for training,
                 either a positive or negative label.
+  -s subsamples Subsample the data. If the number of samples for a particular
+                stage/level is over the value given, at most half of that many
+                positive and negative samples are kept. The default is keeping
+                all samples.
   -o output     Output the results of testing the model on the input data to the
                 given image. Accepts anything that is accepted by `imstack -S`
                 in quotes. The data is always calculated anyways so this just
