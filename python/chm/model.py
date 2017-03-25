@@ -118,7 +118,7 @@ class Model(object):
             sms = info['submodels']
             model = Model.nested_list(nstages, nlevels, lambda s,l:
                 (SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l])
-                if s > len(model) or l >= len(model[s-1]) or model[s-1][l] is None else sms[s-1][l]))
+                if s > len(sms) or l >= len(sms[s-1]) or sms[s-1][l] is None else sms[s-1][l]))
             info.update({'nstages':nstages,'nlevels':nlevels,'submodels':model})
             
         else:
