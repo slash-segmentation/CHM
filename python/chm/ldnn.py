@@ -234,8 +234,8 @@ def filter_clustering_warnings(action='always'):
     import warnings
     warnings.simplefilter(action, __ldnn.ClusteringWarning)
 
-def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,
-          dropout=False, niters=25, batchsz=1, rate=0.025, momentum=0.5, target=(0.1,0.9), disp=True): #pylint: disable=too-many-arguments
+def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,  #pylint: disable=too-many-arguments
+          dropout=False, niters=25, batchsz=1, rate=0.025, momentum=0.5, target=(0.1,0.9), disp=True):
     """
     Calculate the initial weights using multilevel K-Means clustering on a subset of the data. The
     clusters are used according to the end of section 3 of Seyedhosseini et al 2013.

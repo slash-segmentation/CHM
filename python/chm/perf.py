@@ -15,13 +15,13 @@ def main():
     from pysegtools.images.io import FileImageStack
     from pysegtools.images.filters.threshold import ThresholdImageStack
 
-    from sys import exit, argv
-    if len(argv) != 3:
+    import sys
+    if len(sys.argv) != 3:
         print("Requires 2 arguments: a stack of predicted images and a stack of ground-truth images")
-        exit(1)
+        sys.exit(1)
     
-    predicted = ThresholdImageStack(FileImageStack.open_cmd(argv[1]), 'auto-stack')
-    ground_truth = ThresholdImageStack(FileImageStack.open_cmd(argv[2]), 1)
+    predicted = ThresholdImageStack(FileImageStack.open_cmd(sys.argv[1]), 'auto-stack')
+    ground_truth = ThresholdImageStack(FileImageStack.open_cmd(sys.argv[2]), 1)
     
     confusion_matrix = calc_confusion_matrix(predicted, ground_truth)
     print("Accuracy = %f"%calc_accuracy(*confusion_matrix))
