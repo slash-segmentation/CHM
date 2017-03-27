@@ -388,7 +388,7 @@ def gradient_descent(X, Y, W, niters=25, batchsz=1, dropout=False, rate=0.025, m
     N2,M2 = (N//2,M//2) if dropout else (N,M)
     
     # Allocate memory
-    order = arange(P)
+    order = arange(S)
     total_error = empty(niters)
     f_full,g_full = empty(batchsz), empty((N2,batchsz))
     grads,prevs = empty((N2,M2,n)), zeros((N,M,n))
