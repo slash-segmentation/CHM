@@ -360,7 +360,7 @@ def __chm_train_main_parse_args():
     # Get defaults for optional arguments
     nstages, nlevels = 2, 4
     # TODO: SIFT should not need compat mode here!
-    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor()),
+    fltrs = OrderedDict((('haar',Haar(scale=False)), ('hog',HOG(scale=False)), ('edge',Edge(scale=False)), ('gabor',Gabor(scale=False)),
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
     masks = None
@@ -434,7 +434,7 @@ def __get_filter(f):
         return F(f)
     filters = {'haar':Haar, 'hog':HOG, 'edge':Edge, 'frangi':Frangi, 'gabor':Gabor, 'sift': SIFT}
     if f not in filters: __chm_train_usage("Unknown filter '%s'"%f)
-    return filters[f]()
+    return filters[f](scale=False)
 
 def __chm_train_usage(err=None):
     import sys
