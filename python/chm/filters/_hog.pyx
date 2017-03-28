@@ -22,7 +22,7 @@ include "filters.pxi"
 
 from libc.stdlib cimport malloc, free
 from libc.string cimport memset, memcpy
-from libc.math cimport M_PI, sqrt, atan
+from libc.math cimport M_PI, sqrt, atan2
 from cython.parallel cimport parallel, prange
 from cython.view cimport contiguous
 
@@ -283,15 +283,18 @@ cdef inline intp __gradient(double[:,::contiguous] im, intp y, intp x, double* m
     mag[0] = sqrt(dx*dx + dy*dy) # Unnecessary: / (CELL_SIZE * CELL_SIZE)
     cdef double ornt
     IF UNSIGNED_ANGLES:
-        if dx == 0: ornt = 0 if y == 0 else M_PI/2
-        else: ornt = atan(dy/dx); ornt += (ornt<0)*M_PI
-        # Slower but more straight forward ways to calculate the unsigned orientation:
-        #ornt = atan2(dy, dx); ornt %= M_PI
-        #ornt = atan2(dy, dx); ornt += (ornt<0)*M_PI
-        return <intp>(ornt*NBINS/M_PI)
+        ornt = atan2(dy, dx)
+        ornt += (ornt<0)*M_PI
+        # This is faster but biases taking values from the last bin and places them in the first bin
+        #if dx == 0: ornt = 0 if dy == 0 else M_PI/2
+        #else: ornt = atan(dy/dx); ornt += (ornt<0)*M_PI
+        ornt = ornt*NBINS/M_PI
     ELSE:
         ornt = atan2(dy, dx) + M_PI
-        return <intp>(ornt*NBINS/(2*M_PI))
+        ornt = ornt*NBINS/(2*M_PI)
+    cdef intp orientation = <intp>ornt
+    if orientation >= NBINS: orientation = NBINS-1
+    return orientation
 
 cdef void __normalize(double[:,:,::1] hist, intp a, intp b, double* block, double[:,:,:] out) nogil:
     """
