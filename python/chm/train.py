@@ -70,13 +70,15 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
             if subsamples is not False: X,Y = __subsample(X, Y, subsamples//2, nthreads=nthreads)
             # Note: always use 1 for nthreads during learning
             # OPT: allow multiple threads for clustering?
-            sm.learn(X, Y, 1) # TODO: pass the disp method along with an increased indentation
+            sm.normalize(X, nthreads=nthreads)
+            sm.learn(X, Y, nthreads=1) # TODO: the disp method should using the logging module
             del X, Y
             model.save()
         else: disp('Skipping learning... (already complete)', 1)
 
         ##### Generate the outputs #####
         disp('Generating outputs...', 1)
+        sm.normalize(X_full)
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)
@@ -212,7 +214,7 @@ def __subsample(X, Y, n=3000000, nthreads=1):
     Returns the possibly subsampled X and Y.
     """
     # OPT: use nthreads and improve speed (possibly similar to LDNN's kmeans downsampling)
-    # Currently takes just under a minute on a 12,500,000 element dataset that is reduced to 3,091,660
+    # Currently takes ~25 secs on a 12,500,000 element dataset that is reduced to 3,116,282
     npixs = len(Y)
     if npixs <= 2*n: return X, Y
 
