@@ -262,7 +262,7 @@ class SubModel(object):
         """Gets the state - everything except the model field"""
         return {
             'stage': self.__stage, 'level': self.__level,
-            'min_norm', :self.__min_norm, 'max_norm', :self.__max_norm,
+            'min_norm': self.__min_norm, 'max_norm': self.__max_norm,
             'filter': self.__filter, 'context_filter': self.__context_filter,
             'classifier': self.__classifier,
         }
@@ -282,7 +282,7 @@ class SubModel(object):
     def stage(self): return self.__stage
     @property
     def level(self): return self.__level
-    @propety
+    @property
     def norm_factors(self): return (self.__min_norm, self.__max_norm)
     @property
     def image_filter(self):
