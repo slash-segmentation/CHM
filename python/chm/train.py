@@ -35,7 +35,7 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
     ims0,lbls0,masks0 = __check_and_load(ims, lbls, masks)
         
     # Get parameters
-    shapes = __get_all_shapes([im.shape for im in ims], model.nlevels)
+    shapes = __get_all_shapes([im.shape for im in ims0], model.nlevels)
     nthreads = __get_nthreads(nthreads)
     disp = __print if disp else lambda s,l=0:None
 
