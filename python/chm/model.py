@@ -45,7 +45,11 @@ class Model(object):
     def __contains__(self, name): return name in self._info
     def _get_param(self, name): return self._info[name]
     def __getitem__(self, i):
-        if isinstance(i, tuple) and len(i) == 2: return self._model[i[0]-1][i[1]]
+        if isinstance(i, tuple) and len(i) == 2:
+            s,l = i
+            if s < -self._nstages or s > self._nstages or s == 0: raise IndexError('invalid stage')
+            if l < -self._nlevels or l >= self._nlevels: raise IndexError('invalid level')
+            return self._model[s-1 if s > 0 else s][l]
         return self._get_param(i)
     def __iter__(self):
         for stage in self._model:
