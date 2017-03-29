@@ -526,7 +526,6 @@ def __run_chm_test_proc(mems, model, nthreads, q):
             contexts, cntxt_rgn = get_contexts(region)
             X = mod.filter(im, contexts, None, region, cntxt_rgn, nthreads)
             del contexts
-            if mod.norm_factors != (None, None): mod.normalize(X, nthreads)
             out[region[0]:region[2],region[1]:region[3]] = mod.evaluate(X, nthreads)
             del X
         except KeyboardInterrupt: break 
@@ -578,8 +577,6 @@ def testCHM(im, model, nthreads=1):
             contexts.append(MyDownSample(clabels[-1], 1, nthreads=nthreads))
         X = sm.filter(imx, contexts, nthreads=nthreads)
         if stage == nstages and level == 0: del im, imx, contexts
-        if sm.norm_factors != (None, None):
-            sm.normalize(X, nthreads)
         clabels.append(sm.evaluate(X, nthreads))
         del X
     return clabels[0]

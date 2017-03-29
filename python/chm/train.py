@@ -70,7 +70,6 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
             if subsamples is not False: X,Y = __subsample(X, Y, subsamples//2, nthreads=nthreads)
             # Note: always use 1 for nthreads during learning
             # OPT: allow multiple threads for clustering?
-            sm.normalize(X, nthreads=nthreads)
             sm.learn(X, Y, nthreads=1) # TODO: the disp method should using the logging module
             del X, Y
             model.save()
@@ -78,7 +77,6 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
 
         ##### Generate the outputs #####
         disp('Generating outputs...', 1)
-        sm.normalize(X_full)
         __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
         del X_full
         __load_clabels(sm, clabels)

@@ -249,27 +249,23 @@ class SubModel(object):
     __model = None
 
     """Represents part of a model for a single stage and level."""
-    def __init__(self, stage, level, fltr, cntxt_fltr, classifier, min_norm=None, max_norm=None):
+    def __init__(self, stage, level, fltr, cntxt_fltr, classifier):
         self.__stage = stage
         self.__level = level
         self.__filter = fltr
         self.__context_filter = cntxt_fltr
         self.__classifier = classifier
-        self.__min_norm = min_norm
-        self.__max_norm = max_norm
 
     def __getstate__(self):
         """Gets the state - everything except the model field"""
         return {
             'stage': self.__stage, 'level': self.__level,
-            'min_norm': self.__min_norm, 'max_norm': self.__max_norm,
             'filter': self.__filter, 'context_filter': self.__context_filter,
             'classifier': self.__classifier,
         }
     def __setstate__(self, state):
         self.__init__(state['stage'], state['level'],
-                      state['filter'], state['context_filter'], state['classifier'],
-                      state.get('min_norm'), state.get('max_norm'))
+                      state['filter'], state['context_filter'], state['classifier'])
     
     @property
     def model(self): return self.__model() # _model is a weak-reference
@@ -282,8 +278,6 @@ class SubModel(object):
     def stage(self): return self.__stage
     @property
     def level(self): return self.__level
-    @property
-    def norm_factors(self): return (self.__min_norm, self.__max_norm)
     @property
     def image_filter(self):
         """Returns the filter used for images for this model."""
@@ -359,22 +353,6 @@ class SubModel(object):
         
         # Done!
         return out
-    
-    def normalize(self, X, nthreads=1):
-        """
-        Normalize the data so that each row ranges from 0 to 1. The data sent in is modified in-place.
-        The first time this is run for a specific submodel the min and max are calculated from the
-        data given. Otherwise the min and max from the first time is used.
-        """
-        # OPT: use nthreads and improve speed
-        # TODO: remove extreme outliers from min/max
-        if self.__min_norm is None or self.__max_norm is None:
-            self.__min_norm,self.__max_norm = X.min(1),X.max(1)
-        mn,mx = self.__min_norm,self.__max_norm
-        X -= mn[:,None]
-        D = mx - mn
-        D[D==0] = 1
-        X *= 1/D[:,None]
         
     def evaluate(self, X, nthreads=1):
         """

@@ -18,6 +18,8 @@ import_array()
 from libc.math cimport exp, sqrt
 ctypedef double* dbl_p
 
+from chm.__shuffle cimport shuffle, shuffle_partial
+
 #################### General ####################
 
 def downsample(intp min, double[:,:] X, char[::1] Y, intp downsample=10):
@@ -102,7 +104,7 @@ def stddev(double[:,::1] X):
         for j in xrange(M): stds[j] = sqrt(stds[j]/N)
     return stds.base
 
-def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False):
+def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False, int nthreads=1):
     """
     Downsample, possibly 'whiten', and run k-means on the data.
 
@@ -132,61 +134,21 @@ def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False
     if whiten:
         sd = stddev(data)
         sd[sd == 0] = 1 # avoid divide-by-0, turning it into no-scaling (should only ever be 0 for the column of all 1s anyways)
-        data /= sd
+        data *= 1/sd
     
     # Calculate clusters using kmeans
+    # OPT: parallelize this
     clusters,rms2 = kmeansML(k, data)
     for _ in xrange(1, repeats):
         new_clusters,new_rms2 = kmeansML(k, data)
         if new_rms2 < rms2:
             clusters = new_clusters
             rms2 = new_rms2
-
+    
     # Un-whiten the clusters
     if whiten: clusters *= sd
 
     return clusters
-
-
-#################### Shuffling ####################
-
-#from libc.stdlib cimport rand, srand, RAND_MAX
-cdef extern from 'randomkit.h' nogil:
-    ctypedef struct rk_state:
-        pass
-    ctypedef enum rk_error:
-        pass
-    int rk_randomseed(rk_state *state) nogil
-    unsigned long rk_interval(unsigned long max, rk_state *state) nogil
-
-cdef rk_state rng
-cdef bint rng_inited = False
-
-cdef void init_rng() nogil:
-    global rng_inited
-    rk_randomseed(&rng)
-    rng_inited = True
-
-cpdef inline void shuffle(intp[::1] arr, intp sub = -1) nogil:
-    """
-    Fisher–Yates In-Place Shuffle. It is optimal efficiency and unbiased (assuming the RNG is
-    unbiased). This uses the random-kit RNG bundled with Numpy. If sub is given only that many
-    elements are shuffled at the END of the array (they are shuffled with the entire array
-    though).
-    """
-    if not rng_inited: init_rng()
-    cdef intp i, j, t, n = arr.shape[0], end = 0 if sub == -1 else n-sub-1
-    for i in xrange(n-1, end, -1):
-        j = rk_interval(i, &rng)
-        t = arr[j]; arr[j] = arr[i]; arr[i] = t
-    
-    # The original implementation used rand()/RAND_MAX and was seriously flawed. On some systems
-    # any training set with more than 32767 samples (a single 180x180 image would get past that) it
-    # would do a divide-by-0 almost every time. Also, the results would be skewed because rand()
-    # was not very robust and the method used for scaling the output was also not great.
-    #for i in xrange(n-1):
-    #   j = i + rand() / (RAND_MAX / (n - i) + 1)
-    #   t = arr[j]; arr[j] = arr[i]; arr[i] = t
 
 
 #################### K-Means ML ####################
@@ -325,7 +287,7 @@ cdef double[:,::1] random_subset(double[:,::1] data, Py_ssize_t n, double[:,::1]
     assert(total >= n)
     if out is None: out = PyArray_EMPTY(2, [n, m], NPY_DOUBLE, False)
     cdef intp[::1] inds = PyArray_Arange(0, total, 1, NPY_INTP)
-    shuffle(inds, n) # NOTE: shuffles n elements at the END of the array
+    shuffle_partial(inds, n) # NOTE: shuffles n elements at the END of the array
     for i in xrange(n): out[i,:] = data[inds[total-n+i],:]
     return out
     
@@ -473,10 +435,85 @@ def descent_do(double[:,:,::1] grads, double[:,:,::1] prevs, double[:,:,::1] W,
                 p_ij[k] = grads[i,j,k] + momentum*p_ij[k]
                 W_ij[k] -= rate*p_ij[k]
 
+def gradient_descent(double[:,:] X, char[::1] Y, double[:,:,::1] W,
+                     const intp niters, const double rate, const double momentum, target, disp=None):
+    """
+    This is an optimized version of gradient descent that always has dropout=False and batchsz=1. See
+    chm.ldnn.gradient_descent for more information about the other parameters.
+    
+    ?
+    Slightly faster when X is Fortran-ordered but not by much (possibly about 15%). However that would mean
+    that the entire X array, which is normally C-ordered, would have to be copied and stored in memory and
+    it is huge.
+    """
+
+    # Matrix sizes
+    cdef intp N = W.shape[0], M = W.shape[1], n = W.shape[2], P = Y.shape[0]
+
+    # Allocate memory
+    cdef intp[::1] order = PyArray_Arange(0, P, 1, NPY_INTP)
+    cdef double[:,:,::1] prevs = PyArray_ZEROS(3, [N,M,n], NPY_DOUBLE, False)
+    cdef double[:,::1] s = PyArray_ZEROS(2, [N,M], NPY_DOUBLE, False)
+    cdef double[::1]   g = PyArray_ZEROS(1, &N,    NPY_DOUBLE, False)
+    cdef double[::1]   x = PyArray_EMPTY(1, &n,    NPY_DOUBLE, False) # a single row from X
+    cdef ndarray total_error = PyArray_EMPTY(1, &niters, NPY_DOUBLE, False)
+    
+    # Variables
+    cdef intp i, p
+    cdef double totalerror, y, lower_target, upper_target, target_diff
+    lower_target,upper_target = target
+    target_diff = upper_target-lower_target
+    
+    for i in xrange(niters):
+        with nogil:
+            totalerror = 0.0
+            shuffle(order)
+            for p in xrange(P):
+                x[:] = X[:,order[p]] # copying here greatly increases overall speed 
+                y = lower_target + target_diff*<bint>Y[order[p]]
+                totalerror += _grad_desc(x, y, W, prevs, s, g, rate, momentum)
+        total_error[i] = sqrt(totalerror/P)
+        if disp is not None: disp('Iteration #%d error=%f' % (i+1,total_error[i]))
+    return total_error
+
+cdef double _grad_desc(const double[::1] x, const double y, double[:,:,::1] W, double[:,:,::1] prevs,
+                       double[:,::1] s, double[::1] g, const double rate, const double momentum) nogil:
+    """A single step and sample for gradient descent."""
+    cdef intp N = W.shape[0], M = W.shape[1], n = W.shape[2], i, j, k
+    
+    # Calculate the sigmas, gs, and classifier (eqs 9 and 10 from Seyedhosseini et al 2013) 
+    cdef double f = 1.0, g_i, s_ij
+    for i in xrange(N):
+        g_i = 1.0
+        for j in xrange(M):
+            s_ij = 0.0
+            for k in xrange(n): s_ij += W[i,j,k]*x[k]
+            s_ij = 1.0/(1.0+exp(-s_ij))
+            s[i,j] = s_ij
+            g_i *= s_ij
+        g[i] = g_i
+        f *= 1.0-g_i
+    f = 1.0-f
+    
+    # Calculate gradient (eqs 12 and 13 from Seyedhosseini et al 2013)
+    # and perform a gradient descent step
+    cdef double yf = y-f, c1 = -2.0*(1.0-f)*yf, c2, c3
+    for i in xrange(N):
+        c2 = c1/(1.0-g[i])*g[i]
+        for j in xrange(M):
+            c3 = c2*(1.0-s[i,j])
+            for k in xrange(n):
+                prevs[i,j,k] = x[k]*c3 + momentum*prevs[i,j,k]
+                W[i,j,k] -= rate*prevs[i,j,k]
+
+    # Calculate error (part of eq 11 from Seyedhosseini et al 2013)
+    return yf*yf
+
+
 def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
                              const intp niters, const double rate, const double momentum, target, disp=None):
     """
-    This is an optimized version of gradient descent that always has dropout=0.5 and batchsz=1. See
+    This is an optimized version of gradient descent that always has dropout=True and batchsz=1. See
     chm.ldnn.gradient_descent for more information about the other parameters.
     
     Slightly faster when X is Fortran-ordered but not by much (possibly about 15%). However that would mean

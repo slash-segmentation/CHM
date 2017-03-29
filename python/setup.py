@@ -10,10 +10,8 @@ except ImportError: from distutils.core import setup
 from distutils.extension import Extension
 from distutils.ccompiler import get_default_compiler
 from Cython.Build import cythonize
-from os.path import abspath, join, sep
-import numpy
-import pysegtools.general.cython
-import chm
+from os.path import join
+import numpy, pysegtools.general.cython, chm
 
 compiler_name = get_default_compiler() # TODO: this isn't the compiler that will necessarily be used, but is a good guess...
 compiler_opt = {
@@ -31,21 +29,32 @@ linker_opt = {
 
 cy_inc = pysegtools.general.cython.get_include()
 np_inc = numpy.get_include()
-np_rand = abspath(join(np_inc, '..', '..', 'random'))
 
-def create_ext(name, dep=[], src=[], inc=[], lib=[]):
+def create_ext(name, dep=[], src=[], inc=[], lib=[], objs=[]):
     return Extension(
         name=name,
         depends=dep,
-        sources=[name.replace('.',sep)+'.pyx']+src,
+        sources=[join(*name.split('.'))+'.pyx']+src,
         define_macros=[('NPY_NO_DEPRECATED_API','7'),],
         include_dirs=[np_inc,cy_inc]+inc,
         library_dirs=lib,
+        extra_objects=objs,
         extra_compile_args=compiler_opt.get(compiler_name, []),
         extra_link_args=linker_opt.get(compiler_name, []),
         language='c++',
     )
 
+def create_ext_mtrand(name, dep=[], src=[], inc=[], lib=[], objs=[]):
+    """Create an extension that links against the mtrand library."""
+    import numpy.random.mtrand
+    from os.path import isfile, dirname, abspath
+    path = getattr(numpy.random.mtrand, '__file__', None)
+    if path is None or not isfile(path):
+        path = abspath(join(np_inc, '..', '..', 'random', 'mtrand'))
+        for ext in ('.so', '.dylib', '.pyd', '.dll'):
+            if os.path.isfile(path+ext): path += ext; break
+        else: raise ImportError('cannot find mtrand library')
+    return create_ext(name, dep, src, inc + [dirname(path)], lib, objs + [path])
 
 setup(name='chm',
           version='%s'%chm.__version__,
@@ -60,7 +69,8 @@ setup(name='chm',
           zip_safe=False, # I don't think this code would work when running from inside a zip file due to the dynamic-load and dynamic-cython systems
           ext_modules = cythonize([
               create_ext('chm._utils'),
-              create_ext('chm.__ldnn', inc=[np_rand], lib=[np_rand]), #libraries=[':mtrand.so']
+              create_ext('chm.__ldnn'),
+              create_ext_mtrand('chm.__shuffle'),
               create_ext('chm.__imresize'),
               create_ext('chm.filters._correlate'),
               create_ext('chm.filters._haar'),
