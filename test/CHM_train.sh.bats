@@ -110,7 +110,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -133,16 +133,16 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
 }
 
 #
-# CHM_train.sh with fake successful matlab and 2 basic arguments -s and nproc 25
+# CHM_train.sh with fake successful matlab and 2 basic arguments -n 1 and nproc 25
 #
-@test "CHM_train.sh with fake successful matlab and 2 basic arguments -s and nproc 25" {
+@test "CHM_train.sh with fake successful matlab and 2 basic arguments -n 1 and nproc 25" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
@@ -152,11 +152,11 @@ teardown() {
   export FAKE_NPROC_PROCS=25
 
 
-  run $CHM_TRAIN blah alsoblah -s
+  run $CHM_TRAIN blah alsoblah -n 1
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -165,38 +165,38 @@ teardown() {
 
 
 #
-# CHM_train.sh with fake successful matlab and 2 basic arguments and -s
+# CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1
 #
-@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -s" {
+@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
   export PATH=$SUCCESS_MATLAB:$PATH
 
-  run $CHM_TRAIN blah alsoblah -s
+  run $CHM_TRAIN blah alsoblah -n 1
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
   
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,1);');" ]
  
   # reset path
   export PATH=$A_TEMP_PATH
 }
 
 #
-# CHM_train.sh with fake fail matlab and 2 basic arguments and -s
+# CHM_train.sh with fake fail matlab and 2 basic arguments and -n 1
 #
-@test "CHM_train.sh with fake fail matlab and 2 basic arguments and -s" {
+@test "CHM_train.sh with fake fail matlab and 2 basic arguments and -n 1" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
   export PATH=$FAIL_MATLAB:$PATH
 
-  run $CHM_TRAIN blah alsoblah -s
+  run $CHM_TRAIN blah alsoblah -n 1
   echo "$output" 1>&2
   [ "$status" -eq 1 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -204,38 +204,38 @@ teardown() {
 
 
 #
-# CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 4 -L 3
+# CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1 -S 4 -L 3
 #
-@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 4 -L 3" {
+@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1 -S 4 -L 3" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
   export PATH=$SUCCESS_MATLAB:$PATH
 
-  run $CHM_TRAIN blah alsoblah -s -S 4 -L 3
+  run $CHM_TRAIN blah alsoblah -n 1 -S 4 -L 3
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',4,3,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',4,3,0,1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
 }
 
 #
-# CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m -r
+# CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1 -S 2 -L 1 -m -r
 #
-@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -s -S 2 -L 1 -m -r" {
+@test "CHM_train.sh with fake successful matlab and 2 basic arguments and -n 1 -S 2 -L 1 -m -r" {
   A_TEMP_PATH=$PATH
 
   # put fake matlab in path
   export PATH=$SUCCESS_MATLAB:$PATH
 
-  run $CHM_TRAIN blah alsoblah -s -S 2 -L 1 -m "$THE_TMP" -r
+  run $CHM_TRAIN blah alsoblah -n 1 -S 2 -L 1 -m "$THE_TMP" -r
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''$THE_TMP'',2,1,1);');" ]
+  [ "${lines[0]}" = "-nodisplay -nojvm -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''$THE_TMP'',2,1,1,1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
