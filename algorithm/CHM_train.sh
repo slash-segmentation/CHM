@@ -35,8 +35,7 @@ Optional Arguments:
                   after the last completed stage/level. You must give the same
                   parameters (data, labels, ...) as before for the model to
                   make sense.
-  -s              Single-thread / non-parallel. Without this some parts can be
-                  run in parallel, but not many." 1>&2;
+  -n              Number of threads." 1>&2;
   exit 1;
 }
 
@@ -50,13 +49,17 @@ LABELS=$2;
 MODEL_FOLDER=./temp/;
 declare -i RESTART=0; # 0=FALSE, 1=TRUE
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
+NTHREADS=0;
 declare -i NSTAGE=2;
 declare -i NLEVEL=4;
 shift 2
-while getopts ":srm:S:L:" o; do
+while getopts ":n:rm:S:L:" o; do
   case "${o}" in
     s)
-      SINGLE_THREAD=-nojvm;
+      SINGLE_THREAD="-nojvm -singleCompThread";
+      ;;
+    n)
+      NTHREADS="$((OPTARG * 1))";
       ;;
     r)
       RESTART=1;
@@ -101,11 +104,11 @@ else
 fi
 
 # Set 'singleCompThread' for MATLAB if there are a lot of processors
-if [[ -n "${SINGLE_THREAD}" ]]; then SINGLE_THREAD="${SINGLE_THREAD} -singleCompThread";
+if (( NTHREADS == 1 )); then SINGLE_THREAD="-nojvm -singleCompThread";
 elif [[ -n `which nproc 2>/dev/null` ]] && (( `nproc` > 24 )); then SINGLE_THREAD=-singleCompThread; fi;
 
 # Run the main matlab script (need JVM for parallel)
-matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL},${RESTART});');";
+matlab -nodisplay ${SINGLE_THREAD} -r "run_from_shell('CHM_train(''${INPUTS}'',''${LABELS}'',''${MODEL_FOLDER}'',${NSTAGE},${NLEVEL},${RESTART},${NTHREADS});');";
 matlab_err=$?;
 
 # Cleanup
