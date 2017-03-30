@@ -217,20 +217,21 @@ def __subsample(X, Y, n=3000000, nthreads=1):
     if npixs <= 2*n: return X, Y
 
     from numpy import zeros, flatnonzero
-    from numpy.random import shuffle
+    from .__shuffle import shuffle_partial
+    
     n_trues = Y.sum()
     n_falses = npixs-n_trues
     keep = zeros(npixs, bool)
     if n_trues > n:
         ind = flatnonzero(Y)
-        shuffle(ind)
-        keep[ind[:n]] = True
+        shuffle_partial(ind, n)
+        keep[ind[-n:]] = True
         del ind
     else: keep |= Y
     if n_falses > n:
         ind = flatnonzero(~Y)
-        shuffle(ind)
-        keep[ind[:n]] = True
+        shuffle_partial(ind, n)
+        keep[ind[-n:]] = True
         del ind
     else: keep |= ~Y
     return X[:,keep], Y[keep]
