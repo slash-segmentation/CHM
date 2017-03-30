@@ -3,6 +3,8 @@ Gabor Filter. Implemented with FFTs.
 
 NOTE: Also tested real-space ones and complex FFTs but both were slower.
 
+This module can also be run using python -m chm.filters.gabor to create an FFTW wisdom cache.
+
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
@@ -311,5 +313,34 @@ class Gabor(Filter):
             from tempfile import gettempdir
             Gabor.__fftw_wisdom_file = join(gettempdir(), 'pychm-pyfftw-wisdom')
             Gabor.__load_fftw_wisdom()
-
+            
+    @staticmethod
+    def __main__():
+        import sys
+        if not _have_pyfftw:
+            print("Cannot create an FFTW wisdom cache since PyFFTW is not available.")
+            sys.exit(0)
+        if len(sys.argv) == 1:
+            print("Must provide at least one comma-seperated list of height,width,num-threads to create an FFTW wisdom cache from. May specify any number of these and each will be used in creating the cache. Additionally the num-threads may not be just a number but a range like 1-24.")
+            sys.exit(0)
+        for arg in sys.argv[1:]:
+            try:
+                h,w,n = arg.split(',')
+                sh = int(h,10),int(w,10)
+                if '-' in n:
+                    n1,n2 = n.split('-')
+                    for n in xrange(int(n1,0), int(n2,0)+1):
+                        print('Calculating wisdom for %s,%s,%d...'%(h,w,n))
+                        Gabor.__get_fftw_plans(sh, n)
+                        Gabor.__fftw_plans.clear()
+                else:
+                    print('Calculating wisdom for %s,%s,%s...'%(h,w,n))
+                    Gabor.__get_fftw_plans(sh, int(n,10))
+                    Gabor.__fftw_plans.clear()
+            except ValueError:
+                print('Invalid value "%s%'%arg)
+        print('Completed')
+                
 Gabor.__static_init__()
+
+if __name__ == "__main__": Gabor.__main__()
