@@ -133,7 +133,7 @@ teardown() {
   echo "$output" 1>&2
   [ "$status" -eq 0 ]
 
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0i,0);');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_train(''blah'',''alsoblah'',''./temp/'',2,4,0,0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
