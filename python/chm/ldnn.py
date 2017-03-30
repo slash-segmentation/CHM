@@ -274,6 +274,7 @@ def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,  #pylint: disable=too-many
         __print('Calculating initial weights...')
     W = init_weights(X, Y, N, M, downsample, kmeans_rep, True, nthreads)
     if disp:
+        set_lib_threads(nthreads)
         __print('Initial error: %f'%calc_error(X,Y,W,target), 3)
         __print('Gradient descent...')
     set_lib_threads(1) # always use 1 thread during gradient descent
