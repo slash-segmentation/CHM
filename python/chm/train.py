@@ -70,7 +70,7 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
             if subsamples is not False: X,Y = __subsample(X, Y, subsamples//2, nthreads=nthreads)
             # Note: always use 1 for nthreads during learning
             # OPT: allow multiple threads for clustering?
-            sm.learn(X, Y, nthreads=1) # TODO: the disp method should using the logging module
+            sm.learn(X, Y, nthreads=nthreads) # TODO: edhe disp method should using the logging module
             del X, Y
             model.save()
         else: disp('Skipping learning... (already complete)', 1)
