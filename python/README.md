@@ -72,7 +72,9 @@ to the code, you can do the following to update them:
     git pull
     ./setup.py build_ext --inplace # builds any changed Cython modules
 
+For hints on getting this to work on a cluster (e.g. Comet) see the INSTALL guide for segtools.
 
+	
 CHM Test
 --------
 Basic usage is:
@@ -95,18 +97,22 @@ filename and type are used. *The MATLAB command line allowed multiple files howe
 single image is allowed, to process more images you must write a loop in bash or similar.*
 
 The CHM test program splits the input image into a bunch of tiles and operates on each tile
-separately. The size of the tiles to process can be given with `-t #x#`, e.g. `-t 512x512`. For
-MATLAB models that include the training image size, that is used as the default. For Python models
-the default used is 1024x1024. For speed and memory it is likely optimal if the tile size is a
-multiple of 2^Nlevel of the model (typically Nlevel<=4, so should be a multiple of 16). *The MATLAB
-command line called this option `-b`. Additionally, the MATLAB command line program overlapped
-tiles (specified with `-o`) which is no longer needed.*
+separately. The size of the tiles to process can be given with `-t #x#`, e.g. `-t 512x512`. The
+default is 512x512. The tile size must be a multiple of 2^Nlevel of the model (typically Nlevel<=4,
+so should be a multiple of 16). *The MATLAB command line called this option `-b`. Additionally, the
+MATLAB command line program overlapped tiles (specified with `-o`) which is no longer needed.*
 
-Instead of computing labels for every tile, individual tiles can be specified using `-T #,#`, e.g.
-`-T 0,2` computes the tile in the first column, third row. This option can be specified any number
-of times to cause multiple tiles to be calculted. All tiles not calculated will output as black
-(0). Any tile indices out of range are simply ignored. *The MATLAB command line called this option
-`-t` and indexing started at 1 instead of 0.*
+Instead of computing labels for every tile, tiles can be specified using either tile groups
+(recommended) or individually. Tile groups use `-g` to specify which group to process and `-G` to
+specify the number of groups. Thus when distributing the testing process among three machines the
+processes would be run with `-g 1 -G 3`, `-g 2 -G 3` and `-g 3 -G 3` on the three machines. The
+testing process will determine which tiles it is to process based on this information in a way that
+reduces any extra work and making sure each process has roughly the same amount of work. The total
+number of groups should not be larger than 30. Individual tiles can be specified using `-T #,#`,
+e.g. `-T 0,2` computes the tile in the first column, third row. This option can be specified any
+number of times to cause multiple tiles to be calculted. All tiles not calculated will output as
+black (0). Any tile indices out of range are simply ignored. *The MATLAB command line called this
+option `-t` and indexing started at 1 instead of 0 and did not support tile groups.*
 
 By default the output image data is saved as single-byte grayscale data (0-255). The output data
 type can be changed with `-d type` where `type` is one of `u8` (8-bit integer from 0-255), `u16`
@@ -186,7 +192,12 @@ from the previous stages and levels to generate additional features. This filter
 with `-c`, e.g. `-c intensity-stencil-7` specifies the default filter used. This only supports a
 single filter, so `+`, `-`, or a list of filters cannot be given.
 
-The training algorithm requires also running the testing algorithm internally. If desired these
+To speed up the training process the training data can be subsampled by using the `-s` option. If
+the number of samples for a particular stage/level is over the value given, at most half of that
+many positive and negative samples are kept. The default is to keep all samples. *MATLAB had a fixed
+value of 6000000.*
+
+The training algorithm also requires running the testing algorithm internally. If desired these
 results can be saved using the option `-o`. This option takes anything that can be given to 
 `imstack -S` although quotes may be required to make it a single argument. This means that if you
 want to see the results of running CHM test on the training data you can get it for free. Like CHM
