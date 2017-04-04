@@ -318,8 +318,11 @@ def init_weights(X, Y, N=5, M=5, downsample=1, kmeans_rep=5, whiten=False, nthre
 
     # First bullet point on page 5 of Seyedhosseini et al 2013
     # Calculating C+ and C- using k-means
-    set_lib_threads(min(nthreads, 2))
+    num_pos = Y.sum()
+    num_neg = len(Y) - Y.sum()
+    set_lib_threads(min(nthreads, num_pos // (500*downsample)))
     Cp = __ldnn.run_kmeans(N, X,  Y, downsample, kmeans_rep, whiten, nthreads)
+    set_lib_threads(min(nthreads, num_neg // (500*downsample)))
     Cn = __ldnn.run_kmeans(M, X, ~Y, downsample, kmeans_rep, whiten, nthreads)
     
     # Second and third bullet points on page 5 of Seyedhosseini et al 2013
