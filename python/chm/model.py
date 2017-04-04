@@ -48,7 +48,7 @@ class Model(object):
         if isinstance(i, tuple) and len(i) == 2:
             s,l = i
             if s < -self._nstages or s > self._nstages or s == 0: raise IndexError('invalid stage')
-            if l < -self._nlevels or l >= self._nlevels: raise IndexError('invalid level')
+            if l < -self._nlevels-1 or l > self._nlevels: raise IndexError('invalid level')
             return self._model[s-1 if s > 0 else s][l]
         return self._get_param(i)
     def __iter__(self):
