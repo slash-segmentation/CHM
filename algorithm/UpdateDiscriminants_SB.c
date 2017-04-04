@@ -152,7 +152,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
         }
         totalerror[x] = sqrt(totalerror[x]/tN);
         mexPrintf("Epoch No. %d ... error = %f \n",x+1,totalerror[x]);
-        mexEvalString("drawnow;"); // causes the print to happen now
+        mexEvalString("drawnow;"); /* causes the print to happen now */
 
  /*
         pmat = matOpen(file, "w");
