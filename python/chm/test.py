@@ -501,9 +501,10 @@ def __run_chm_test_proc(mems, model, nthreads, q):
     # Get the images and outputs in shared memory as numpy arrays
     ims, outs, cntxts, out_tmp = __get_arrays(*mems)
     # Protect ourselves against accidental writes to these arrays
-    for im in ims: im.flags.writeable = False
-    for c in cntxts:
-        for c in c: c.flags.writeable = False
+    # Can't do this since Cython doesn't support using read-only arrays
+    #for im in ims: im.flags.writeable = False
+    #for c in cntxts:
+    #    for c in c: c.flags.writeable = False
             
     # Set the number of base library threads
     from .utils import set_lib_threads
