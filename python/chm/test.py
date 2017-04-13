@@ -520,9 +520,7 @@ def __run_chm_test_proc(mems, model, nthreads, q):
                     _contexts = cntxts[level]
                     get_contexts = lambda region:(_contexts,region)
             contexts, cntxt_rgn = get_contexts(region)
-            print("A")
             X = mod.filter(im, contexts, None, region, cntxt_rgn, nthreads)
-            print("B")
             del contexts
             out[region[0]:region[2],region[1]:region[3]] = mod.evaluate(X, nthreads)
             del X
