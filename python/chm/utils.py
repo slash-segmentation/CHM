@@ -567,6 +567,7 @@ def set_lib_threads(nthreads):
         # Do a general search for all *blas* and *omp* libraries
         __add_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
         __add_set_num_threads_funcs('omp', ('omp_set_num_threads',))
+        __add_set_num_threads_funcs('mkl', ('mkl_set_num_threads','MKL_Set_Num_Threads'), True)
         
         # Do system-specific additions
         if   sys.platform == 'win32':  __init_set_library_threads_win32()
@@ -582,7 +583,7 @@ def set_lib_threads(nthreads):
             except OSError: pass
     __last_set_num_threads = nthreads
 
-def __add_set_num_threads_funcs(name, funcs):
+def __add_set_num_threads_funcs(name, funcs, ref=False):
     """
     Adds C functions to the __set_num_thread_funcs list. The functions come from all libraries that
     have a basename that are similar to `name` and have any of the names listed in `funcs` and are
@@ -594,6 +595,9 @@ def __add_set_num_threads_funcs(name, funcs):
     
     This may find additional matching librarys such as _decomp_update when given OMP, but since
     that library does not contain a function named omp_set_num_threads it will still be ignored.
+    
+    The final argument ref shudl be set to True if the function must be called with a pointer to
+    the number of threads instead of just the number of threads.
     """
     import ctypes
     from psutil import Process
@@ -608,19 +612,16 @@ def __add_set_num_threads_funcs(name, funcs):
     dlls = [getattr(dll_lookup, path) for path in paths]
     
     # Get the functions within those DLLs
-    funcs = [getattr(dll, fn) for dll,fn in product(dlls, funcs) if hasattr(dll, fn)]
-    for f in funcs:
-        f.restype = None
-        f.argtypes = (ctypes.c_int,)
+    funcs = [__wrap_func(getattr(dll, fn), ref) for dll,fn in product(dlls, funcs) if hasattr(dll, fn)]
 
     # Add the functions to __set_num_thread_funcs
     __set_num_thread_funcs.extend(funcs)
-
+        
 def __add_set_num_threads_func(dll, func, ref=False):
     """
-    Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll` (which
-    is sent to ctypes.utils.find_library if it does not already have an extension) called `func`.
-    If `ref` is True, then the function takes a pointer to an int instead of just an int.
+    Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll`
+    (which is sent to ctypes.utils.find_library if it does not already have an extension) called
+    `func`. If `ref` is True, then the function takes a pointer to an int instead of just an int.
     """
     import os.path, ctypes, ctypes.util
     if '.' in dll: path = dll
@@ -632,9 +633,23 @@ def __add_set_num_threads_func(dll, func, ref=False):
             path = ctypes.util._findLib_gcc(dll) #pylint: disable=protected-access
     try: f = getattr(getattr(getattr(ctypes, 'windll', ctypes.cdll), path), func)
     except (AttributeError, OSError): return
+    __set_num_thread_funcs.append(__wrap_func(f))
+
+def __wrap_func(f, ref=False):
+    """
+    Wraps a ctypes function for setting the number of threads in a function thta can be called with
+    just the number of threads. For normal functions this just sets the restype and argtypes fields
+    and returns the given function. For functions that take a pointer to the number of threads this
+    wraps it in a Python function that does the creation of the pointer.
+    """
+    from ctypes import c_int, POINTER
     f.restype = None
-    f.argtypes = (ctypes.POINTER(ctypes.c_int),) if ref else (ctypes.c_int,)
-    __set_num_thread_funcs.append(f)
+    if not ref:
+        f.argtypes = (c_int,)
+        return f
+    INTP = POINTER(c_int)
+    f.argtypes = (INTP,)
+    return lambda x:f(INTP(c_int(x)))
 
 def __init_set_library_threads_win32():
     """Does nothing - all libraries should be auto-added."""
@@ -660,9 +675,10 @@ def __init_set_library_threads_darwin():
     # Should be auto-added: (iomp5|gomp).omp_set_num_threads'
 
 def __init_set_library_threads_posix():
-    """Adds MKL library in various forms."""
-    __add_set_num_threads_func('mkl.so', 'mkl_serv_set_num_threads')
-    __add_set_num_threads_func('mkl_rt', 'MKL_Set_Num_Threads', True)
+    """Does nothing - all libraries should be auto-added."""
+    pass
+    #__add_set_num_threads_func('mkl.so', 'mkl_serv_set_num_threads') # or mkl_core?
     # Should be auto-added:
     #   (iomp5|gomp).omp_set_num_threads
     #   (openblas|openblas64).(goto_set_num_threads|openblas_set_num_threads)
+    #   mkl_rt.(MKL_Set_Num_Threads|mkl_set_num_threads)
