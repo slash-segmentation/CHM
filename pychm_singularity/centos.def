@@ -31,6 +31,7 @@ Include: yum
    cp $SEGTOOLS_TAR_GZ "$SINGULARITY_ROOTFS/."
    SEGTOOLS_VERSION=`echo "$SEGTOOLS_TAR_GZ" | sed "s/\.tar.gz//" | sed "s/^.*pysegtools-//"`
    sed -i "s/@@SEGTOOLS_VERSION@@/$SEGTOOLS_VERSION/g" "$SINGULARITY_ROOTFS/singularity"   
+   cp -r pychmtestdata "$SINGULARITY_ROOTFS/."
 
 %post
    echo "Hello from inside the container"
@@ -50,14 +51,19 @@ Include: yum
    pip install pyfftw
    pip install rpy2
 
-   mkdir -p /oasis /projects /data /state/partition1 /scratch /scratch1 /scratch2
+   mkdir -p /oasis /projects /data /state/partition1 /scratch /scratch1 /scratch2 /ccdbprod
 
    cd / ; tar -zxf pysegtools-*.tar.gz
    cd /pysegtools-*;python setup.py install
+   cd /;rm -rf /pysegtools-*
 
    cd / ; tar -zxf chm-*.tar.gz
    cd /chm-*;python setup.py install
+   cd /;rm -rf /chm-*
 
 %test
-   /singularity verify 
-
+   /singularity verify `pwd`
+   ecode=$?
+   rm -f /foo.out
+   rm -f /foo.png
+   exit $?
