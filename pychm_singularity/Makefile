@@ -18,7 +18,7 @@ singularity: clean
 	@echo "Creating sdist for segtools"
 	cd build/segtools;python setup.py sdist
 	imgfile=`echo build/pychm.img` ; \
-	sudo singularity create -s 4096 $$imgfile ; \
+	sudo singularity create -s 2816 $$imgfile ; \
 	sudo singularity bootstrap $$imgfile centos.def; \
 	echo 'Singularity image created $imgfile'
 	ls -l build
