@@ -45,22 +45,33 @@ export LD_LIBRARY_PATH=/opt/intel/mkl/lib/intel64:${LD_LIBRARY_PATH}
 # just pass this to python
 if [ "$mode" == "-m" ] ; then
   exec python -m "$@"
-  exit $?
 fi
 
 if [ "$mode" == "verify" ] ; then
-  exec python -m pysegtools.imstack_main --check
-  exit $?
+  echo ""
+  echo "Running segtools check"
+  echo ""
+  python -m pysegtools.imstack_main --check
+  if [ $# -ne 1 ] ; then
+    echo "verify mode requires <directory> as second argument to run test PyCHM train job"
+    exit 1
+  fi
+  echo ""
+  echo "Running small PyCHM train job which writes output to $1/foo.out" 
+  echo ""
+  $0 train $1/foo.out "[ /pychmtestdata/images/*.png ]" "[ /pychmtestdata/labels/*.png ]" -S 2 -L 1 
+  echo ""
+  echo "Running small PyCHM test job which writes output to $1/foo.png"
+  echo ""
+  exec $0 test $1/foo.out /pychmtestdata/5.png $1/foo.png
 fi
 
 if [ "$mode" == "train" ] ; then
   exec python -m chm.train "$@"
-  exit $?
 fi
 
 if [ "$mode" == "test" ] ; then
   exec python -m chm.test "$@"
-  exit $?
 fi
 
 echo "Invalid mode: $mode: Run $image_name with no arguments for help"
