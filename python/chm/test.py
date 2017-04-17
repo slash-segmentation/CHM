@@ -46,6 +46,9 @@ def CHM_test(im, model, tilesize=None, tiles=None, ntasks=None, nthreads=None, i
     ignore_bad_tiles is whether invalid tiles in the tiles argument cause an exception or are
         silently ignored, default is to throw an exception
     """
+    from .utils import set_lib_threads
+    set_lib_threads(1) # OpenMP must not use any threads before we fork the processes
+
     # Parse the arguments and get basic information
     im, model, tilesize, tiles, rgn, ntasks, nthreads = \
         __parse_args(im, model, tilesize, tiles, ntasks, nthreads, ignore_bad_tiles)
@@ -53,7 +56,7 @@ def CHM_test(im, model, tilesize=None, tiles=None, ntasks=None, nthreads=None, i
     rgns, rgns_out = __gen_offset_regions(tiles, tilesize, offsets, im.shape, model.nlevels)
     
     # Allocate shared memory and run the processes
-    mems = __alloc_shared_memory(im, rgn, model.nlevels, ntasks*nthreads)
+    mems = __alloc_shared_memory(im, rgn, model.nlevels)
     out = __run_chm_test_procs(mems, model, rgns, ntasks, nthreads)
     del mems
     
@@ -281,7 +284,7 @@ def __copy_regions(im, regions, offsets, full_shape):
     for rgn in regions: copy(x[rgn[0]:rgn[2],rgn[1]:rgn[3]], im[rgn[0]:rgn[2],rgn[1]:rgn[3]])
     return out
 
-def __alloc_shared_memory(im, rgn, nlevels, nthreads_full):
+def __alloc_shared_memory(im, rgn, nlevels):
     """
     Allocate the shared memory needed and copying the image into im_sm. Returns the argmuments to
     give to __get_arrays.
@@ -296,8 +299,8 @@ def __alloc_shared_memory(im, rgn, nlevels, nthreads_full):
 
     # Move the image into shared memory (as floating-point)
     im_sm = RawArray(c_double, sizes[0])
-    im2double(im, frombuffer(im_sm, float64).reshape(shapes[0]), rgn, nthreads_full)
-    
+    im2double(im, frombuffer(im_sm, float64).reshape(shapes[0]), rgn)
+
     # Allocate shared memory for the output/clabels, downsampled images, and contexts of all sizes
     # The ds_sm is used for several purposes
     # TODO: can these RawArrays be memmapped to a file?
@@ -386,8 +389,11 @@ def __run_chm_test_parallel(mems, model, regions, q, processes, nthreads_full):
     of images and contexts in between levels utilizing nthreads_full.
     """
     from itertools import izip
-    from .utils import MyDownSample, copy
+    from .utils import MyDownSample, copy, set_lib_threads
     
+    # At this point since all children processes have been spawned we can use OpenMP threads again
+    set_lib_threads(nthreads_full)
+
     # View the shared memory as numpy arrays
     ims, outs, contexts, out_tmp = __get_arrays(*mems)
 
@@ -403,24 +409,13 @@ def __run_chm_test_parallel(mems, model, regions, q, processes, nthreads_full):
             im = MyDownSample(im, 1, ims[level], None, nthreads_full)
             for c,o in izip(contexts[level-1], contexts[level]): MyDownSample(c, 1, o, None, nthreads_full)
             MyDownSample(outs[level-1], 1, contexts[level][-1], None, nthreads_full)
-            #for i,c in enumerate(contexts[level]): __save('cntxt-%d-%d.png'%(level,i), c) ##
-        #__save('im-%d.png'%(level), im) ##
-        #print(im.min(), im.max()) ##
 
         # Load the queue and wait
         for region in regions[level]: q.put_nowait((stage, level, tuple(region)))
         __wait_for_queue(q, stage, level, len(regions[level]), processes)
-        #__save('out-%d-%d.png'%(stage,level), outs[level]) ##
 
     # Done! Return the output image
     return outs[0]
-
-def __save(name, im):
-    # TODO: remove
-    from scipy.misc import imsave
-    from numpy import uint8
-    if im.dtype == uint8: imsave(name, im)
-    else: imsave(name, (im*255).round().astype(uint8))
 
 def __wait_for_queue(q, stage, level, total_tiles, processes):
     """
