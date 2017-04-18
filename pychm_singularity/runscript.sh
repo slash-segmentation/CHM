@@ -38,20 +38,27 @@ if [ "$mode" == "version" ] ; then
   exit 0
 fi
 
+P_CMD="python -s"
+
 export LD_LIBRARY_PATH=/opt/intel/mkl/lib/intel64:${LD_LIBRARY_PATH}
+
+# to make sure we are calling correct python
+# in case someone set an alternate one in their PATH
+# environment
+export PATH=/usr/bin:$PATH
 
 # if first argument is -m then assume
 # user wants to invoke a python module
 # just pass this to python
 if [ "$mode" == "-m" ] ; then
-  exec python -m "$@"
+  exec $P_CMD -m "$@"
 fi
 
 if [ "$mode" == "verify" ] ; then
   echo ""
   echo "Running segtools check"
   echo ""
-  python -m pysegtools.imstack_main --check
+  $P_CMD -m pysegtools.imstack_main --check
   if [ $# -ne 1 ] ; then
     echo "verify mode requires <directory> as second argument to run test PyCHM train job"
     exit 1
@@ -67,11 +74,11 @@ if [ "$mode" == "verify" ] ; then
 fi
 
 if [ "$mode" == "train" ] ; then
-  exec python -m chm.train "$@"
+  exec $P_CMD -m chm.train "$@"
 fi
 
 if [ "$mode" == "test" ] ; then
-  exec python -m chm.test "$@"
+  exec $P_CMD -m chm.test "$@"
 fi
 
 echo "Invalid mode: $mode: Run $image_name with no arguments for help"
