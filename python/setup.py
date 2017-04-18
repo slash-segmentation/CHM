@@ -16,9 +16,9 @@ import numpy, pysegtools.general.cython, chm
 compiler_name = get_default_compiler() # TODO: this isn't the compiler that will necessarily be used, but is a good guess...
 compiler_opt = {
         'msvc'    : ['/D_SCL_SECURE_NO_WARNINGS','/EHsc','/O2','/DNPY_NO_DEPRECATED_API=7','/bigobj','/openmp'],
-        'unix'    : ['-std=c++11','-O3','-march=native','-DNPY_NO_DEPRECATED_API=7','-fopenmp'], # gcc/clang (whatever is system default)
-        'mingw32' : ['-std=c++11','-O3','-march=native','-DNPY_NO_DEPRECATED_API=7','-fopenmp'],
-        'cygwin'  : ['-std=c++11','-O3','-march=native','-DNPY_NO_DEPRECATED_API=7','-fopenmp'],
+        'unix'    : ['-std=c++11','-O3','-DNPY_NO_DEPRECATED_API=7','-fopenmp'], # gcc/clang (whatever is system default)
+        'mingw32' : ['-std=c++11','-O3','-DNPY_NO_DEPRECATED_API=7','-fopenmp'],
+        'cygwin'  : ['-std=c++11','-O3','-DNPY_NO_DEPRECATED_API=7','-fopenmp'],
     }
 linker_opt = {
         'msvc'    : [],
