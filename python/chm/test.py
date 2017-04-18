@@ -508,7 +508,8 @@ def __run_chm_test_proc(mems, model, nthreads, q):
     # Process the queue
     prev_level = -1
     while True:
-        tile = q.get()
+        try: tile = q.get()
+        except KeyboardInterrupt: break
         try:
             if tile is None: break # All done!
             stage, level, region = tile
