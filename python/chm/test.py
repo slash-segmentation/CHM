@@ -178,16 +178,17 @@ def __get_ntasks_and_nthreads(ntasks, nthrds, model, tilesize, max_ntasks, total
     running based on the amount of memory, then maximize then number of threads based on the number
     of CPUs.
     """
-    from psutil import cpu_count, virtual_memory
+    from pysegtools.general.utils import get_mem_usable, get_ncpus_usable
     base_mem = total_pixels*80/3 # expected amount of shared memory
     task_mem = CHM_test_max_mem(tilesize, model)//2
-    ncpus = cpu_count(True) # we use the logical number of CPUs, not physical
+    ncpus = get_ncpus_usable()
+    mem_avail = (get_mem_usable() - base_mem) // task_mem
     if ntasks is None and nthrds is None:
-        ntasks = __clip((virtual_memory().available-base_mem)//task_mem, 1, min(max_ntasks, ncpus))
+        ntasks = __clip(mem_avail, 1, min(max_ntasks, ncpus))
         nthrds = __clip(ncpus//ntasks, 1, ncpus)
     elif ntasks is None:
         nthrds = __clip(nthrds, 1, ncpus)
-        ntasks = __clip((virtual_memory().available-base_mem)//task_mem, 1, min(max_ntasks, ncpus))
+        ntasks = __clip(mem_avail, 1, min(max_ntasks, ncpus))
     elif nthrds is None:
         ntasks = __clip(int(ntasks),   1, max_ntasks)
         nthrds = __clip(ncpus//ntasks, 1, ncpus)

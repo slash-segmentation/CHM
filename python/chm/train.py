@@ -115,8 +115,8 @@ def __get_nthreads(nthreads):
     Gets the number of threads to use. If nthreads is None or 0 the result is min(ncpus, 4)
     otherwise the result is min(ncpus, nthreads) where ncpus is the physical number of CPUs.
     """
-    from psutil import cpu_count
-    return min(cpu_count(False), nthreads or 4)
+    from pysegtools.general.utils import get_ncpus_usable
+    return min(get_ncpus_usable(), nthreads or 4)
 
 def __print(s, depth=0):
     """
