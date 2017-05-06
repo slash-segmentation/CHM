@@ -29,8 +29,12 @@ class Intensity(Filter):
     original, un-padded, image. The padding used is the max offset given.
 
     This function uses the region information in a special way so that no physical padding is ever
-    added, instead handling reflections as needed directly. Implemented in Cython for speed and
+    added*, instead handling reflections as needed directly. Implemented in Cython for speed and
     multi-threading support. Uses very minimal intermediate memory.
+    
+    * However when the width or the height of the image is less than the offsets in that direction
+    then a slow method with intermediate memory is used. However in these cases the images are quite
+    small so the slowdown and extra memory are insignificant.
     """
     def __init__(self, offsets):
         # Fix an issue where intp isn't always stored as intp
@@ -42,9 +46,27 @@ class Intensity(Filter):
                 offsets = offsets.astype(intp)
         super(Intensity, self).__init__(abs(offsets.ravel()).max(), offsets.shape[1])
         self.__offsets = offsets
-    def __call__(self, im, out=None, region=None, nthreads=1):
-        from ._intensity import intensity #pylint: disable=no-name-in-module
-        return intensity(im, self.__offsets, out=out, region=region, nthreads=nthreads)
+    def __call__(self, im, out=None, region=None, nthreads=1, slow=False):
+        offs = self.__offsets
+
+        # Make sure that the offsets are not wider/taller than the image
+        H,W = im.shape if region is None else (region[2]-region[0], region[3]-region[1])
+        (L_rad,T_rad),(R_rad,B_rad) = -offs.min(1), offs.max(1)
+        x_rad, y_rad = max(L_rad, R_rad), max(T_rad, B_rad)
+        
+        # Use the fast method in most cases
+        if x_rad <= W and y_rad <= H and not slow:
+            from ._intensity import intensity #pylint: disable=no-name-in-module
+            return intensity(im, offs, out=out, region=region, nthreads=nthreads)
+        
+        # Slow method from this point on
+        from ..utils import get_image_region
+        from numpy import empty
+        im,region = get_image_region(im, max(x_rad,y_rad), region, nthreads=nthreads)
+        if out is None: out = empty(offs.shape[1], H, W)
+        elif out.shape != (offs.shape[1], H, W) or out.dtype != float: raise ValueError('Invalid output array')
+        for i,(x,y) in enumerate(offs.T-offs.T.min(0)): out[i,:,:] = im[y:y+H, x:x+W]
+        return out
 
     __squares = {}
     @staticmethod

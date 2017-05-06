@@ -232,6 +232,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
         }
         totalerror[x] = sqrt(totalerror[x]/tN);
         mexPrintf("Epoch No. %d ... error = %f \n",x+1,totalerror[x]); 
+        mexEvalString("drawnow;"); /* causes the print to happen now */
 /*        mexPrintf("Epoch No. %d ... error = %f (validation set)\n",x+1,totalerrorvalid[x]);      
         if(x>0){
             if(totalerrorvalid[x] > totalerrorvalid[x-1]){
@@ -255,11 +256,11 @@ void mexFunction( int nlhs, mxArray *plhs[],
         /*mxDestroyArray(discold);
         discold = mxDuplicateArray(plhs[0]);
         discoldp = mxGetPr(discold);*/
-        pmat = matOpen(file,"w");
+        /*pmat = matOpen(file,"w");
         s = matPutVariable(pmat,"discriminants",plhs[0]);
-        s = matPutVariable(pmat,"totalerror",plhs[1]);
+        s = matPutVariable(pmat,"totalerror",plhs[1]);*/
         /*s = matPutVariable(pmat,"totalerrorvalid",plhs[2]);*/
-        s = matClose(pmat);
+        /*s = matClose(pmat);*/
     }
     /*mxDestroyArray(discreserve);
     mxDestroyArray(discold);*/

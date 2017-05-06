@@ -29,7 +29,7 @@ if nargin < 5; Nlevel = 4; end
 if nargin < 6; restart = 0; end
 if nargin < 7; nthreads = 0; end
 
-if nthreads ~= 0; maxNumCompThreads(nthreads); end
+if nthreads ~= 0 && maxNumCompThreads ~= nthreads; maxNumCompThreads(nthreads); end
 
 if ~ismcc && ~isdeployed
     % Add path to functions required for feature extraction (already included in compiled version)
