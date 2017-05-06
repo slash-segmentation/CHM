@@ -63,6 +63,7 @@ else
     end
 end
 % Subsampling
+if ~strcmpi(getenv('MATLAB_CHM_SKIP_SUBSAMPLE'), 'TRUE')
 if PixN > 6000000 % increase this for real problems
     ind = [];
     maxs = 3000000;
@@ -78,6 +79,7 @@ if PixN > 6000000 % increase this for real problems
     end
     X = X(:,ind);
     DD = DD(:,ind);
+end
 end
 % Learning the Classifier
 fprintf('Start learning LDNN ... stage %d level %d \n',stage,level);
