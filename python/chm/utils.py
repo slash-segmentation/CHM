@@ -564,11 +564,19 @@ def set_lib_threads(nthreads):
         # Load these libraries so that BLAS and OpenMP libraries are loaded
         import numpy, scipy.linalg, chm._utils # pylint: disable=unused-variable
         
-        # Do a general search for all *blas* and *omp* libraries
+        # Do a general search for all *blas*, *omp*, and *mkl* libraries
         __add_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
         __add_set_num_threads_funcs('omp', ('omp_set_num_threads',))
-        __add_set_num_threads_funcs('mkl', ('mkl_set_num_threads','MKL_Set_Num_Threads'), True)
-        
+        __add_set_num_threads_funcs('mkl', ('mkl_set_num_threads'), True)
+        __add_set_num_threads_funcs('mkl', ('MKL_Set_Num_Threads'))
+
+
+        # Set some  nvironmental variablesi
+        __add_num_threads_env_var('OPENBLAS_NUM_THREADS')
+        __add_num_threads_env_var('GOTO_NUM_THREADS')
+        __add_num_threads_env_var('OMP_NUM_THREADS')
+        __add_num_threads_env_var('MKL_NUM_THREADS')
+
         # Do system-specific additions
         if   sys.platform == 'win32':  __init_set_library_threads_win32()
         elif sys.platform == 'cygwin': __init_set_library_threads_cygwin()
@@ -596,7 +604,7 @@ def __add_set_num_threads_funcs(name, funcs, ref=False):
     This may find additional matching librarys such as _decomp_update when given OMP, but since
     that library does not contain a function named omp_set_num_threads it will still be ignored.
     
-    The final argument ref shudl be set to True if the function must be called with a pointer to
+    The final argument ref shuld be set to True if the function must be called with a pointer to
     the number of threads instead of just the number of threads.
     """
     import ctypes
@@ -651,6 +659,12 @@ def __wrap_func(f, ref=False):
     f.argtypes = (INTP,)
     return lambda x:f(INTP(c_int(x)))
 
+def __add_num_threads_env_var(name):
+    from os import environ
+    def set_num_threads_env_var(nthreads): return environ[name]=str(nthreads)
+    set_num_threads_env_var._var_name = name
+    __set_num_thread_funcs.append(set_num_threads_env_var)
+
 def __init_set_library_threads_win32():
     """Does nothing - all libraries should be auto-added."""
     pass
@@ -669,9 +683,7 @@ def __init_set_library_threads_darwin():
     """
     Adds function for setting the number of threads for vecLib in the Apple Accelerate Library.
     """
-    import os
-    def set_veclib_max_threads(nthreads): os.environ['VECLIB_MAXIMUM_THREADS']=str(nthreads)
-    __set_num_thread_funcs.append(set_veclib_max_threads)
+    __add_num_threads_env_var('VECLIB_MAXIMUM_THREADS')
     # Should be auto-added: (iomp5|gomp).omp_set_num_threads'
 
 def __init_set_library_threads_posix():
