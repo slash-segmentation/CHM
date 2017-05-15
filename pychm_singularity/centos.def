@@ -36,7 +36,7 @@ Include: yum
 %post
    echo "Hello from inside the container"
    yum -y install epel-release  
-   yum -y install cmake git wget tcsh xauth xclock mlocate time tree numpy numpy-f2py scipy tar gzip gcc gcc-gfortran gcc-c++ python python-devel python-virtualenv atlas atlas-devel lapack lapack-devel lapack64 lapack64-develzlib zlib-devel libtiff libtiff-devel libjpeg-turbo libjpeg-turbo-devel hdf5 hdf5-devel fftw fftw-devel libpng libpng-devel libpng-static xorg-x11-fonts-* mesa-* python2-pip python-wheel python-pillow python-pillow-devel R readline readline-devel python-singledispatch
+   yum -y install cmake git wget tcsh xauth xclock mlocate time tree numpy numpy-f2py scipy tar gzip gcc gcc-gfortran gcc-c++ python python-devel python-virtualenv atlas atlas-devel lapack lapack-devel lapack64 lapack64-develzlib zlib-devel libtiff libtiff-devel libjpeg-turbo libjpeg-turbo-devel hdf5 hdf5-devel fftw fftw-devel libpng libpng-devel libpng-static xorg-x11-fonts-* mesa-* python2-pip python-wheel python-pillow python-pillow-devel R readline readline-devel python-singledispatch ImageMagick
 
    updatedb
    pip install --upgrade pip
