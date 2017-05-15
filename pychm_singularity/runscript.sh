@@ -13,10 +13,12 @@ if [ $# -eq 0 ] ; then
   echo "This singularity image runs PyCHM ($pychm_version) train or test"
   echo "using included segtools ($segtools_version)"
   echo ""
-  echo "  The mode is determined by the first argument <-m|train|test|verify>"
+  echo "  The mode is determined by the first argument "
+  echo "    <-m|<file>|train|test|verify>"
   echo "  If first argument is:"
   echo ""
   echo "    -m    -- Invokes python passing -m and all other args"
+  echo "    <file> -- Runs PyCHM Test in Probability Map Viewer Mode"
   echo "    train -- Runs PyCHM Train"
   echo "    test  -- Runs PyCHM Test"
   echo "    verify -- Runs a quick test to verify PyCHM Train & Test work"
@@ -80,6 +82,35 @@ fi
 if [ "$mode" == "test" ] ; then
   exec $P_CMD -m chm.test "$@"
 fi
+
+if [ -f "$mode" ] ; then
+  if [ $# -ne 2 ] ; then
+    echo ""
+    echo "$0 <input tile> <output tile> <model directory>"
+    echo "In this mode PyCHM test is run on <input tile> image file using the model"
+    echo "specified by <model directory>. The overlap is "
+    echo "set to 0x0 and block/tile size is set to size of <input tile> image."
+    echo "After CHM is run, the Image Magick convert command is used to threshold the"
+    echo "image using the flag -threshold 30% to zero out intensities below this" 
+    echo "threshold. The resulting image is stored in <output tile> image file as a png"
+    echo ""
+    exit 3
+  fi
+
+  input="$mode"
+  output="$1"
+  outputdir=`dirname $output`
+  model="$2"
+  echo "Running $0 test $model $input $output"
+  $0 test "$model" "$input" "$output"
+  outimagetmp="${output}.tmp.png"
+  echo "Running convert: $output -threshold 30% $outimagetmp"
+  convert "$output" -threshold 30% "$outimagetmp"
+  echo "Running mv $outimagetmp $output"
+  mv "$outimagetmp" "$output"
+  exit $?
+fi
+
 
 echo "Invalid mode: $mode: Run $image_name with no arguments for help"
 exit 6
