@@ -661,7 +661,7 @@ def __wrap_func(f, ref=False):
 
 def __add_num_threads_env_var(name):
     from os import environ
-    def set_num_threads_env_var(nthreads): return environ[name]=str(nthreads)
+    def set_num_threads_env_var(nthreads): environ[name] = str(nthreads)
     set_num_threads_env_var._var_name = name
     __set_num_thread_funcs.append(set_num_threads_env_var)
 
