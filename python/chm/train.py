@@ -65,12 +65,12 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
             disp('Learning...', 1)
             # Apply masking and subsampling
             # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
-            X,Y = (X_full,Y) if M is None else (X_full.compress(M, 0), Y.compress(M, 0))
+            X,Y = (X_full,Y) if M is None else (X_full.compress(M, 1), Y.compress(M, 0))
             del M
             if subsamples is not False: X,Y = __subsample(X, Y, subsamples//2, nthreads=nthreads)
             # Note: always use 1 for nthreads during learning
             # OPT: allow multiple threads for clustering?
-            sm.learn(X, Y, nthreads=nthreads) # TODO: edhe disp method should using the logging module
+            sm.learn(X, Y, nthreads=nthreads) # TODO: the disp method should using the logging module
             del X, Y
             model.save()
         else: disp('Skipping learning... (already complete)', 1)
