@@ -56,7 +56,7 @@ def imresize(im, scale_or_output_shape, method='bicubic', antialiasing=None, out
     # Parse arguments scale_or_output_shape, method, and antialiasing
     sh = im.shape
     scale, out_shape = __scale_shape(sh, scale_or_output_shape)
-    antialiasing = (antialiasing is None and method != 'nearest') or bool(antialiasing)
+    antialiasing = method != 'nearest' if antialiasing is None else bool(antialiasing)
     kernel, kernel_width = __methods.get(method, method)
 
     # Handle the im and out arguments
@@ -114,7 +114,7 @@ def __scale_shape(sh, scale_or_shape):
 
     if isinstance(scale_or_shape, Sequence) and len(scale_or_shape) == 2:
         if all((isinstance(ss, Integral) and ss > 0) or ss is None for ss in scale_or_shape) and any(ss is not None for ss in scale_or_shape):
-            shape = tuple(scale_or_shape)
+            shape = list(scale_or_shape)
             if   shape[0] is None: shape[0], sz_dim = shape[1] * sh[0] / sh[1], 1
             elif shape[1] is None: shape[1], sz_dim = shape[0] * sh[1] / sh[0], 0
             else: sz_dim = None
@@ -122,7 +122,7 @@ def __scale_shape(sh, scale_or_shape):
 
             if sz_dim is not None:
                 scale = shape[sz_dim] / sh[sz_dim]
-                scale = (scale, scale) #pylint: disable=redefined-variable-type
+                scale = (scale, scale)
             else:
                 scale = (shape[0]/sh[0], shape[1]/sh[1])
             return scale, shape

@@ -848,7 +848,7 @@ def __chm_test_main_parse_args():
         if groups is None: __chm_test_usage("Group number and number of groups must be used together")
         if len(tiles) != 0: __chm_test_usage("Groups cannot be used with tiles")
         if group > groups: __chm_test_usage("Group number cannot be greater than the number of groups")
-        group = (group, groups) #pylint: disable=redefined-variable-type
+        group = (group, groups)
     elif groups is not None: __chm_test_usage("Group number and number of groups must be used together")
     elif len(tiles) == 0: tiles = None
     

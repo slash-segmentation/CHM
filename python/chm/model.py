@@ -154,11 +154,11 @@ class Model(object):
         max_stg = 1 if info['nlevels'] != nlvls else nstgs # if number of levels changed, any stage above 1 needs to be trashed
         reset = False
         for s,sm in enumerate(sms):
-            for l,sm in enumerate(sm):
-                if sm is None or sm.stage-1 != s or sm.level != l:
+            for l,sm2 in enumerate(sm):
+                if sm2 is None or sm2.stage-1 != s or sm2.level != l:
                     print('Corrupted model - completely replacing')
                     return None
-                reset = reset or s+1 > max_stg or l > nlvls or (s+1 == nstgs and l > 0) or not sm.classifier.learned
+                reset = reset or s+1 > max_stg or l > nlvls or (s+1 == nstgs and l > 0) or not sm2.classifier.learned
                 if reset: sms[s][l] = None # TODO: sms[s][l].copy() instead?
         return info
 

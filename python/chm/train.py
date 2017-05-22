@@ -217,7 +217,7 @@ def __subsample(X, Y, n=3000000, nthreads=1):
     if npixs <= 2*n: return X, Y
 
     from numpy import zeros, flatnonzero
-    from .__shuffle import shuffle_partial
+    from .__shuffle import shuffle_partial #pylint: disable=no-name-in-module
     
     n_trues = Y.sum()
     n_falses = npixs-n_trues
@@ -391,7 +391,7 @@ def __chm_train_main_parse_args():
         elif o == "-c":
             cntxt_fltr = __get_filter(a.lower())
         elif o == "-s":
-            try: subsamples = int(a, 10) # pylint: disable=redefined-variable-type
+            try: subsamples = int(a, 10)
             except ValueError: __chm_train_usage("Number of subsamples must be an integer >= 1000000")
             if subsamples < 1000000: __chm_train_usage("Number of subsamples must be an integer >= 1000000")
         elif o == "-M":
@@ -412,7 +412,7 @@ def __chm_train_main_parse_args():
             if nthreads <= 0: __chm_train_usage("Number of threads must be a positive integer")
         else: __chm_train_usage("Invalid argument %s" % o)
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
-    fltrs = FilterBank(fltrs.values()) #pylint: disable=redefined-variable-type
+    fltrs = FilterBank(fltrs.values())
     classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l)))
     model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, restart)
     return (ims, lbls, model, subsamples, masks, output, dt, nthreads)

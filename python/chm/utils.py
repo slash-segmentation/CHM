@@ -627,7 +627,7 @@ def __add_set_num_threads_funcs(name, funcs, ref=False):
         
 def __add_set_num_threads_func(dll, func, ref=False):
     """
-    Adds a C function to the __set_num_thread_funcs list. The function comes the given `dll`
+    Adds a C function to the __set_num_thread_funcs list. The function comes from the given `dll`
     (which is sent to ctypes.utils.find_library if it does not already have an extension) called
     `func`. If `ref` is True, then the function takes a pointer to an int instead of just an int.
     """
@@ -641,7 +641,7 @@ def __add_set_num_threads_func(dll, func, ref=False):
             path = ctypes.util._findLib_gcc(dll) #pylint: disable=protected-access
     try: f = getattr(getattr(getattr(ctypes, 'windll', ctypes.cdll), path), func)
     except (AttributeError, OSError): return
-    __set_num_thread_funcs.append(__wrap_func(f))
+    __set_num_thread_funcs.append(__wrap_func(f, ref))
 
 def __wrap_func(f, ref=False):
     """
@@ -662,7 +662,7 @@ def __wrap_func(f, ref=False):
 def __add_num_threads_env_var(name):
     from os import environ
     def set_num_threads_env_var(nthreads): environ[name] = str(nthreads)
-    set_num_threads_env_var._var_name = name
+    set_num_threads_env_var.var_name = name
     __set_num_thread_funcs.append(set_num_threads_env_var)
 
 def __init_set_library_threads_win32():

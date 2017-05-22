@@ -108,7 +108,7 @@ class Gabor(Filter):
     # functions take the master image and number of threads and return a funcion that will do the
     # actual convolution itself between the image and a kernel.
     @staticmethod
-    def __get_convolve_numpy(im, nthreads_):
+    def __get_convolve_numpy(im, _nthreads):
         # INTERMEDIATE:
         #     2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)
         #     2*(im.shape[0],(im.shape[1]+1)//2) + (?,?)    [during call to conv]
@@ -338,7 +338,7 @@ class Gabor(Filter):
                     Gabor.__get_fftw_plans(sh, int(n,10))
                     Gabor.__fftw_plans.clear()
             except ValueError:
-                print('Invalid value "%s%'%arg)
+                print('Invalid value "%s"'%arg)
         print('Completed')
                 
 Gabor.__static_init__()
