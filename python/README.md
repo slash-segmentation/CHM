@@ -55,8 +55,7 @@ the dependent Python packages. On Linux machines, setting this up would look lik
     
     # Install the devel pysegtools (and all dependencies)
     git clone git@github.com:slash-segmentation/segtools.git
-    pip install -e segtools[PIL,MATLAB,OPT,tasks]
-    python -m pysegtools.imstack --check
+    pip install -e segtools[PIL,MATLAB,OPT]
 
     # Install the devel PyCHM
     git clone git@github.com:slash-segmentation/CHM.git
