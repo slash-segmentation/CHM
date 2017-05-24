@@ -538,10 +538,10 @@ def ensure_binary(im):
     if len(unq) == 1:
         match = im == unq[0]
         if match.all(): return zeros(im.shape, bool)
-        unq = sorted(unq[0], im[argmin(match)])
+        unq = sorted((unq[0], im[argmin(match)]))
     if len(unq) == 2:
         binary = im == unq[1]
-        if (im == unq[0] | binary).all(): return binary
+        if ((im == unq[0]) | binary).all(): return binary
     from pysegtools.images.filters.threshold import threshold
     return threshold(im)
 
