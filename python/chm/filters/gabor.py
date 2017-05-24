@@ -191,8 +191,10 @@ class Gabor(Filter):
     def __save_fftw_wisdom():
         """Exports the current FFTW wisdom to a temporary file for reuse if possible."""
         if not _have_pyfftw: return
+        import os
         from pyfftw import export_wisdom
-        with open(Gabor.__fftw_wisdom_file, 'wb') as f: f.write(export_wisdom()[0])
+        with os.fdopen(os.open(Gabor.__fftw_wisdom_file, os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0), 0o666), 'w') as f:
+            f.write(export_wisdom()[0])
     
     @staticmethod
     def __load_fftw_wisdom():
@@ -311,7 +313,10 @@ class Gabor(Filter):
         if _have_pyfftw:
             from os.path import join
             from tempfile import gettempdir
-            Gabor.__fftw_wisdom_file = join(gettempdir(), 'pychm-pyfftw-wisdom')
+            from psutil import Process
+            from os.path import basename
+            hsh = hash(':'.join(mm.path for mm in Process().memory_maps() if 'libfftw' in basename(mm.path)))
+            Gabor.__fftw_wisdom_file = join(gettempdir(), 'pychm-pyfftw-wisdom-%X'+hsh)
             Gabor.__load_fftw_wisdom()
             
     @staticmethod
