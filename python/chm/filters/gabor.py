@@ -193,7 +193,7 @@ class Gabor(Filter):
         if not _have_pyfftw: return
         import os
         from pyfftw import export_wisdom
-        with os.fdopen(os.open(Gabor.__fftw_wisdom_file, os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0), 0o666), 'w') as f:
+        with os.fdopen(os.open(Gabor.__fftw_wisdom_file, os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0), 0o666), 'wb') as f:
             f.write(export_wisdom()[0])
     
     @staticmethod
