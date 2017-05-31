@@ -316,7 +316,7 @@ class Gabor(Filter):
             from psutil import Process
             from os.path import basename
             hsh = hash(':'.join(mm.path for mm in Process().memory_maps() if 'libfftw' in basename(mm.path)))
-            Gabor.__fftw_wisdom_file = join(gettempdir(), 'pychm-pyfftw-wisdom-%X'+hsh)
+            Gabor.__fftw_wisdom_file = join(gettempdir(), 'pychm-pyfftw-wisdom-%X'%hsh)
             Gabor.__load_fftw_wisdom()
             
     @staticmethod
