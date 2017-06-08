@@ -47,7 +47,7 @@ class LDNN(Classifier):
     __weights = None # combined w_ijk and b_ij values, shaped like NxMx(n+1)
     __params = None
     __norm = None
-    __norm_method = 'min-max' # one of min-max, mean-std, or median-mad
+    __norm_method = 'min-max-old' # default value for backwards compatibility
     
     _def_params_L0S1 = {'N':10,'M':20,'downsample':10,'kmeans_rep':1,
                         'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
@@ -151,7 +151,12 @@ def get_norm(X, method='mean-std', nthreads=1):
 def normalize(X, norm, method='mean-std', nthreads=1):
     """Normalize the each row based on the normalization factors and method. X is modified in-place."""
     # OPT: use nthreads and improve speed
-    if method in ('min-max', 'iqr'):
+    if method == 'min-max-old':
+        # For backwards compatibility only (min-max used to store the min and max instead of min and 1/(max-min))
+        mn,mx = norm
+        X -= mn[:,None]
+        X *= __one_over(mx - mn)[:,None]
+    elif method in ('min-max', 'iqr'):
         # min will be at 0 or Q1-1.5*IQR and max will be at 1 or Q3+1.5*IQR
         mn,mx = norm
         X -= mn[:,None]
