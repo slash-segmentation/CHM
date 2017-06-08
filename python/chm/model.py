@@ -228,7 +228,7 @@ class MatlabModel(Model):
             with openmat(path, 'r') as mat: info = mat_nice(mat['model'])
             disc = info['discriminants']
             N,M = int(info['nGroup']), int(info['nDiscriminantPerGroup'])
-            classifier = LDNN({'dropout':disc.dtype!=float32,'N':N,'M':M}, disc.T.reshape(N, M, -1))
+            classifier = LDNN({'dropout':disc.dtype!=float32,'N':N,'M':M}, weights=disc.T.reshape(N, M, -1))
             f,fc = self.__get_filters()
             return SubModel(stg, lvl, f, fc, classifier)
         model = Model.nested_list(self._nstages, self._nlevels, load)

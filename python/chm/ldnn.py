@@ -47,6 +47,7 @@ class LDNN(Classifier):
     __weights = None # combined w_ijk and b_ij values, shaped like NxMx(n+1)
     __params = None
     __norm = None
+    __norm_method = 'min-max' # one of min-max, mean-std, or median-mad
     
     _def_params_L0S1 = {'N':10,'M':20,'downsample':10,'kmeans_rep':1,
                         'dropout':False,'batchsz':100,'niters':15,'rate':0.005,'target':(0.1,0.9),'momentum':0.5}
@@ -60,40 +61,45 @@ class LDNN(Classifier):
         if level == 0: return cls._def_params_L0S1 if stage == 1 else cls._def_params_L0
         return cls._def_params
     
-    def __init__(self, params=None, weights=None, norm=None):
+    def __init__(self, params=None, norm_method='median-mad', weights=None, norm=None):
         """
         Creates or loads an LDNN classifier.
         
         The parameters for the classifer are specified as a dictionary. See the class documentation
         for available parameters.
         
-        If weights is provided as a string that file is loaded as an NPY file. If it is an array it
-        must be NxMxn (where n can be any value). If not provided then the classifier needs to be
-        learned before it can be evaluated.
+        The normalization method must be one of 'min-max', 'mean-std', 'median-mad' (default), or 'iqr'.
+           min-max: maps the minimum of each feature to 0 and the maximum to 1
+           mean-std: maps the mean to 0.5 and mean-/+2*std to 0 and 1
+           median-mad: maps the median to 0.5 and mean-/+2*MAD to 0 and 1 where MAD is standardized
+                       median absolute difference (i.e. divided by ~0.6745)
+           iqr: maps Q1-1.5*IQR to 0 and Q3+1.5*IQR to 1 where IQR is the interquatile range and Q1
+                and Q3 are the first and third quartiles
+        
+        If the model is already learned then the weights must be provided. They must be a NxMxn array
+        (where n can be any value). Additionally if learned with normalized data the normalization
+        factors must be provided and match the normalization method picked.
         """
+        from numpy import float64, ndarray
         self.__params = LDNN._def_params.copy()
         if params is not None: self.__params.update(params)
+        if norm_method not in ('min-max', 'mean-std', 'median-mad'): raise ValueError('norm_method')
+        self.__norm_method = norm_method
         if weights is not None:
-            if isinstance(weights, basestring):
-                from os.path import abspath, exists
-                from numpy import load
-                path = abspath(weights)
-                if exists(path): self.__load(load(path, 'r'))
-                else: raise ValueError('weights cannot be loaded')
-            else: self.__load(weights)
+            assert(weights.shape[:2] == (self.__params['N'],self.__params['M']))
+            self.__weights = weights.view(ndarray).astype(float64, copy=False)
         if norm is not None: self.__norm = norm
-    def __load(self, weights):
-        """Internal load function - checks the weights and sets the submodel as loaded."""
-        from numpy import float64, ndarray
-        assert(weights.shape[:2] == (self.__params['N'],self.__params['M']))
-        self.__weights = weights.view(ndarray).astype(float64, copy=False)
+    @property
+    def params(self): return self.__params.copy()
+    @property
+    def normalization_method(self): return self.__norm_method
     @property
     def learned(self): return self.__weights is not None
     @property
     def features(self): return self.__weights.shape[-1] if self.learned else None
     @property
     def extra_features(self): return 1
-    def copy(self): return self.__class__(self.__params)
+    def copy(self): return self.__class__(self.__params, self.__norm_method)
     @property
     def evaluation_memory(self):
         from numpy import float64
@@ -102,29 +108,62 @@ class LDNN(Classifier):
     
     def evaluate(self, X, nthreads=1):
         assert(self.__weights is not None)
-        if self.__norm is not None: normalize(X, self.__norm, nthreads)
+        if self.__norm is not None: normalize(X, self.__norm, self.__norm_method, nthreads)
         return test(self.__weights, X, self.__params.get('dropout', False), nthreads)
     
     def learn(self, X, Y, nthreads=1):
         assert(self.__weights is None)
-        self.__norm = get_norm(X, nthreads)
-        normalize(X, self.__norm, nthreads)
+        self.__norm = get_norm(X, self.__norm_method, nthreads)
+        normalize(X, self.__norm, self.__norm_method, nthreads)
         self.__weights = learn(X, Y, nthreads=nthreads, **self.__params)
 
-def get_norm(X, nthreads=1):
-    """Get the normalization factors for each row of the data (just the min/max right now)."""
-    # OPT: use nthreads and improve speed
-    # TODO: remove extreme outliers from min/max
-    return X.min(1),X.max(1)
+def __one_over(a):
+    from numpy import divide
+    a[a==0] = 1
+    return divide(1, a, a)
+
+def get_norm(X, method='mean-std', nthreads=1):
+    """
+    Get the normalization factors for each row of the data. These factors won't necessarily be the values requested
+    (like min and max) but derived from them for fast calculations of normalizations later.
+    """
+    from .stats import min_max, mean_std, median_mad, percentile
+    if method == 'min-max':
+        mn,mx = min_max(X, 1, nthreads=nthreads)
+        mx -= mn
+        return mn, __one_over(mx)
+    elif method == 'mean-std':
+        mean,std = mean_std(X, 1, nthreads=nthreads)
+        std *= 2
+        return mean, __one_over(std)
+    elif method == 'median-mad':
+        med,mad = median_mad(X, 1, nthreads=nthreads)
+        mad *= 2
+        return med, __one_over(mad)
+    elif method == 'iqr':
+        q1,q3 = percentile(X, [0.25, 0.75], 1, nthreads=nthreads)
+        iqr = q3-q1
+        q1 -= 1.5*iqr
+        iqr *= 4
+        return q1, __one_over(iqr)
+    raise ValueError('method')
     
-def normalize(X, norm, nthreads=1):
-    """Normalize the each row based on the normalization factors. X is modified in-place."""
+def normalize(X, norm, method='mean-std', nthreads=1):
+    """Normalize the each row based on the normalization factors and method. X is modified in-place."""
     # OPT: use nthreads and improve speed
-    mn,mx = norm
-    X -= mn[:,None]
-    D = mx - mn
-    D[D==0] = 1
-    X *= 1/D[:,None]
+    if method in ('min-max', 'iqr'):
+        # min will be at 0 or Q1-1.5*IQR and max will be at 1 or Q3+1.5*IQR
+        mn,mx = norm
+        X -= mn[:,None]
+        X *= mx[:,None]
+    elif method in ('mean-std', 'median-mad'):
+        # new mean/median will be 0.5 and +/-2 std/MADs at 0 and 1
+        mean,std = norm
+        X -= mean[:,None]
+        X *= std[:,None]
+        X += 0.5
+    else: raise ValueError('method')
+
 
 def f_(s, dropout=False, out=None):
     """

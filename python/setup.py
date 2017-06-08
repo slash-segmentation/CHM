@@ -69,6 +69,7 @@ setup(name='chm',
           zip_safe=False, # I don't think this code would work when running from inside a zip file due to the dynamic-load and dynamic-cython systems
           ext_modules = cythonize([
               create_ext('chm._utils'),
+              create_ext('chm.__stats'),
               create_ext('chm.__ldnn'),
               create_ext_mtrand('chm.__shuffle'),
               create_ext('chm.__imresize'),
