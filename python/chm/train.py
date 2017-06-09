@@ -362,6 +362,7 @@ def __chm_train_main_parse_args():
     fltrs = OrderedDict((('haar',Haar(scale=False)), ('hog',HOG(scale=False)), ('edge',Edge(scale=False)), ('gabor',Gabor(scale=False)),
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
+    norm_method = 'median-mad'
     masks = None
     subsamples = False
     output, dt = None, uint8
@@ -390,6 +391,11 @@ def __chm_train_main_parse_args():
                 fltrs = OrderedDict((f,__get_filter(f)) for f in a.lower().split(','))
         elif o == "-c":
             cntxt_fltr = __get_filter(a.lower())
+        elif o == "-n":
+            a = a.lower()
+            if a not in ('min-max', 'mean-std', 'median-mad', 'iqr'):
+                __chm_train_usage("The norm method must be one of min-max, mean-std, median-mad, or iqr")
+            norm_method = a
         elif o == "-s":
             try: subsamples = int(a, 10)
             except ValueError: __chm_train_usage("Number of subsamples must be an integer >= 1000000")
@@ -404,8 +410,6 @@ def __chm_train_main_parse_args():
             if a not in dt_trans: __chm_train_usage("Data type must be one of u8, u16, u32, f32, or f64")
             dt = dt_trans[a]
         elif o == "-r": restart = True
-        elif o == "-n":
-            __chm_train_usage("Tasks not supported during training")
         elif o == "-N":
             try: nthreads = int(a, 10)
             except ValueError: __chm_train_usage("Number of threads must be a positive integer")
@@ -413,7 +417,7 @@ def __chm_train_main_parse_args():
         else: __chm_train_usage("Invalid argument %s" % o)
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
     fltrs = FilterBank(fltrs.values())
-    classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l)))
+    classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l), norm_method))
     model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, restart)
     return (ims, lbls, model, subsamples, masks, output, dt, nthreads)
 
@@ -471,6 +475,13 @@ Optional Arguments:
   -c filter     The filter used to generate features for context images. This
                 takes a single filter listed above.
                 Default is intensity-stencil-7
+  -n norm       Normalize each feature in the data using the given method.
+                The methods that are available are:
+                    min-max: minimum goes to 0, maximum goes to 1
+                    mean-std: mean to 0.5 and mean-/+2*std to 0 and 1
+                    median-mad: median to 0.5 and median-/+2*MAD to 0 and 1
+                        where MAD is the standardized median abs diff (default)
+                    iqr: Q1-1.5*IQR to 0 and Q3+1.5*IQR to 1
   -M mask       Specify a mask of the input images and labels for which pixels
                 should be used during training. The default is to use all
                 pixels. The mask can be anything that can be given to
