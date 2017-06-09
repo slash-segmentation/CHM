@@ -314,7 +314,8 @@ def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,  #pylint: disable=too-many
     """
     from .utils import set_lib_threads
     if disp:
-        __print('Number of training samples = %d'%X.shape[1])
+        pos = Y.sum()
+        __print('Number of training samples = %d (%d positive, %d negative)'%(X.shape[1],pos,X.shape[1]-pos))
         __print('Calculating initial weights...')
     W = init_weights(X, Y, N, M, downsample, kmeans_rep, True, nthreads)
     if disp:
