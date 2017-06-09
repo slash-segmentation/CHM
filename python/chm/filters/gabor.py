@@ -191,10 +191,9 @@ class Gabor(Filter):
     def __save_fftw_wisdom():
         """Exports the current FFTW wisdom to a temporary file for reuse if possible."""
         if not _have_pyfftw: return
-        import os
+        from pysegtools.general.io import umask
         from pyfftw import export_wisdom
-        with os.fdopen(os.open(Gabor.__fftw_wisdom_file, os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0), 0o666), 'wb') as f:
-            f.write(export_wisdom()[0])
+        with umask(0), open(Gabor.__fftw_wisdom_file, 'wb') as f: f.write(export_wisdom()[0])
     
     @staticmethod
     def __load_fftw_wisdom():
@@ -326,7 +325,21 @@ class Gabor(Filter):
             print("Cannot create an FFTW wisdom cache since PyFFTW is not available.")
             sys.exit(0)
         if len(sys.argv) == 1:
-            print("Must provide at least one comma-seperated list of height,width,num-threads to create an FFTW wisdom cache from. May specify any number of these and each will be used in creating the cache. Additionally the num-threads may not be just a number but a range like 1-24.")
+            print(
+"""This program creates an FFTW wisdom cache for use with PyCHM. You must provide
+at least one comma-seperated list of height,width,num-threads to create an FFTW
+wisdom cache from. You may specify any number of these and each will be used in
+creating the cache. Additionally the num-threads may not be just a number but a
+range like 1-24.
+
+The cache will be saved to:
+    %s
+You can set the environmental variable TMPDIR, TEMP, or TMP to influence which
+directory the cache will be saved to.
+
+This cache is re-usable on all similar machines (hardware and software). The
+filename contains a hash of the FFTW library in use which also needs to be the
+same for re-using.""" % Gabor.__fftw_wisdom_file)
             sys.exit(0)
         for arg in sys.argv[1:]:
             try:
