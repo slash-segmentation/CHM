@@ -473,7 +473,7 @@ def gradient_descent(double[:,:] X, char[::1] Y, double[:,:,::1] W,
                 y = lower_target + target_diff*<bint>Y[order[p]]
                 totalerror += _grad_desc(x, y, W, prevs, s, g, rate, momentum)
         total_error[i] = sqrt(totalerror/P)
-        if disp is not None: disp('Iteration #%d error=%f' % (i+1,total_error[i]))
+        if disp is not None: disp('Iteration #%d error: %f' % (i+1,total_error[i]))
     return total_error
 
 cdef double _grad_desc(const double[::1] x, const double y, double[:,:,::1] W, double[:,:,::1] prevs,
@@ -516,9 +516,9 @@ def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
     This is an optimized version of gradient descent that always has dropout=True and batchsz=1. See
     chm.ldnn.gradient_descent for more information about the other parameters.
     
-    Slightly faster when X is Fortran-ordered but not by much (possibly about 15%). However that would mean
-    that the entire X array, which is normally C-ordered, would have to be copied and stored in memory and
-    it is huge.
+    Slightly faster when X is Fortran-ordered but not by much (possibly about 15%). However that
+    would mean that the entire X array, which is normally C-ordered, would have to be copied and
+    stored in memory and it is huge.
     """
 
     # Matrix sizes
@@ -551,7 +551,7 @@ def gradient_descent_dropout(double[:,:] X, char[::1] Y, double[:,:,::1] W,
                 y = lower_target + target_diff*<bint>Y[order[p]]
                 totalerror += _grad_desc_do(x, y, W, prevs, i_order[:N2], j_order[:M2], s, g, rate, momentum)
         total_error[i] = sqrt(totalerror/P)
-        if disp is not None: disp('Iteration #%d error=%f' % (i+1,total_error[i]))
+        if disp is not None: disp('Iteration #%d error: %f' % (i+1,total_error[i]))
     return total_error
 
 cdef double _grad_desc_do(const double[::1] x, const double y, double[:,:,::1] W, double[:,:,::1] prevs,
