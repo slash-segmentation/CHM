@@ -244,7 +244,7 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
             # Compute cluster membership, RMS^2 error, new means, and cluster counts
             rms2 = km_update(data, means, means_next, membership, counts, temp)
             if rms2 > prevRms2:
-                with gil: raise RuntimeError('rms should always decrease')
+                with gil: raise RuntimeError('rms should always decrease: %f > %f' % (rms2, prevRms2))
 
             # Check for convergence
             IF KMEANS_ML_ETOL==0.0:
