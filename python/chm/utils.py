@@ -556,6 +556,9 @@ def set_lib_threads(nthreads):
     libraries, it does nothing.
     """
     global __set_num_thread_funcs, __last_set_num_threads #pylint: disable=global-statement
+    from numbers import Integral
+    if not isinstance(nthreads, Integral): raise TypeError('nthreads must be an integral type, it is a %s'%type(nthreads))
+    if nthreads < 1: raise ValueError('nthreads must be positive, it is %d'%nthreads)
     if __set_num_thread_funcs is None:
         # Establish the __set_num_thread_funcs to use
         import os, sys
@@ -570,8 +573,7 @@ def set_lib_threads(nthreads):
         __add_set_num_threads_funcs('mkl', ('mkl_set_num_threads'), True)
         __add_set_num_threads_funcs('mkl', ('MKL_Set_Num_Threads'))
 
-
-        # Set some  nvironmental variablesi
+        # Set some environmental variables
         __add_num_threads_env_var('OPENBLAS_NUM_THREADS')
         __add_num_threads_env_var('GOTO_NUM_THREADS')
         __add_num_threads_env_var('OMP_NUM_THREADS')
