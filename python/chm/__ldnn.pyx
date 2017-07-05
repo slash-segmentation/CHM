@@ -270,10 +270,10 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         # Retry a fixed number of times
         from warnings import warn
         if retry < KMEANS_ML_MAX_RETRIES:
-            warn.warn('Re-running kmeans due to empty cluster.', ClusteringWarning)
+            warn('Re-running kmeans due to empty cluster.', ClusteringWarning)
             return __kmeansML(k, data, means_orig, means_next_orig, membership, counts, temp, retry+1)
         else:
-            warn.warn('There is an empty cluster.', ClusteringWarning)
+            warn('There is an empty cluster.', ClusteringWarning)
 
     # At this point the means data is in means_next
     # We need to make sure that refers to the means_orig array or copy the data over
