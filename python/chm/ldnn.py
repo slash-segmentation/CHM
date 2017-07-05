@@ -365,9 +365,9 @@ def init_weights(X, Y, N=5, M=5, downsample=1, kmeans_rep=5, whiten=False, nthre
     # Calculating C+ and C- using k-means
     num_pos = Y.sum()
     num_neg = len(Y) - Y.sum()
-    set_lib_threads(min(nthreads, num_pos // (500*downsample)))
+    set_lib_threads(max(min(nthreads, num_pos // (500*downsample)), 1))
     Cp = __ldnn.run_kmeans(N, X,  Y, downsample, kmeans_rep, whiten, nthreads) #pylint: disable=no-member
-    set_lib_threads(min(nthreads, num_neg // (500*downsample)))
+    set_lib_threads(max(min(nthreads, num_neg // (500*downsample)), 1))
     Cn = __ldnn.run_kmeans(M, X, ~Y, downsample, kmeans_rep, whiten, nthreads) #pylint: disable=no-member
     
     # Second and third bullet points on page 5 of Seyedhosseini et al 2013
