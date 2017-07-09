@@ -359,7 +359,7 @@ class SubModel(object):
         Evaluates the feature matrix X with the model (matrix is features by pixels). The
         classifier must have been loaded or learned before this is called.
         """
-        if not self.classifier.learned: raise ValueError('Model no loaded/learned')
+        if not self.classifier.learned: raise ValueError('Model not loaded/learned')
         import gc
         gc.collect() # evaluation is very memory intensive, make sure we are ready
         from numpy import float64
