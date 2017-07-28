@@ -260,7 +260,7 @@ class SubModel(object):
         self.__level = level
         self.__filter = fltr
         self.__context_filter = cntxt_fltr
-        if norm_method is not None and norm_method not in __norm_methods: raise ValueError('norm_method')
+        if norm_method is not None and norm_method not in _norm_methods: raise ValueError('norm_method')
         self.__norm_method = norm_method
         self.__classifier = classifier
         self.__norm = None if norm is None else asarray(norm)
@@ -318,8 +318,8 @@ class SubModel(object):
     
     @property
     def __should_norm(self):
-        return (self.image_filter.should_normalize + self.context_filter.should_normalize*self.ncontexts +
-                (False,)*self.classifier.extra_features)
+        return list(self.image_filter.should_normalize + self.context_filter.should_normalize*self.ncontexts +
+                    (False,)*self.classifier.extra_features)
     
     @property
     def ncontexts(self):
@@ -387,10 +387,11 @@ class SubModel(object):
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
         
         # Normalize the data
-        should_norm = self.__should_norm
-        X_ = X[should_norm] # TODO: is there a more efficient way to do this?
-        normalize(X_, self.__norm, self.__norm_method, nthreads)
-        X[should_norm] = X_
+        if method != 'none' and method is not None:
+            should_norm = self.__should_norm
+            X_ = X[should_norm] # TODO: is there a more efficient way to do this?
+            _normalize(X_, self.__norm, self.__norm_method, nthreads)
+            X[should_norm] = X_
         
         # Evaluation is very memory intensive, make sure we are ready
         import gc; gc.collect()
@@ -414,11 +415,12 @@ class SubModel(object):
         if Y.dtype != bool: Y = Y > 0
 
         # Normalize the data
-        should_norm = self.__should_norm
-        X_ = X[should_norm] # TODO: is there a more efficient way to do this?
-        self.__norm = get_norm(X_, self.__norm_method, nthreads)
-        normalize(X_, self.__norm, self.__norm_method, nthreads)
-        X[should_norm] = X_
+        if method != 'none' and method is not None:
+            should_norm = self.__should_norm
+            X_ = X[should_norm] # TODO: is there a more efficient way to do this?
+            self.__norm = _get_norm(X_, self.__norm_method, nthreads)
+            _normalize(X_, self.__norm, self.__norm_method, nthreads)
+            X[should_norm] = X_
         
         # Learning is very memory intensive, make sure we are ready
         import gc; gc.collect()
@@ -435,9 +437,9 @@ def __one_over(a):
     a[a==0] = 1
     return divide(1, a, a)
 
-__norm_methods = ('none', 'min-max', 'mean-std', 'median-mad', 'iqr')
+_norm_methods = ('none', 'min-max', 'mean-std', 'median-mad', 'iqr')
 
-def __get_norm(X, method='mean-std', nthreads=1):
+def _get_norm(X, method='mean-std', nthreads=1):
     """
     Get the normalization factors for each row of the data. These factors won't necessarily be the values requested
     (like min and max) but derived from them for fast calculations of normalizations later.
@@ -465,7 +467,7 @@ def __get_norm(X, method='mean-std', nthreads=1):
         return asarray((q1, __one_over(iqr)))
     raise ValueError('method')
     
-def __normalize(X, norm, method='mean-std', nthreads=1):
+def _normalize(X, norm, method='mean-std', nthreads=1):
     """Normalize the each row based on the normalization factors and method. X is modified in-place."""
     # OPT: use nthreads and improve speed
     if method == 'none' or method is None: pass
