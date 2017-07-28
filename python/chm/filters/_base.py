@@ -27,9 +27,12 @@ class Filter(object):
     features that represent the original image in some way. The filter may require some extra
     padding to be valid.
 
-    Besides the properties "padding" and "features", every filter has a single operation which is
-    invoked simply by calling the filter, giving it the image along with optional output, region,
-    number of threads, and if it should be run in "compatibility mode".
+    Besides the properties "padding", "features", and "should_normalize", every filter has a single
+    operation which is invoked simply by calling the filter, giving it the image along with
+    optional output, region, number of threads.
+    
+    Some filters take an optional parameter when being constructing to operate in "compatibility
+    mode" with the original MATLAB mode.
     """
     __metaclass__ = ABCMeta
 
@@ -65,6 +68,14 @@ class Filter(object):
     def features(self):
         """The number of features created by this filter"""
         return self._features
+    
+    @property
+    def should_normalize(self):
+        """
+        A sequence of True/False values for each features if that features should be normalized when
+        requested (default implementation returns True for each feature).
+        """
+        return (True,)*self.features
 
 
 ########## Cumulative Filter ##########
@@ -76,7 +87,11 @@ class FilterBank(Filter):
     """
     def __init__(self, filters):
         super(FilterBank, self).__init__(max(f.padding for f in filters), sum(f.features for f in filters))
-        self.__filters = filters
+        self.__filters = tuple(filters)
+    @property
+    def filters(self): return self.__filters
+    @property
+    def should_normalize(self): return sum((f.should_normalize for f in self.__filters), ())
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ..utils import im2double, set_lib_threads
         set_lib_threads(nthreads)
@@ -131,7 +146,7 @@ def run_threads(func, total, min_size=1, nthreads=1):
     """
     Runs a bunch of threads, over "total" items, chunking the items. The function is given a
     "threadid" (a value 0 to nthreads-1, inclusive) along with a start and stop index to run over
-    (where stop is not included).
+    (where stop is not included). This mirrors the similar Cython function.
     """
     from multiprocessing import cpu_count
     from threading import Thread

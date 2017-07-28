@@ -393,8 +393,8 @@ def __chm_train_main_parse_args():
             cntxt_fltr = __get_filter(a.lower())
         elif o == "-n":
             a = a.lower()
-            if a not in ('min-max', 'mean-std', 'median-mad', 'iqr'):
-                __chm_train_usage("The norm method must be one of min-max, mean-std, median-mad, or iqr")
+            if a not in ('none', 'min-max', 'mean-std', 'median-mad', 'iqr'): # TODO: use model.__norm_methods
+                __chm_train_usage("The norm method must be one of none, min-max, mean-std, median-mad, or iqr")
             norm_method = a
         elif o == "-s":
             try: subsamples = int(a, 10)
@@ -417,8 +417,8 @@ def __chm_train_main_parse_args():
         else: __chm_train_usage("Invalid argument %s" % o)
     if len(fltrs) == 0: __chm_train_usage("Must list at least one filter")
     fltrs = FilterBank(fltrs.values())
-    classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l), norm_method))
-    model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, restart)
+    classifier = Model.nested_list(nstages, nlevels, lambda s,l:LDNN(LDNN.get_default_params(s,l)))
+    model = Model.create(path, nstages, nlevels, classifier, fltrs, cntxt_fltr, norm_method, restart)
     return (ims, lbls, model, subsamples, masks, output, dt, nthreads)
 
 def __get_filter(f):
@@ -477,6 +477,7 @@ Optional Arguments:
                 Default is intensity-stencil-7
   -n norm       Normalize each feature in the data using the given method.
                 The methods that are available are:
+                    none: no normalization is performed
                     min-max: minimum goes to 0, maximum goes to 1
                     mean-std: mean to 0.5 and mean-/+2*std to 0 and 1
                     median-mad: median to 0.5 and median-/+2*MAD to 0 and 1

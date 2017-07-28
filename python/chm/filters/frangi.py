@@ -29,7 +29,9 @@ class Frangi(Filter):
     """
     def __init__(self, scale=True):
         super(Frangi, self).__init__(11*3, 14)
-        self.__scale = scale
+        self.__scale = True # TODO: always scale?
+    @property
+    def should_normalize(self): return (False,)*self.features
     def __call__(self, im, out=None, region=None, nthreads=1):
         from numpy import empty
         from ._base import get_image_region

@@ -46,6 +46,8 @@ class Intensity(Filter):
                 offsets = offsets.astype(intp)
         super(Intensity, self).__init__(abs(offsets.ravel()).max(), offsets.shape[1])
         self.__offsets = offsets
+    @property
+    def should_normalize(self): return (False,)*self.features
     def __call__(self, im, out=None, region=None, nthreads=1, slow=False):
         offs = self.__offsets
 

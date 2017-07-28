@@ -79,25 +79,29 @@ class Model(object):
         return cls(path)
 
     @classmethod
-    def create(cls, path, nstages, nlevels, classifier, fltr, cntxt_fltr=None, restart=False, **extra_info):
+    def create(cls, path, nstages, nlevels, classifier, fltr, cntxt_fltr=None, norm_method='median-mad', restart=False, **extra_info):
         """
         Creates a new, blank, model that will be saved to the given path. It will have the given
         number of stages and levels (with the final stage only having a single level).
-        
-        The arguments fltr, cntxt_fltr, and classifier can be either a single value which will then
-        be used for every level and stage. If they are an sequence then each value is used for the
-        levels and repeated for each stage. If they are an sequence of sequences it describes a
-        different Filter/Classifier for each stage and level. Finally, if not provided at all then
-        the context filter defaults to `Intensity.Stencil(7)`.
 
-        Initially, all submodels in the model are blank. Blank submodels within a blank model
-        cannot be used for evaluation. Once their `learn` method is called they are no longer
-        blank.
+        The arguments fltr, cntxt_fltr, classifier, norm_methods can be either a single value which
+        will then be used for every level and stage. If they are an sequence then each value is
+        used for the levels and repeated for each stage. If they are an sequence of sequences it
+        describes a different Filter/Classifier/normalization for each stage and level. Finally, if
+        not provided at all then the context filter defaults to `Intensity.Stencil(7)`.
 
-        If `restart` is True, then the model is re-loaded if it already exists, all submodels that
-        are not learned are removed along with any stages or levels that are not part of the model
-        anymore or need to be re-done due to a change in number of stages or levels. Then un-learned
-        submodels are created as necessary from the given filters and context filters specified.
+        The normalization method must be one of 'none', 'min-max', 'mean-std', 'median-mad', or
+        'iqr' with the default being median-mad.
+           none: no normalization is performed
+           min-max: maps the minimum of each feature to 0 and the maximum to 1
+           mean-std: maps the mean to 0.5 and mean-/+2*std to 0 and 1
+           median-mad: maps the median to 0.5 and mean-/+2*MAD to 0 and 1 where MAD is standardized
+                       median absolute difference (i.e. divided by ~0.6745)
+           iqr: maps Q1-1.5*IQR to 0 and Q3+1.5*IQR to 1 where Q1 and Q3 are the first and third
+                quartiles and IQR is the interquatile range (IQR=Q3-Q1)
+        Some filters (e.g. frangi and intensity) can request that their data not be normalized and
+        then are never normalized. This is mainly due to the fact that those filters are bimodal
+        and the normalization process can greatly mess with their results.
         """
         from os.path import abspath, exists
         from .filters import Filter
@@ -115,20 +119,21 @@ class Model(object):
             from .filters import Intensity
             cntxt_fltr = Intensity.Stencil(7)
         cntxt_fltr = cls.__expand(nstages, nlevels, cntxt_fltr, Filter)
+        norm_method = cls.__expand(nstages, nlevels, norm_method, basestring)
         
         if restart:
             # (Re-)Create submodels and info
             info = cls.__check_submodels(path, nstages, nlevels)
             sms = info['submodels']
             model = Model.nested_list(nstages, nlevels, lambda s,l:
-                (SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l])
+                (SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l],norm_method[s-1][l])
                 if s > len(sms) or l >= len(sms[s-1]) or sms[s-1][l] is None else sms[s-1][l]))
             info.update({'nstages':nstages,'nlevels':nlevels,'submodels':model})
             
         else:
             # Create submodels and info
             model = Model.nested_list(nstages, nlevels, lambda s,l:
-                SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l]))
+                SubModel(s,l,fltr[s-1][l],cntxt_fltr[s-1][l],classifier[s-1][l],norm_method[s-1][l]))
             info = {'nstages':nstages,'nlevels':nlevels,'submodels':model}
 
         # Save the data
@@ -137,7 +142,7 @@ class Model(object):
 
         # Load the model
         return cls(path)
-    
+
     @classmethod
     def __check_submodels(cls, path, nstgs, nlvls):
         """
@@ -156,7 +161,7 @@ class Model(object):
         for s,sm in enumerate(sms):
             for l,sm2 in enumerate(sm):
                 if sm2 is None or sm2.stage-1 != s or sm2.level != l:
-                    print('Corrupted model - completely replacing')
+                    print('ERROR: Corrupted model - completely replacing')
                     return None
                 reset = reset or s+1 > max_stg or l > nlvls or (s+1 == nstgs and l > 0) or not sm2.classifier.learned
                 if reset: sms[s][l] = None # TODO: sms[s][l].copy() instead?
@@ -179,12 +184,12 @@ class Model(object):
         x = list(x)
         if isinstance(x[0], clazz):
             # a filter/classifier for each level, but same set for all stages
-            if len(x) != nlevels+1: raise ValueError('wrong number of filters/classifiers')
+            if len(x) != nlevels+1: raise ValueError('wrong number of filters/classifiers/normalizations')
             return [[dup(X) for X in x] for _ in xrange(nstages-1)] + [[dup(x[0])]]
         # a list of lists of filters/classifiers
         x = [list(y) if isinstance(y, Iterable) else [y] for y in x]
         if len(x) != nstages or any(len(y) != nlevels+1 for y in x[:-1]) or len(x[-1]) != 1:
-            raise ValueError('wrong number of filters/classifiers')
+            raise ValueError('wrong number of filters/classifiers/normalizations')
         return x
     
     @staticmethod
@@ -249,12 +254,16 @@ class SubModel(object):
     __model = None
 
     """Represents part of a model for a single stage and level."""
-    def __init__(self, stage, level, fltr, cntxt_fltr, classifier):
+    def __init__(self, stage, level, fltr, cntxt_fltr, classifier, norm_method=None, norm=None):
+        from numpy import asarray
         self.__stage = stage
         self.__level = level
         self.__filter = fltr
         self.__context_filter = cntxt_fltr
+        if norm_method is not None and norm_method not in __norm_methods: raise ValueError('norm_method')
+        self.__norm_method = norm_method
         self.__classifier = classifier
+        self.__norm = None if norm is None else asarray(norm)
 
     def __getstate__(self):
         """Gets the state - everything except the model field"""
@@ -262,13 +271,15 @@ class SubModel(object):
             'stage': self.__stage, 'level': self.__level,
             'filter': self.__filter, 'context_filter': self.__context_filter,
             'classifier': self.__classifier,
+            'norm_method': self.__norm_method, 'norm': self.__norm,
         }
     def __setstate__(self, state):
         self.__init__(state['stage'], state['level'],
-                      state['filter'], state['context_filter'], state['classifier'])
+                      state['filter'], state['context_filter'], state['classifier'],
+                      state['norm_method'], state['norm'])
     
     @property
-    def model(self): return self.__model() # _model is a weak-reference
+    def model(self): return self.__model() # __model is a weak-reference and () gets the strong-reference
     @model.setter
     def model(self, value): # should only use this in Model.__init__
         assert((isinstance(value, Model) or value is None) and self.__model is None)
@@ -287,6 +298,8 @@ class SubModel(object):
         """Returns the filter used for the contexts for this model."""
         return self.__context_filter
     @property
+    def normalization_method(self): return self.__norm_method
+    @property
     def classifier(self):
         """Returns the classifier used for this model."""
         return self.__classifier
@@ -302,6 +315,11 @@ class SubModel(object):
         evaluating or learning.
         """
         return self.image_filter.features + self.ncontexts * self.context_filter.features + self.classifier.extra_features
+    
+    @property
+    def __should_norm(self):
+        return (self.image_filter.should_normalize + self.context_filter.should_normalize*self.ncontexts +
+                (False,)*self.classifier.extra_features)
     
     @property
     def ncontexts(self):
@@ -360,13 +378,24 @@ class SubModel(object):
         classifier must have been loaded or learned before this is called.
         """
         if not self.classifier.learned: raise ValueError('Model not loaded/learned')
-        import gc
-        gc.collect() # evaluation is very memory intensive, make sure we are ready
+        
+        # Check the data and reshape it so it to ensure that it is features by pixel
         from numpy import float64
         if X.ndim < 2: raise ValueError('X must be at least 2D')
         if X.shape[0] != self.features: raise ValueError('X has the wrong number of features')
         sh = X.shape[1:]
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
+        
+        # Normalize the data
+        should_norm = self.__should_norm
+        X_ = X[should_norm] # TODO: is there a more efficient way to do this?
+        normalize(X_, self.__norm, self.__norm_method, nthreads)
+        X[should_norm] = X_
+        
+        # Evaluation is very memory intensive, make sure we are ready
+        import gc; gc.collect()
+
+        # Run the classifier's evaluation method and reshape the result
         return self.classifier.evaluate(X, nthreads).astype(float64, copy=False).reshape(sh)
 
     def learn(self, X, Y, nthreads=1):
@@ -375,16 +404,84 @@ class SubModel(object):
         pixels.
         """
         if self.classifier.learned: raise ValueError('Model already loaded/learned')
-        import gc
-        gc.collect() # learning is very memory intensive, make sure we are ready
+        
+        # Check the data and reshape it so it to ensure that it is features by pixel and boolean
         from numpy import float64
         if X.ndim < 2: raise ValueError('X must be at least 2D')
         if X.shape[0] != self.features: raise ValueError('X has the wrong number of features')
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
         if Y.ndim != 1 or Y.shape[0] != X.shape[1]: raise ValueError('Y must be 1D of the same length as X')
         if Y.dtype != bool: Y = Y > 0
+
+        # Normalize the data
+        should_norm = self.__should_norm
+        X_ = X[should_norm] # TODO: is there a more efficient way to do this?
+        self.__norm = get_norm(X_, self.__norm_method, nthreads)
+        normalize(X_, self.__norm, self.__norm_method, nthreads)
+        X[should_norm] = X_
+        
+        # Learning is very memory intensive, make sure we are ready
+        import gc; gc.collect()
+        
+        # Run the classifier's learn method
         self.classifier.learn(X, Y, nthreads)
 
+
+def __one_over(a):
+    """
+    Calculates the value 1/a in-place. For any value of of a == 0 the result is 1 instead of `nan`.
+    """
+    from numpy import divide
+    a[a==0] = 1
+    return divide(1, a, a)
+
+__norm_methods = ('none', 'min-max', 'mean-std', 'median-mad', 'iqr')
+
+def __get_norm(X, method='mean-std', nthreads=1):
+    """
+    Get the normalization factors for each row of the data. These factors won't necessarily be the values requested
+    (like min and max) but derived from them for fast calculations of normalizations later.
+    """
+    from numpy import asarray
+    from .stats import min_max, mean_std, median_mad, percentile
+    if method == 'none' or method is None: return None
+    elif method == 'min-max':
+        mn,mx = min_max(X, 1, nthreads=nthreads)
+        mx -= mn
+        return asarray((mn, __one_over(mx)))
+    elif method == 'mean-std':
+        mean,std = mean_std(X, 1, nthreads=nthreads)
+        std *= 2
+        return asarray((mean, __one_over(std)))
+    elif method == 'median-mad':
+        med,mad = median_mad(X, 1, nthreads=nthreads)
+        mad *= 2
+        return asarray((med, __one_over(mad)))
+    elif method == 'iqr':
+        q1,q3 = percentile(X, [0.25, 0.75], 1, nthreads=nthreads)
+        iqr = q3-q1
+        q1 -= 1.5*iqr
+        iqr *= 4
+        return asarray((q1, __one_over(iqr)))
+    raise ValueError('method')
+    
+def __normalize(X, norm, method='mean-std', nthreads=1):
+    """Normalize the each row based on the normalization factors and method. X is modified in-place."""
+    # OPT: use nthreads and improve speed
+    if method == 'none' or method is None: pass
+    elif method in ('min-max', 'iqr'):
+        # min will be at 0 or Q1-1.5*IQR and max will be at 1 or Q3+1.5*IQR
+        mn,mx = norm
+        X -= mn[:,None]
+        X *= mx[:,None]
+    elif method in ('mean-std', 'median-mad'):
+        # new mean/median will be 0.5 and +/-2 std/MADs at 0 and 1
+        mean,std = norm
+        X -= mean[:,None]
+        X *= std[:,None]
+        X += 0.5
+    else: raise ValueError('method')
+    
 def __add_class_names():
     from pysegtools.general.json import add_class_name
     from .filters import Filter
