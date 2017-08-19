@@ -482,19 +482,20 @@ def calc_confusion_matrix(predicted, ground_truth):
     for p,gt in izip(predicted, ground_truth):
         p,gt = ensure_binary(p.data),ensure_binary(gt.data)
         _p,_gt = ~p,~gt
-        TP += ( p &  gt).sum()
-        TN += (_p & _gt).sum()
-        FP += ( p & _gt).sum()
-        FN += (_p &  gt).sum()
+        TP += int(( p &  gt).sum())
+        TN += int((_p & _gt).sum())
+        FP += int(( p & _gt).sum())
+        FN += int((_p &  gt).sum())
     return TP,TN,FP,FN
 def calc_accuracy(TP, TN, FP, FN):
     """
     Calculates and returns the accuracy as:
         (TP+TN) / (TP+TN+FP+FN)
     where TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
-    negatives of the confusion matrix.
+    negatives of the confusion matrix. If the total is 0 then 1 is returned.
     """
-    return (TP+TN) / (TP+TN+FP+FN)
+    total = TP+TN+FP+FN
+    return (TP+TN) / total if total else 1
 def calc_fvalue(TP, TN, FP, FN):
     """
     Calculates and returns the F-Value as:
@@ -503,9 +504,12 @@ def calc_fvalue(TP, TN, FP, FN):
         precision = TP / (TP + FP)
         recall    = TP / (TP + FN)
     and TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
-    negatives of the confusion matrix (takes TN even though it isn't used to be consistent).
+    negatives of the confusion matrix (takes TN even though it isn't used to be consistent). If
+    the number of true positives is 0 then 1 is returned if the number of false negatives is
+    also 0 otherwise 0 is returned.
     """
     #pylint: disable=unused-argument
+    if TP == 0: return 1 if FN == 0 else 0
     precision = TP / (TP + FP)
     recall    = TP / (TP + FN)
     return 2*precision*recall / (precision+recall)
@@ -517,11 +521,13 @@ def calc_gmean(TP, TN, FP, FN):
         recall      = TP / (TP + FN)
         specificity = TN / (TN + FP)
     and TP, TN, FP, and FN are the true positives, true negatives, false positives, and false
-    negatives of the confusion matrix.
+    negatives of the confusion matrix. If TP + FN is 0 then recall is set to 1. If TN + FP is 0
+    then specificity is set to 1.
     """
     from numpy import sqrt
-    recall      = TP / (TP + FN)
-    specificity = TN / (TN + FP)
+    GP,GN = TP+FN, TN+FP # ground truth positives and negatives
+    recall      = TP / GP if GP else 1
+    specificity = TN / GN if GN else 1
     return sqrt(recall*specificity)
 def ensure_binary(im):
     """
@@ -531,8 +537,10 @@ def ensure_binary(im):
         if there is 1 unique value then it is assumed to be False
         if there are 2 unique values the greater one is True and the lesser one is False
         otherwise the image is thresholded at a value determined by Otsu's method
+    This also will replace all nans and infs in the image with usable values in-place.
     """
-    from numpy import unique, zeros, argmin
+    from numpy import nan_to_num, unique, zeros, argmin
+    nan_to_num(im, False) # make sure values are finite
     if im.dtype == bool: return im
     unq = unique(im[0])
     if len(unq) == 1:
