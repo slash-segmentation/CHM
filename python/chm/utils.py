@@ -545,7 +545,7 @@ def ensure_binary(im):
     # Note: the nan_to_num function only takes the 'copy' argument in 1.13 and higher
     from numpy import __version__ as npy_vers
     from distutils.version import StrictVersion
-    im = nan_to_num(im, False) if StrictVersion(npy_vers) >= '1.13' else nan_to_num(im)
+    im = nan_to_num(im, False) if StrictVersion(npy_vers) >= str('1.13') else nan_to_num(im)
 
     if im.dtype == bool: return im
     unq = unique(im[0])
