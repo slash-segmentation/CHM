@@ -154,7 +154,8 @@ def sigma_ij(W, X, out=None):
     #   regardless of inputs always produces C-contiguous output
     #   fastest when both inputs are C ordered and ~10% slower when both inputs are F ordered
     #   mixed inputs (one input is C and the other is F) lie inbetween
-    from numpy import exp, negative, divide, add
+    from numpy import clip, exp, negative, divide, add
+    from __ldnn import min_s_value, max_s_value
     N,M,n = W.shape # the n is actually n+1
     n_,S = X.shape
     if out is not None:
@@ -169,6 +170,7 @@ def sigma_ij(W, X, out=None):
         s += W[:,-1:]
     else: raise ValueError()
     del W,X
+    clip(s, min_s_value, max_s_value, out=s)
     return divide(1.0, add(1.0, exp(negative(s, out=s), out=s), out=s), out=s).reshape(N, M, S)
 
 def __print(s, depth=2):

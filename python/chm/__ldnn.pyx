@@ -104,6 +104,12 @@ def stddev(double[:,::1] X):
         for j in xrange(M): stds[j] = sqrt(stds[j]/N)
     return stds.base
 
+cdef inline double clip(double x, double mn, double mx) nogil:
+    """Clip or clamp a number x inbetween the values mn and mx."""
+    # Note: on GCC and Clang this hopefully procudes code using SSE maxsd and minsd assembly which
+    # is really fast. See https://stackoverflow.com/a/16659263/582298
+    return mn if x < mn else (mx if x > mx else x)
+
 def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False, int nthreads=1):
     """
     Downsample, possibly 'whiten', and run k-means on the data.
@@ -385,6 +391,13 @@ cdef void distSqr(double[:,::1] x, double[:,::1] y, double[:,::1] z) nogil:
 
 #################### Gradient Descent ####################
 
+# 1/(1+exp(-37)) produces 1.0 and 1/(1+exp(709)) is 1.217e-308 (close enough to 0)
+# outside of this range we start getting nans, infs, and Numpy errors
+DEF MIN_S_VALUE=-709.0
+DEF MAX_S_VALUE=37.0
+min_s_value = MIN_S_VALUE
+max_s_value = MAX_S_VALUE
+
 def gradient(double[::1] f, double[:,::1] g, double[:,:,::1] s, double[::1,:] x, double[::1] y, double[:,:,::1] grads):
     """
     Calculates the gradient of the error using equation 12/13 from Seyedhosseini et al 2013 for a batch
@@ -488,6 +501,7 @@ cdef double _grad_desc(const double[::1] x, const double y, double[:,:,::1] W, d
         for j in xrange(M):
             s_ij = 0.0
             for k in xrange(n): s_ij += W[i,j,k]*x[k]
+            s_ij = clip(s_ij, MIN_S_VALUE, MAX_S_VALUE)
             s_ij = 1.0/(1.0+exp(-s_ij))
             s[i,j] = s_ij
             g_i *= s_ij
@@ -569,6 +583,7 @@ cdef double _grad_desc_do(const double[::1] x, const double y, double[:,:,::1] W
             s_ij = 0.0
             W_ij = &W[i_order[i],j_order[j],0]
             for k in xrange(n): s_ij += W_ij[k]*x[k]
+            s_ij = clip(s_ij, MIN_S_VALUE, MAX_S_VALUE)
             s_ij = 1.0/(1.0+exp(-s_ij))
             s[i,j] = s_ij
             g_i *= s_ij
