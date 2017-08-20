@@ -540,7 +540,13 @@ def ensure_binary(im):
     This also will replace all nans and infs in the image with usable values in-place.
     """
     from numpy import nan_to_num, unique, zeros, argmin
-    nan_to_num(im, False) # make sure values are finite
+    
+    # Make sure values are finitei
+    # Note: the nan_to_num function only takes the 'copy' argument in 1.13 and higher
+    from numpy import __version__ as npy_vers
+    from distutils.version import StrictVersion
+    im = nan_to_num(im, False) if StrictVersion(npy__vers) >= '1.13' else nan_to_num(im)
+
     if im.dtype == bool: return im
     unq = unique(im[0])
     if len(unq) == 1:
