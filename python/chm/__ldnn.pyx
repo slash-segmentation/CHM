@@ -224,7 +224,7 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         <return>    RMS^2 error
     """
     cdef intp n = data.shape[0], d = data.shape[1], i, j
-    cdef bint has_empty = False, converged
+    cdef bint has_empty = False, converged = False
     cdef double S, max_sum
     cdef double[:,::1] means_orig = means, means_next_orig = means_next, means_tmp
 
@@ -237,8 +237,6 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         # recurse on random subsample to get means - O(coarseN) allocation
         __kmeansML(k, random_subset(data, coarseN), means, means_next, membership, counts, temp, 0)
     
-    import numpy as np
-    
     # Iterate
     with nogil:
         rms2 = km_update(data, means, means_next, membership, counts, temp)
@@ -250,14 +248,19 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
             # Compute cluster membership, RMS^2 error, new means, and cluster counts
             rms2 = km_update(data, means, means_next, membership, counts, temp)
             if rms2 > prevRms2:
-                with gil: raise RuntimeError('rms should always decrease: %f > %f' % (rms2, prevRms2))
-
-            # Check for convergence
-            IF KMEANS_ML_ETOL==0.0:
-                converged = prevRms2 == rms2
-            ELSE:
-                # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
-                converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
+                with gil:
+                    if rms2 > prevRms2 * 1.005 or means.shape[1] == n:
+                        raise RuntimeError('rms should always decrease: %f > %f' % (rms2, prevRms2))
+                    from warnings import warn
+                    warn('rms should always decrease (%f > %f) however since it is a <0.5% increase and we are not at the highest level K-means we will treat this as a rounding error'%(rms2, prevRms2), ClusteringWarning)
+                    # NOTE: the 'converged' flag is carried over from the previous iteration (likely False)
+            else:
+                # Check for convergence
+                IF KMEANS_ML_ETOL==0.0:
+                    converged = prevRms2 == rms2 # actually <= but the < is checked above
+                ELSE:
+                    # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
+                    converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
             if converged:
                 max_sum = 0.0
                 for i in xrange(k):
