@@ -252,7 +252,7 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
                     if rms2 > prevRms2 * 1.005 or means.shape[1] == n:
                         raise RuntimeError('rms should always decrease: %f > %f' % (rms2, prevRms2))
                     from warnings import warn
-                    warn('rms should always decrease (%f > %f) however since it is a <0.5% increase and we are not at the highest level K-means we will treat this as a rounding error'%(rms2, prevRms2), ClusteringWarning)
+                    warn('rms should always decrease (%f > %f) however since it is a <0.5%% increase and we are not at the highest level K-means we will treat this as a rounding error'%(rms2, prevRms2), ClusteringWarning)
                     # NOTE: the 'converged' flag is carried over from the previous iteration (likely False)
             else:
                 # Check for convergence
