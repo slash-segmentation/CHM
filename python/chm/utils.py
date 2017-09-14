@@ -539,7 +539,7 @@ def ensure_binary(im):
         otherwise the image is thresholded at a value determined by Otsu's method
     This also will replace all nans and infs in the image with usable values in-place.
     """
-    from numpy import nan_to_num, unique, zeros, argmin
+    from numpy import nan_to_num, unique, zeros, argmin, unravel_index
     
     # Make sure values are finitei
     # Note: the nan_to_num function only takes the 'copy' argument in 1.13 and higher
@@ -552,7 +552,7 @@ def ensure_binary(im):
     if len(unq) == 1:
         match = im == unq[0]
         if match.all(): return zeros(im.shape, bool)
-        unq = sorted((unq[0], im[argmin(match)]))
+        unq = sorted((unq[0], im[unravel_index(argmin(match), im.shape)]))
     if len(unq) == 2:
         binary = im == unq[1]
         if ((im == unq[0]) | binary).all(): return binary
