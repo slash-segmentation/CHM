@@ -387,7 +387,7 @@ class SubModel(object):
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
         
         # Normalize the data
-        if method != 'none' and method is not None:
+        if self.__norm_method != 'none' and self.__norm_method is not None:
             should_norm = self.__should_norm
             X_ = X[should_norm] # TODO: is there a more efficient way to do this?
             _normalize(X_, self.__norm, self.__norm_method, nthreads)
@@ -415,7 +415,7 @@ class SubModel(object):
         if Y.dtype != bool: Y = Y > 0
 
         # Normalize the data
-        if method != 'none' and method is not None:
+        if self.__norm_method != 'none' and self.__norm_method is not None:
             should_norm = self.__should_norm
             X_ = X[should_norm] # TODO: is there a more efficient way to do this?
             self.__norm = _get_norm(X_, self.__norm_method, nthreads)
