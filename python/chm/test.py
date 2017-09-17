@@ -594,12 +594,11 @@ def CHM_test_max_mem(tilesize, model):
     used at level = 0 (when there are the most context features), and 20 is the number of
     discriminants per group at that level.
 
-    Theoretical maximum memory usage is 7.31 GB (for 1000x1000 tiles and 4 levels). In practice I
-    am seeing this +0.03 GB which is not too much overhead, probably estimating 100 MB overhead
-    would be good enough in all cases.
+    Theoretical maximum memory usage is 1.92 GB (for 512x512 tiles and 4 levels). In practice I
+    am seeing about +0.02 GB from this which is not too much overhead.
 
-    Note: this now asks the model for its evaluation memory per pixel, adds 100 bytes per pixel,
-    then multiplies by the number of pixels.
+    Note: this actually asks the model for its evaluation memory per pixel, adds 128 bytes per
+    pixel for overhead, then multiplies by the number of pixels.
     """
     from numpy import asarray
     tilesize = asarray(tilesize)
@@ -608,7 +607,7 @@ def CHM_test_max_mem(tilesize, model):
     for lvl in xrange(1, model.nlevels+1):
         if not (tilesize%2).any(): tilesize = tilesize // 2
         sizes[lvl] = tilesize[0]*tilesize[1]
-    return max((m.classifier.evaluation_memory+100)*sizes[m.level] for m in model) # the +100 bytes/pixel is a fudge-factor
+    return max((m.classifier.evaluation_memory+128)*sizes[m.level] for m in model) # the +128 bytes/pixel is a fudge-factor
 
 def get_tiles_for_group(grp, ngrps, imshape, tilesize=None):
     """
