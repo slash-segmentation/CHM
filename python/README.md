@@ -85,23 +85,24 @@ General help will be given if no arguments (or invalid arguments) are provided
     python -m chm.test
     
 The model must be a directory of a MATLAB model or a Python model file. For MATLAB models the
-folder contains param.mat and MODEL_level#_stage#.mat. For Python models the file will be next to
-several files like model_name-LDNN_#-#.npy. *The MATLAB command line made this optional but now it
-is mandatory.*
+folder contains param.mat and MODEL\_level#\_stage#.mat. For Python models it is a single file.
+*The MATLAB command line made this optional but now it is now mandatory.*
 
 The CHM test program takes a single 2D input image, calculates the labels according to a model,
 and saves the labels to the 2D output image. The images can be anything supported by the `imstack`
-program for 2D images. The output-image can given as a directory in which case the input image
+program for 2D images. The output-image can be given as a directory in which case the input image
 filename and type are used. *The MATLAB command line allowed multiple files however now only a
-single image is allowed, to process more images you must write a loop in bash or similar.*
+single image is allowed now, to process more images you must write a loop in bash or similar.*
 
 The CHM test program splits the input image into a bunch of tiles and operates on each tile
 separately. The size of the tiles to process can be given with `-t #x#`, e.g. `-t 512x512`. The
 default is 512x512. The tile size must be a multiple of 2^Nlevel of the model (typically Nlevel<=4,
 so should be a multiple of 16). *The MATLAB command line called this option `-b`. Additionally, the
-MATLAB command line program overlapped tiles (specified with `-o`) which is no longer needed.*
+MATLAB command line program overlapped tiles (specified with `-o`) which is no longer needed or
+supported. Finally, in MATLAB this was a critical quality vs speed option and now the default
+should really always be used.*
 
-Instead of computing labels for every tile, tiles can be specified using either tile groups
+Instead of computing the labels for every tile, tiles can be specified using either tile groups
 (recommended) or individually. Tile groups use `-g` to specify which group to process and `-G` to
 specify the number of groups. Thus when distributing the testing process among three machines the
 processes would be run with `-g 1 -G 3`, `-g 2 -G 3` and `-g 3 -G 3` on the three machines. The
@@ -109,27 +110,28 @@ testing process will determine which tiles it is to process based on this inform
 reduces any extra work and making sure each process has roughly the same amount of work. The total
 number of groups should not be larger than 30. Individual tiles can be specified using `-T #,#`,
 e.g. `-T 0,2` computes the tile in the first column, third row. This option can be specified any
-number of times to cause multiple tiles to be calculted. All tiles not calculated will output as
-black (0). Any tile indices out of range are simply ignored. *The MATLAB command line called this
-option `-t` and indexing started at 1 instead of 0 and did not support tile groups.*
+number of times to cause multiple tiles to be calculated at once. All tiles not calculated will
+output as black (0). Any tile indices out of range are simply ignored. *The MATLAB command line
+called this option `-t` and indexing started at 1 instead of 0 and did not support tile groups.*
 
 By default the output image data is saved as single-byte grayscale data (0-255). The output data
 type can be changed with `-d type` where `type` is one of `u8` (8-bit integer from 0-255), `u16`
-(16-bit integer from 0-65535), `u32` (32-bit integer from 0-2147483647), `f32` (32-bit floating
+(16-bit integer from 0-65535), `u32` (32-bit integer from 0-4294967295), `f32` (32-bit floating
 point number from 0.0-1.0), or `f64` (64-bit floating-point number from 0.0-1.0). All of the other
-data types increase the resolution of the output data. However, the output image format must
-support the data type (for example, PNG supports u8 and u16 while TIFF supports all the types).
+data types increase the resolution of the output data. However the output image format must
+support the data type (for example, PNG only supports u8 and u16 while TIFF supports of all the
+types).
 
 Finally, by default the CHM test program will attempt to use as much memory is available and all
 logical processors available. If this is not desired, it can be tweaked using the `-n` and `-N`
 options. The `-n` option specifies the number of tasks while `-N` specifies the number of threads
-per task. Each additional task will take up significant memory (up to 7.5 GiB for 1000x1000 tiles
-and Nlevel=4) while each additional thread per task doesn't effect memory significantly. However,
+per task. Each additional task will take up significant memory (up to 2 GiB for default tiles and
+Nlevel=4) while each additional thread per task doesn't effect memory significantly. However,
 splitting the work into two tasks with one thread each will be much faster than having one task
 with two threads. The default uses twice as many tasks as would fit in memory (since the maximum
-memory usage is only used for a short period of time) and then divides the threads between all
-tasks. If only one of `-n` or `-N` is given, the other is derived based on it. *The MATLAB command
-line only had the option to be multithreaded or not with `-s`.*
+memory usage is only used for a short period of time) up to the number of CPUs and then divides
+the threads between all tasks. If only one of `-n` or `-N` is given, the other is derived based on
+it. *The MATLAB command line only had the option to be multithreaded or not with `-s`.*
 
 *The MATLAB command line option `-M` is completely gone as there is no need for MATLAB or MCR to be
 installed. It also did histogram equalization by default. This is no longer supported at all and
@@ -154,20 +156,19 @@ labels work similarily except that anything that is 0 is considered background w
 is considered a positive label. The inputs and labels are matched up in the order they are given
 and paired images must be the same size.
 
-The model is given as a path to a file for where to save the model to. Additional files will be
-created next to that file that have a similar name. These files must be kept with the model file
-itself. If the option `-r` is also specified and the path already contains (part of) a Python model,
-then the model is run in 'restart' mode. In restart mode, the previous model is examained and as
-much of it is reused as possible. This is useful for when a previous attempt failed partway through
-or when desiring to add additional stages or levels to a model. If the filters are changed from the
-original model, any completed stages/levels will not use the new filters but new stages/levels will.
-The input images and labels must be the same when restarting.
+The model is given as a path to a file for where to save the model to. If the option `-r` is also
+specified and the path already contains (part of) a Python model, then the model is run in 'restart'
+mode. In restart mode, the previous model is examined and as much of it is reused as possible. This
+is useful for when a previous attempt failed partway through or when desiring to add additional
+stages or levels to a model. If the filters are changed from the original model, any completed
+stages/levels will not use the new filters but new stages/levels will. The input images and labels
+must be the same when restarting.
 
-**Note:** while the training process is running several temporary files are saved in a folder that
-has the same path as the model but with "-temp" appended to it. If the training process crashes
-(for example due to insufficient memory) then this folder will not be cleaned up automatically. It
-can be manually removed and will be recreated as necessary if running in restart mode. It can
-become fairly large (100+ MiB). Without this folder models should only be 10-20 MiB.
+**Note:** while the training process is running several temporary files are saved in the same folder.
+If the training process crashes (for example due to insufficient memory) then this folder will not be
+cleaned up automatically. It can be manually removed and will be recreated as necessary if running in
+restart mode. It can become fairly large (100+ MiB). Without this folder models should only be
+10-20 MiB.
 
 The default number of stages and levels are 2 and 4 respectively. They can be set using `-S #` and
 `-L #` respectively. The number of stages must be at least 2 while the number of levels must be at
@@ -177,14 +178,14 @@ but do increase both. Typically, higher number of levels are required with large
 not contribute much for smaller structures. Some testing has shown that using more than 2 levels
 does not contribute much to increased quality - at least for non-massive structures.
 
-The filters used for generating features are, by default, the same used by the MATLAB CHM train but
+The filters used for generating features are, by default, the same used by MATLAB CHM train but
 without extra compatibility. The filters can be adjusted using the `-f` option in various ways. The
 available filters are `haar`, `hog`, `edge`, `gabor`, `sift`, `frangi`, and `intensity-<type>-#`
 (where `<type>` is either `stencil` or `square` and `#` is the radius in pixels). To add filters to
 the list of current filters do something like `-f +frangi`. To remove filters from the list of
 current filters do something like `-f -hog`. Additionally, the list of filters can be specified
-directly, for example `-f haar,hog,edge,gabor,sift,intensity-stencil-10` would specify the default
-filters. More then one `-f` option can be given and they will build off of each other.
+directly, for example `-f haar,hog,edge,gabor,sift,intensity-stencil-10` which would specify the
+default set of filters. More then one `-f` option can be given and they will build off of each other.
 
 Besides filters being used to generate the features for images, a filter is used on the 'contexts'
 from the previous stages and levels to generate additional features. This filter can be specified
@@ -224,7 +225,7 @@ image first and then using fast lookups to get the features.
 
 When used for MATLAB models the computations are bit slower but reduces the drift errors compared
 to the MATLAB output. Technically it is slightly less accurate, but the numbers are in the range of
-1e-8 off for a 1000x1000 image.
+1e-8 off for a 1000x1000 tile.
 
 ### HOG
 
@@ -269,7 +270,7 @@ parameters to create the kernels:
  * psi:        0 (phase)
 The magnitude of the complex filtered image is used as the feature.
 
-The original MATLAB code has a serious bug in it that it uses the imfilter function with a uint8
+The original MATLAB code has a serious bug in it that it uses the `imfilter` function with an `uint8`
 input which causes the filter output to be clipped to 0-255 and rounded to an integer before taking
 the complex magnitude. This is a major problem as the Gabor filters have negative values (all of
 which are set to 0) and can produce results above the input range, along with losing lots of
