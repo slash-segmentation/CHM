@@ -193,7 +193,7 @@ def test(W, X, dropout=False, nthreads=1):
             nodes/discriminants per group (ANDs)
         X   nxS or (n+1)xS matrix of samples where S is the number of samples. If it is (n+1)xS then
             the last row will be filled with 1s by this method. Using an (n+1)xS input is faster.
-        dropout is the weights were calculated using dropout [default is False]
+        dropout if the weights were calculated using dropout [default is False]
 
     Returns a contiguous length-P array of the classifier results.
 
@@ -250,13 +250,13 @@ def learn(X, Y, N=5, M=5, downsample=1, kmeans_rep=5,  #pylint: disable=too-many
     W = init_weights(X, Y, N, M, downsample, kmeans_rep, True, nthreads)
     if disp:
         set_lib_threads(nthreads)
-        __print('Initial error: %f'%calc_error(X,Y,W,target), 3)
+        __print('Initial error: %f'%calc_error(X,Y,W,target,dropout), 3)
         __print('Gradient descent...')
     set_lib_threads(1) # always use 1 thread during gradient descent
     gradient_descent(X, Y, W, niters, batchsz, dropout, rate, momentum, target, disp)
     set_lib_threads(nthreads)
     if disp:
-        __print('Final error: %f'%calc_error(X,Y,W,target), 3)
+        __print('Final error: %f'%calc_error(X,Y,W,target,dropout), 3)
     return W
 
 def init_weights(X, Y, N=5, M=5, downsample=1, kmeans_rep=5, whiten=False, nthreads=1):
@@ -312,7 +312,7 @@ def init_weights(X, Y, N=5, M=5, downsample=1, kmeans_rep=5, whiten=False, nthre
     baises *= -0.5
     return weights
 
-def calc_error(X, Y, W, target=(0.1,0.9)):
+def calc_error(X, Y, W, target=(0.1,0.9), dropout=False):
     """
     Calculate the square root of the error of the model (eq 11 from Seyedhosseini et al 2013).
     
@@ -323,12 +323,15 @@ def calc_error(X, Y, W, target=(0.1,0.9)):
         
     Parameters:
         target  target values, default to 0.1 and 0.9, see LeCun et al 1998 section 4.5
+        dropout if the weights were calculated using dropout [default is False]
+        
+    Note that if X/Y/W are the dropped-out subsets than dropout should be kept as False.
     """
     from math import sqrt
     lower_target,upper_target = target
     Y = (upper_target-lower_target)*Y
     Y += lower_target
-    Y -= f_(sigma_ij(W, X))
+    Y -= f_(sigma_ij(W, X), dropout)
     Y *= Y
     return sqrt(Y.mean())
 
