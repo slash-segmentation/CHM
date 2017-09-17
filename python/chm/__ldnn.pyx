@@ -16,6 +16,7 @@ from pysegtools.general.cython.npy_helper cimport *
 import_array()
 
 from libc.math cimport exp, sqrt
+from libc.float cimport DBL_MAX
 ctypedef double* dbl_p
 
 from chm.__shuffle cimport shuffle, shuffle_partial
@@ -105,7 +106,7 @@ def stddev(double[:,::1] X):
     return stds.base
 
 cdef inline double clip(double x, double mn, double mx) nogil:
-    """Clip or clamp a number x inbetween the values mn and mx."""
+    """Clip/clamp a number x inbetween the values mn and mx."""
     # Note: on GCC and Clang this hopefully procudes code using SSE maxsd and minsd assembly which
     # is really fast. See https://stackoverflow.com/a/16659263/582298
     return mn if x < mn else (mx if x > mx else x)
@@ -398,10 +399,14 @@ cdef void distSqr(double[:,::1] x, double[:,::1] y, double[:,::1] z) nogil:
 
 # 1/(1+exp(-37)) produces 1.0 and 1/(1+exp(709)) is 1.217e-308 (close enough to 0)
 # outside of this range we start getting nans, infs, and Numpy errors
-DEF MIN_S_VALUE=-709.0
-DEF MAX_S_VALUE=37.0
+DEF MIN_S_VALUE = -709.0
+DEF MAX_S_VALUE = 37.0
 min_s_value = MIN_S_VALUE
 max_s_value = MAX_S_VALUE
+
+# During the equation c1/(1-g_i)*g_i we want to make sure g_i in the denominator is
+# not exactly 1.0 or we get division-by-zero errors so we use this value instead.
+DEF ALMOST_ONE = 1.0 - 1e-16
 
 def gradient(double[::1] f, double[:,::1] g, double[:,:,::1] s, double[::1,:] x, double[::1] y, double[:,:,::1] grads):
     """
@@ -415,7 +420,7 @@ def gradient(double[::1] f, double[:,::1] g, double[:,:,::1] s, double[::1,:] x,
     for p in xrange(P):
         c1 = -2.0*(y[p]-f[p])*(1.0-f[p])
         for i in xrange(N):
-            c2 = c1/(1.0-g[i,p])*g[i,p]
+            c2 = c1/(1.0-min(g[i,p], ALMOST_ONE))*g[i,p]
             for j in xrange(M):
                 c3 = c2*(1.0-s[i,j,p])
                 for k in xrange(n):
@@ -518,7 +523,7 @@ cdef double _grad_desc(const double[::1] x, const double y, double[:,:,::1] W, d
     # and perform a gradient descent step
     cdef double yf = y-f, c1 = -2.0*(1.0-f)*yf, c2, c3
     for i in xrange(N):
-        c2 = c1/(1.0-g[i])*g[i]
+        c2 = c1/(1.0-min(g[i], ALMOST_ONE))*g[i]
         for j in xrange(M):
             c3 = c2*(1.0-s[i,j])
             for k in xrange(n):
@@ -600,7 +605,7 @@ cdef double _grad_desc_do(const double[::1] x, const double y, double[:,:,::1] W
     # and perform a gradient descent step
     cdef double yf = y-f, c1 = -2.0*(1.0-f)*yf, c2, c3
     for i in xrange(N2):
-        c2 = c1/(1.0-g[i])*g[i]
+        c2 = c1/(1.0-min(g[i], ALMOST_ONE))*g[i]
         for j in xrange(M2):
             p_ij = &prevs[i_order[i],j_order[j],0]
             W_ij = &W[i_order[i],j_order[j],0]
