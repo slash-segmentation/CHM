@@ -155,7 +155,7 @@ def sigma_ij(W, X, out=None):
     #   fastest when both inputs are C ordered and ~10% slower when both inputs are F ordered
     #   mixed inputs (one input is C and the other is F) lie inbetween
     from numpy import clip, exp, negative, divide, add
-    from .__ldnn import min_s_value, max_s_value
+    from .__ldnn import min_s_value, max_s_value #pylint: disable=no-name-in-module
     N,M,n = W.shape # the n is actually n+1
     n_,S = X.shape
     if out is not None:

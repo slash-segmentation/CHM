@@ -79,7 +79,7 @@ class Model(object):
         return cls(path)
 
     @classmethod
-    def create(cls, path, nstages, nlevels, classifier, fltr, cntxt_fltr=None, norm_method='median-mad', restart=False, **extra_info):
+    def create(cls, path, nstages, nlevels, classifier, fltr, cntxt_fltr=None, norm_method='median-mad', restart=False, **extra_info): #pylint: disable=too-many-arguments
         """
         Creates a new, blank, model that will be saved to the given path. It will have the given
         number of stages and levels (with the final stage only having a single level).

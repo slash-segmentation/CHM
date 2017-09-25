@@ -26,7 +26,7 @@ class Haar(Filter):
     Uses intermediate memory of O(im.size). While technically it is multi-threaded, it doesn't
     really help much.
     """
-    def __init__(self, compat=False, scale=None):
+    def __init__(self, compat=False):
         super(Haar, self).__init__(8, 2)
         self.__compat = compat
 

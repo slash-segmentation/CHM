@@ -26,18 +26,13 @@ class Frangi(Filter):
     
     Uses 4 times the image size as tempoarary memory usage.
     """
-    
-    from math import exp
-    __factor = 1/(1-exp(-2))
-    del exp
-    
     def __init__(self):
         super(Frangi, self).__init__(11*3, 14)
 
     @property
     def should_normalize(self): return (False,)*self.features
     def __call__(self, im, out=None, region=None, nthreads=1):
-        from numpy import empty, exp
+        from numpy import empty
         from ._base import get_image_region
         from ._frangi import frangi #pylint: disable=no-name-in-module
         
@@ -58,5 +53,5 @@ class Frangi(Filter):
             frangi(get_image_region(im, sigma*3, region, nthreads=nthreads)[0], float(sigma), out[i], nthreads)
 
         # Scale the output data
-        out *= __factor
+        out *= 1.1565176427496657 # 1/(1-math.exp(-2))
         return out

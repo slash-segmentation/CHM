@@ -34,7 +34,7 @@ def __get_stats(X, axis, nthreads, opts, cy, cy0, cy1, np):
     functions are the 1D, 2D axis-0, and 2D axis-1 Cython functions to use (they take X, *opts, and
     nthreads as a keyword argument). np is the numpy-fallback function (takes X and axis).
     """
-    from numpy import asarray, rollaxis
+    from numpy import asarray
     
     # No axis - flattened data
     if axis is None: return cy(X.ravel('K'), *opts, nthreads=nthreads)
@@ -49,6 +49,7 @@ def __get_stats(X, axis, nthreads, opts, cy, cy0, cy1, np):
         # additionally, the results would have to be reshaped to match the numpy functions
         #if axis == 0: X = X.reshape((-1, X.shape[-1]))
         #else:
+        #    from numpy import rollaxis
         #    if axis != X.ndim-1: X = rollaxis(X, axis, X.ndim)
         #    X = X.reshape((X.shape[0], -1))
         #    axis = 1
@@ -63,7 +64,7 @@ def __get_stats(X, axis, nthreads, opts, cy, cy0, cy1, np):
 
 def min_max(X, axis=None, nthreads=1):
     """Get the min and max of X, either from the flattened data (default) or along a given axis."""
-    from .__stats import cy_min_max, cy_min_max_0, cy_min_max_1
+    from .__stats import cy_min_max, cy_min_max_0, cy_min_max_1 #pylint: disable=no-name-in-module
     return __get_stats(X, axis, nthreads, (),
                        cy_min_max, cy_min_max_0, cy_min_max_1,
                        lambda X,axis:(X.min(axis), X.max(axis)))
@@ -74,7 +75,7 @@ def mean_std(X, axis=None, ddof=0.0, nthreads=1):
     along a given axis. Also accepts a delta degree of freedom argument which defaults to 0 for
     population statistics.
     """
-    from .__stats import cy_mean_stdev, cy_mean_stdev_0, cy_mean_stdev_1
+    from .__stats import cy_mean_stdev, cy_mean_stdev_0, cy_mean_stdev_1 #pylint: disable=no-name-in-module
     return __get_stats(X, axis, nthreads, (ddof,),
                        cy_mean_stdev, cy_mean_stdev_0, cy_mean_stdev_1,
                        lambda X,axis:(X.mean(axis), X.std(axis, ddof=ddof)))
@@ -84,8 +85,8 @@ def median(X, axis=None, overwrite=False, nthreads=1):
     Calculate the median of X, either from the flattened data (default) or along a given axis. If
     overwrite is True (not the default) then the data in X may be changed.
     """
-    from numpy import median
-    from .__stats import cy_percentile, cy_percentile_0, cy_percentile_1
+    from numpy import median #pylint: disable=redefined-outer-name
+    from .__stats import cy_percentile, cy_percentile_0, cy_percentile_1 #pylint: disable=no-name-in-module
     return __get_stats(X, axis, nthreads, (0.5, overwrite),
                        cy_percentile, cy_percentile_0, cy_percentile_1,
                        lambda X,axis:median(X, axis, overwrite_input=overwrite))
@@ -97,8 +98,8 @@ def percentile(X, qs, axis=None, overwrite=False, nthreads=1):
     from 0.0 to 1.0. A scalar or a sequence of them can be given. If overwrite is True (not the
     default) then the data in X may be changed.
     """
-    from numpy import asarray, percentile
-    from .__stats import cy_percentile, cy_percentile_0, cy_percentile_1
+    from numpy import asarray, percentile #pylint: disable=redefined-outer-name
+    from .__stats import cy_percentile, cy_percentile_0, cy_percentile_1 #pylint: disable=no-name-in-module
     return __get_stats(X, axis, nthreads, (qs,),
                        cy_percentile, cy_percentile_0, cy_percentile_1,
                        lambda X,axis:percentile(X, asarray(qs)*100, axis, overwrite_input=overwrite))
@@ -109,9 +110,10 @@ def median_mad(X, axis=None, overwrite=True, nthreads=1):
     given axis. The MAD values are standardized to match standard deviation (thus divided by
     ~0.6745). If overwrite is True (not the default) then the data in X may be changed.
     """
-    from numpy import abs
+    from numpy import abs #pylint: disable=redefined-builtin
     med = median(X, axis, overwrite=overwrite, nthreads=nthreads)
     mad = X - (med if axis is None else (med[None, :] if axis == 0 else med[:, None]))
     mad = median(abs(mad, mad), axis, overwrite=True, nthreads=nthreads)
     mad *= 1.482602218505602 # 1/scipy.stats.norm.ppf(3/4)
     return med, mad
+

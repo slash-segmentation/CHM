@@ -544,8 +544,8 @@ def ensure_binary(im):
     # Make sure values are finitei
     # Note: the nan_to_num function only takes the 'copy' argument in 1.13 and higher
     from numpy import __version__ as npy_vers
-    from distutils.version import StrictVersion
-    im = nan_to_num(im, False) if StrictVersion(npy_vers) >= str('1.13') else nan_to_num(im)
+    from distutils.version import StrictVersion #pylint: disable=no-name-in-module, import-error
+    im = nan_to_num(im, False) if StrictVersion(npy_vers) >= str('1.13') else nan_to_num(im) #pylint: disable=too-many-function-args
 
     if im.dtype == bool: return im
     unq = unique(im[0])

@@ -50,5 +50,4 @@ class HOG(Filter):
         if self.__compat:
             # TODO: there is a pre-computed division in the C code, should it be kept?
             return hog_entire(im, 15, True, out, nthreads)
-        else:
-            return hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding
+        return hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding
