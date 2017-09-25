@@ -579,7 +579,9 @@ def set_lib_threads(nthreads):
         __set_num_thread_funcs = []
 
         # Load these libraries so that BLAS and OpenMP libraries are loaded
-        import numpy, scipy.linalg, chm._utils # pylint: disable=unused-variable
+        import numpy, chm._utils # pylint: disable=unused-variable
+        try: import scipy.linalg # pylint: disable=unused-variable
+        except ImportError: pass
         
         # Do a general search for all *blas*, *omp*, and *mkl* libraries
         __add_set_num_threads_funcs('blas', ('goto_set_num_threads', 'openblas_set_num_threads'))
