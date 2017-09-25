@@ -670,7 +670,7 @@ def __best_grouping(h, w, n):
             
         # Calculate the penalty for this arrangement
         p = (w-2)*m - ns[0] - ns[-1] + sum(
-                ni*hi + (w%ni)*abs(hi*(w//ni)-area+hi) + (ni-w%ni)*abs(hi*(w//ni)-area) for hi,ni in izip(hs,hs)
+                ni*hi + (w%ni)*abs(hi*(w//ni)-area+hi) + (ni-w%ni)*abs(hi*(w//ni)-area) for hi,ni in izip(hs,ns)
         )
         if p_min is None or p < p_min: p_min,ns_min,hs_min = p,ns,hs
 
