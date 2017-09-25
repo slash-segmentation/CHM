@@ -36,30 +36,19 @@ class HOG(Filter):
     benefit of being much faster (about 30-35x faster) but takes more memory. While the compat mode
     uses minimal intermediate memory the non-compat mode uses O(9*im.size) in temporary memory.
     
-    The scale flag causes the output data to be multiplied by 3.375, resulting in most data being in
-    the range 0 to 1 with a mean of approximately 0.5 (the unscaled theoretical range is 0 to 1, but
-    the vast majority of data is only from 0 to 0.3). It defaults to the opposite of the compat flag.
-    
     Note that the original MATLAB function used float32 values for many intermediate values so the
     outputs from this function are understandably off by up to 1e-7 even in compat mode.
     """
-    # Defaults for Python models created before these flags were added
-    __compat = True
-    __scale = False
-    
-    def __init__(self, compat=False, scale=None):
+    def __init__(self, compat=False):
         super(HOG, self).__init__(7 if compat else 9, 36)
         self.__compat = compat
-        self.__scale = (not compat) if scale is None else scale
-    
+
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ._base import get_image_region
         from ._hog import hog_entire, hog_new #pylint: disable=no-name-in-module
         im, region = get_image_region(im, self._padding, region, nthreads=nthreads)
         if self.__compat:
             # TODO: there is a pre-computed division in the C code, should it be kept?
-            out = hog_entire(im, 15, True, out, nthreads)
+            return hog_entire(im, 15, True, out, nthreads)
         else:
-            out = hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding
-        if self.__scale: out *= 3.375
-        return out
+            return hog_new(im[1:,1:], out, nthreads) # only needs (8,9) padding

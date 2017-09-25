@@ -21,21 +21,12 @@ class Edge(Filter):
     not a good approach since a transition from 0s to the image data will be an edge. Also it takes
     extra effort and memory to do so because the FilterBank class adds reflection padding
     inherently, so we have to detect that and correct it.
-    
-    The scale flag causes the output data to be multiplied by 0.75, resulting in most data being in
-    the range 0 to 1 with a mean of 0.269 (the unscaled theoretical range is 0 to 1.96658337, but
-    the vast majority of data is below 4/3). It defaults to the opposite of the compat flag.
 
     Uses O(2*im.size).
     """
-    # Defaults for Python models created before these flags were added
-    __compat = True
-    __scale = False
-    
-    def __init__(self, compat=False, scale=None):
+    def __init__(self, compat=False):
         super(Edge, self).__init__(6, Edge.__inten.features)
         self.__compat = compat
-        self.__scale = (not compat) if scale is None else scale
 
     def __call__(self, im, out=None, region=None, nthreads=1):
         # CHANGED: no longer returns optional raw data
@@ -51,7 +42,6 @@ class Edge(Filter):
         imy = correlate_xy(im, Edge.__kernel[1], Edge.__kernel[0], nthreads=nthreads) # INTERMEDIATE: im.shape + (6,3)
         hypot(imx, imy, imx, nthreads)
         region = (region[0]-3, region[1]-3, region[2]-3, region[3]-3) # the correlation shifts the image 3 pixels to the top/left
-        if self.__scale: imx *= 0.75
         return Edge.__inten(imx, out=out, region=region, nthreads=nthreads)
 
 

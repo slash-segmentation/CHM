@@ -20,20 +20,24 @@ class Frangi(Filter):
 
     This filter does not have a compat mode since it never existed in the MATLAB version.
     
-    The scale flag causes the output data to be multiplied by 1/(1-exp(-2)), resulting in all data
-    being in the range 0 to 1 (the unscaled theoretical range is 0 to 1-exp(-2)). Most of the values
-    (>75%) will end up at exactly 0. Besides those most of the points will end up at about 1. It
-    defaults to True.
+    The data is scaled by 1/(1-exp(-2)) so that it has a minimum of 0 and maximum of 1. Most of the
+    values will end up at exactly 0 with another smaller spike at 1. This filter is not normalized
+    by the normalization used for other filters.
     
     Uses 4 times the image size as tempoarary memory usage.
     """
-    def __init__(self, scale=True):
+    
+    from math import exp
+    __factor = 1/(1-exp(-2))
+    del exp
+    
+    def __init__(self):
         super(Frangi, self).__init__(11*3, 14)
-        self.__scale = True # TODO: always scale?
+
     @property
     def should_normalize(self): return (False,)*self.features
     def __call__(self, im, out=None, region=None, nthreads=1):
-        from numpy import empty
+        from numpy import empty, exp
         from ._base import get_image_region
         from ._frangi import frangi #pylint: disable=no-name-in-module
         
@@ -54,9 +58,5 @@ class Frangi(Filter):
             frangi(get_image_region(im, sigma*3, region, nthreads=nthreads)[0], float(sigma), out[i], nthreads)
 
         # Scale the output data
-        if self.__scale:
-            from math import exp
-            factor = 1/(1-exp(-2))
-            out *= factor
-            
+        out *= __factor
         return out

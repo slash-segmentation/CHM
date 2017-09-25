@@ -22,23 +22,13 @@ class Haar(Filter):
     output. Additionally, with compat set to False there is no longer an arbitrary value added to
     the area before division (which is unnecessary due to the area never being 0) so it is more
     accurate.
-    
-    The scale flag causes the output data to be multiplied by 0.625 then shifted up by 0.5,
-    resulting in most data being in the range 0 to 1 with a mean of 0.5 (the unscaled theoretical
-    range is -1 to 1, but the vast majority of data is only from -0.8 to 0.8). It defaults to the
-    opposite of the compat flag.
 
     Uses intermediate memory of O(im.size). While technically it is multi-threaded, it doesn't
     really help much.
     """
-    # Defaults for Python models created before these flags were added
-    __compat = True
-    __scale = False
-    
     def __init__(self, compat=False, scale=None):
         super(Haar, self).__init__(8, 2)
         self.__compat = compat
-        self.__scale = (not compat) if scale is None else scale
 
     def __call__(self, im, out=None, region=None, nthreads=1):
         from ._base import get_image_region
@@ -47,6 +37,4 @@ class Haar(Filter):
         # Preliminary testing shows ~7.5% speed increase, or ~0.15ms for a 1000x1000 image, so not worth it
         im, region = get_image_region(im, 8, region, nthreads=nthreads)
         ii = cc_cmp_II(im) # INTERMEDIATE: im.shape + (16,16)
-        out = cc_Haar_features(ii, 16, out, nthreads, self.__compat)
-        if self.__scale: out *= 0.625; out += 0.5
-        return out
+        return cc_Haar_features(ii, 16, out, nthreads, self.__compat)

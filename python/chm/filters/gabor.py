@@ -57,20 +57,10 @@ class Gabor(Filter):
     results above the input range, along with losing lots of resolution in the data (from ~16
     significant digits to ~3). So, when compat is True, the data is put through the same
     simplification process. When it is False (the default), then much better results are produced.
-    
-    The scale flag causes the output data to be scaled so that each filter roughly goes from 0 to 1.
-    Every feature has a different scaling factor as the range for each is different. No shifting is
-    done since the lowest value of each feature is already 0. It defaults to the opposite of the
-    compat flag. If both compat and scale are True the results will likely be fairly meaningless.
     """
-    # Defaults for Python models created before these flags were added
-    __compat = True
-    __scale = False
-    
-    def __init__(self, compat=False, scale=None):
+    def __init__(self, compat=False):
         super(Gabor, self).__init__(Gabor.__padding, len(Gabor.__filters))
         self.__compat = compat
-        self.__scale = (not compat) if scale is None else scale
 
     def __call__(self, im, out=None, region=None, nthreads=1):
         # INTERMEDIATE: im.shape (for either numpy or pyfttw)
@@ -98,7 +88,6 @@ class Gabor(Filter):
                 round_u8_steps(IF2)
             hypot(IF1, IF2, IF1, nthreads)
 
-        if self.__scale: out *= Gabor.__normalizations
         return out
 
 
@@ -209,7 +198,6 @@ class Gabor(Filter):
 
     ##### Static Fields #####
     __filters = None
-    __normalizations = None
     __padding = None
     __fftw_wisdom_file = None
 
@@ -275,39 +263,8 @@ class Gabor(Filter):
         return x_theta
 
     @staticmethod
-    def __get_normalizations():
-        """
-        Calculates the inverse of the normalization factors for each of the filters. Currently this
-        uses the real filter threshold at 0 and applies both the real and imaginary filters to it
-        finding the complex magnitude for each filter.
-        
-        A better solution may be to figure out the standard deviations caused be each real/imaginary
-        pair and use those.
-        """
-        from numpy import array
-        return 1.0/array([
-                1.99,2.45,3.01,2.02,2.52,3.12,1.86,2.42,3.07,1.98,2.42,2.98,1.97,2.41,2.94,1.81,2.29,2.87,
-                1.99,2.45,3.01,2.02,2.52,3.12,1.86,2.42,3.07,1.98,2.42,2.98,1.97,2.41,2.94,1.81,2.29,2.87,
-                4.69,5.66,6.94,4.93,6.17,7.61,4.96,6.35,7.90,4.51,5.58,6.96,4.53,5.33,6.49,4.43,5.32,6.52,
-                4.69,5.66,6.94,4.93,6.17,7.61,4.96,6.35,7.90,4.51,5.58,6.96,4.53,5.33,6.49,4.43,5.32,6.52,
-                8.63,10.8,13.1,10.1,12.5,14.9,10.6,13.4,16.1,8.59,11.0,13.7,7.81,9.60,11.9,7.86,9.77,12.1,
-                8.63,10.8,13.1,10.1,12.5,14.9,10.6,13.4,16.1,8.59,11.0,13.7,7.81,9.60,11.9,7.86,9.77,12.1,
-                15.1,18.4,21.8,18.2,21.7,25.1,19.8,23.9,27.6,15.8,19.7,23.5,13.1,16.1,19.6,13.4,16.5,19.9,
-                15.1,18.4,21.8,18.2,21.7,25.1,19.8,23.9,27.6,15.8,19.7,23.5,13.1,16.1,19.6,13.4,16.5,19.9,
-                24.1,28.4,32.6,28.9,33.2,37.5,32.5,37.4,42.0,26.3,31.5,36.4,20.8,25.1,29.8,21.1,25.2,29.8,
-                24.1,28.4,32.6,28.9,33.2,37.5,32.5,37.4,42.0,26.3,31.5,36.4,20.8,25.1,29.8,21.1,25.2,29.8])
-        #from numpy import empty, sqrt, divide
-        #norms = empty(len(Gabor.__filters))
-        #for i,(GF1,GF2) in enumerate(Gabor.__filters):
-        #    x = (GF1>=0).astype(float) # TODO: make this better
-        #    IF1,IF2 = (x*GF1).sum(),(x*GF2).sum() # no need to actually do convolution
-        #    norms[i] = IF1*IF1+IF2*IF2
-        #return divide(1, sqrt(norms, norms), norms) # 1/sqrt(...)
-    
-    @staticmethod
     def __static_init__():
         Gabor.__filters = Gabor.__get_filters()
-        Gabor.__normalizations = Gabor.__get_normalizations()[:,None,None]
         Gabor.__padding = max(len(GF[0]) // 2 for GF in Gabor.__filters)
         if _have_pyfftw:
             from os.path import join
