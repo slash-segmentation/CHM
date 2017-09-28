@@ -30,7 +30,7 @@ class HOG(Filter):
     gradients along the edge to get all of the data they need. This is much more accurate to the
     original description of the algorithm.
     
-    They also take different approached while caclulating the data. In compat mode each output
+    They also take different approaches while caclulating the data. In compat mode each output
     pixel is calculated at once while in non-compat mode the entire histogram is calculated first
     for all pixels then each block is normalized and saved to the output pixel. This has the
     benefit of being much faster (about 30-35x faster) but takes more memory. While the compat mode
