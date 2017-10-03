@@ -642,40 +642,49 @@ def get_tiles_for_group(grp, ngrps, imshape, tilesize=None):
     # Generate all of the tiles
     return list(product(xrange(xi,xi+wi),xrange(yi,yi+hi)))
     
-def __best_grouping(h, w, n):
+def __best_grouping(H, W, G):
     """
-    Finds the best way to arrange n groups in a w-by-h rectangle. The groups are all rectangles and
+    Finds the best way to arrange G groups in a W-by-H rectangle. The groups are all rectangles and
     arranged into rows with each row having a height and a number of columns. Returns the number of
     columns in each row and the height of each row.
     
-    The algorithm used has a fairly poor assymtotic growth with respect to n but is independent of
-    h and w. Values greater than 25 are likely to take several seconds.
+    The algorithm used has a fairly poor assymtotic growth with respect to G but is independent of
+    H and W. Values greater than 25 are likely to take several seconds.
     """
     from itertools import izip
     from heapq import nlargest
 
-    area = w*h/n
-    # none of the p calculations include the constant 4*n-2*w-2*h+4
-    p_min, ns_min, hs_min = None, None, None
-    for ns in __gen_ns(n):
-        m = len(ns)
-        ends = (0,m-1)
+    m_min, g_min, h_min = None, None, None
+    for g in __gen_ns(G):
+        R = len(g)
+        ends = (0,R-1)
         
         # Calculate the heights of each row
-        hs = [h*ni//n for ni in ns] # base heights for each row
-        R = h - sum(hs) # overall remainder that needs to be distributed across R, 0 <= R < m
-        # Add one to each of the R heights with the largest remainders (preferring ends over middle)
-        for _,_,i in nlargest(R, ((h*ni%n, i in ends, i) for i,ni in enumerate(ns))):
-            hs[i] += 1
+        h = [H*gi//G for gi in g] # base heights for each row
+        rem = H - sum(h) # overall remainder that needs to be distributed across R, 0 <= rem < R
+        # Add one to each of the rem heights with the largest remainders (preferring ends over middle)
+        for _,_,i in nlargest(rem, ((H*gi%G, i in ends, i) for i,gi in enumerate(g))):
+            h[i] += 1
+        hx = [hi+(i!=0)+(i!=R-1) for i,hi in enumerate(h)] # add the borders to each of the heights
             
         # Calculate the penalty for this arrangement
-        p = (w-2)*m - ns[0] - ns[-1] + sum(
-                ni*hi + (w%ni)*abs(hi*(w//ni)-area+hi) + (ni-w%ni)*abs(hi*(w//ni)-area) for hi,ni in izip(hs,ns)
+        C_extra = 2*((W-2)*(R-1)-H+2*G-g[0]-g[-1]+sum(gi*hi for gi,hi in izip(g,h)))
+        C_avg = (H*W+C_extra)/G
+        err = [hxi*W//gi-C_avg for gi,hxi in izip(g,hx)] # the approximate error for each group
+        rem = [W%gi for gi in g]
+        m = C_extra + sum(
+            abs(ei) if gi == 1 else
+            max(2-ri,0)*abs(ei+hxi)+(gi-abs(ri-2))*abs(ei+2*hxi)+max(ri-2,0)*abs(ei+3*hxi)
+            for gi,hxi,ri,ei in izip(g,hx,rem,err)
         )
-        if p_min is None or p < p_min: p_min,ns_min,hs_min = p,ns,hs
+        # Old method (drops some of the values constant across all arrangements)
+        #m = (W-2)*R - g[0] - g[-1] + sum(
+        #        gi*hi + (W%gi)*abs(hi*(W//gi)-area+hi) + (gi-W%gi)*abs(hi*(W//gi)-area) for hi,gi in izip(h,g)
+        #)
+        if m_min is None or m < m_min: m_min,g_min,h_min = p,g,h
 
     # Return the best number of columns per row and row heights
-    return ns_min,hs_min
+    return g_min,h_min
 
 def __gen_ns(n):
     """
