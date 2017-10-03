@@ -4,7 +4,7 @@ Useful Cython function for filters.
 Jeffrey Bush, 2015-2016, NCMIR, UCSD
 """
 
-from pysegtools.general.cython.npy_helper cimport *
+from npy_helper cimport *
 import_array()
 
 from libc.math cimport floor

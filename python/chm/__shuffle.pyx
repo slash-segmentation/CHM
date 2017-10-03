@@ -17,7 +17,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
-from pysegtools.general.cython.npy_helper cimport intp
+from npy_helper cimport intp
 
 cdef extern from 'randomkit.h' nogil:
     ctypedef struct rk_state:

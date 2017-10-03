@@ -4,7 +4,7 @@ Cython Shuffle function definition. See the accompying PYX file for more informa
 Jeffrey Bush, 2017, NCMIR, UCSD
 """
 
-from pysegtools.general.cython.npy_helper cimport intp
+from npy_helper cimport intp
 
 cpdef void shuffle(intp[::1] arr) nogil
 cpdef void shuffle_partial(intp[::1] arr, intp sub) nogil
