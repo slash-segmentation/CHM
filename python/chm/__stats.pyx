@@ -249,7 +249,7 @@ cdef inline void __mean_stdev_1(double[:,::1] x, intp L, intp R, double[::1] mea
 
 ########## Percentile Calculator ##########
 DEF SIZEOF_DBL=8 # cannot do sizeof(double) for Cython compile-time constants...
-DEF COPY_SIZE = 1024*1024//SIZEOF_DBL # copy at most 1 MB of data
+DEF COPY_SIZE=1024*1024//SIZEOF_DBL # copy at most 1 MB of data
 
 def cy_percentile(double[:] x, q, bint overwrite=False, int nthreads=1):
     """

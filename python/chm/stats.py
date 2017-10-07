@@ -27,9 +27,9 @@ from __future__ import print_function
 
 def __get_stats(X, axis, nthreads, opts, cy, cy0, cy1, np):
     """
-    Generalized function from calling the __stats.cy_* functions and falling back to some numpy
+    Generalized function for calling the __stats.cy_* functions and falling back to some numpy
     function. X is the data, axis is the axis to calculate over (or None for flattened data),
-    nthreads in the number of threads to try to use with the cy_* functions, opts is a squence of
+    nthreads in the number of threads to try to use with the cy_* functions, opts is a sequence of
     additional options that need to be given to the Cython functions. The cy, cy0, and cy1
     functions are the 1D, 2D axis-0, and 2D axis-1 Cython functions to use (they take X, *opts, and
     nthreads as a keyword argument). np is the numpy-fallback function (takes X and axis).
@@ -100,20 +100,19 @@ def percentile(X, qs, axis=None, overwrite=False, nthreads=1):
     """
     from numpy import asarray, percentile #pylint: disable=redefined-outer-name
     from .__stats import cy_percentile, cy_percentile_0, cy_percentile_1 #pylint: disable=no-name-in-module
-    return __get_stats(X, axis, nthreads, (qs,),
+    return __get_stats(X, axis, nthreads, (qs, overwrite),
                        cy_percentile, cy_percentile_0, cy_percentile_1,
                        lambda X,axis:percentile(X, asarray(qs)*100, axis, overwrite_input=overwrite))
 
-def median_mad(X, axis=None, overwrite=True, nthreads=1):
+def median_mad(X, axis=None, overwrite=False, nthreads=1):
     """
     Calculate the median and MAD values of X either from the flattened data (default) or along a
     given axis. The MAD values are standardized to match standard deviation (thus divided by
     ~0.6745). If overwrite is True (not the default) then the data in X may be changed.
     """
-    from numpy import abs #pylint: disable=redefined-builtin
+    from numpy import abs, subtract #pylint: disable=redefined-builtin
     med = median(X, axis, overwrite=overwrite, nthreads=nthreads)
-    mad = X - (med if axis is None else (med[None, :] if axis == 0 else med[:, None]))
+    mad = subtract(X, med if axis is None else (med[None, :] if axis == 0 else med[:, None]), out = X if overwrite else None)
     mad = median(abs(mad, mad), axis, overwrite=True, nthreads=nthreads)
     mad *= 1.482602218505602 # 1/scipy.stats.norm.ppf(3/4)
     return med, mad
-
