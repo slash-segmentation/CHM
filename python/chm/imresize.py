@@ -11,9 +11,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from pysegtools.general.delayed import delayed
-from pysegtools.general import cython
 from numpy import finfo, float64
-cython.install()
 
 __all__ = ('imresize', 'imresize_fast')
 
