@@ -15,6 +15,8 @@ from __future__ import print_function
 from npy_helper cimport *
 import_array()
 
+from cython.parallel cimport prange
+
 from libc.math cimport exp, sqrt
 from libc.float cimport DBL_MAX
 ctypedef double* dbl_p
@@ -171,6 +173,8 @@ DEF KMEANS_ML_RATE          = 3
 DEF KMEANS_ML_MIN_N         = 50
 DEF KMEANS_ML_MAX_RETRIES   = 3 # TODO: or 300?
 
+cdef bint higher_accuracy = False # makes km_update use the slower but more accurate distSqr_acc function
+
 class ClusteringWarning(UserWarning): pass
 
 cpdef kmeansML(intp k, double[:,::1] data):
@@ -204,10 +208,17 @@ cpdef kmeansML(intp k, double[:,::1] data):
     cdef ndarray counts     = PyArray_EMPTY(1, &k, NPY_INTP, False)
     cdef ndarray temp       = PyArray_EMPTY(2, [k, n], NPY_DOUBLE, False)
     cdef double rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp)
+    if rms2 == -1.0: # When ran into a negative value from distSqr or rms2 went up, need to increase accuracy
+        global higher_accuracy
+        if not higher_accuracy:
+            higher_accuracy = True
+            rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp)
+        if rms2 == -1.0: # Still problematic...
+            raise RuntimeError('internal calculation error: rms should always decrease and not be negative')
     return means, rms2
 
 cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
-                       intp[::1] membership, intp[::1] counts, double[:,::1] temp, int retry=1) except -1.0:
+                       intp[::1] membership, intp[::1] counts, double[:,::1] temp, int retry=1) except -2.0:
     """
     Mulit-level K-Means core. Originally the private function kmeansInternal.
 
@@ -222,7 +233,7 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         membership  n length vector giving which samples belong to which clusters
         counts      k length vector giving the size of each cluster
         temp        k-by-n matrix used as a temporary
-        <return>    RMS^2 error
+        <return>    RMS^2 error, -1.0 for accuracy error, and -2.0 for Python exception
     """
     cdef intp n = data.shape[0], d = data.shape[1], i, j
     cdef bint has_empty = False, converged = False
@@ -236,7 +247,8 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         random_subset(data, k, means)
     else:
         # recurse on random subsample to get means - O(coarseN) allocation
-        __kmeansML(k, random_subset(data, coarseN), means, means_next, membership, counts, temp, 0)
+        if __kmeansML(k, random_subset(data, coarseN), means, means_next, membership, counts, temp, 0) == 1.0:
+            return -1.0 # error - retry with higher accuracy
     
     # Iterate
     with nogil:
@@ -248,22 +260,14 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
 
             # Compute cluster membership, RMS^2 error, new means, and cluster counts
             rms2 = km_update(data, means, means_next, membership, counts, temp)
-            if rms2 > prevRms2:
-                with gil:
-                    # TODO: with nucleoli-iqr I have actually seen prevRms2 be negative!
-                    # at some point I should look into how that was even possible
-                    if rms2 > prevRms2 * 1.005 or means.shape[1] == n:
-                        raise RuntimeError('rms should always decrease: %f > %f' % (rms2, prevRms2))
-                    from warnings import warn
-                    warn('rms should always decrease (%f > %f) however since it is a <0.5%% increase and we are not at the highest level K-means we will treat this as a rounding error'%(rms2, prevRms2), ClusteringWarning)
-                    # NOTE: the 'converged' flag is carried over from the previous iteration (likely False)
-            else:
-                # Check for convergence
-                IF KMEANS_ML_ETOL==0.0:
-                    converged = prevRms2 == rms2 # actually <= but the < is checked above
-                ELSE:
-                    # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
-                    converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
+            if rms2 == -1.0 or rms2 > prevRms2: return -1.0 # error - retry with higher accuracy
+            
+            # Check for convergence
+            IF KMEANS_ML_ETOL==0.0:
+                converged = prevRms2 == rms2 # actually <= but the < is checked above
+            ELSE:
+                # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
+                converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
             if converged:
                 max_sum = 0.0
                 for i in xrange(k):
@@ -282,14 +286,15 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         # Retry a fixed number of times
         from warnings import warn
         if retry < KMEANS_ML_MAX_RETRIES:
-            warn('Re-running kmeans due to empty cluster.', ClusteringWarning)
             return __kmeansML(k, data, means_orig, means_next_orig, membership, counts, temp, retry+1)
+        if means.shape[1] == n:
+            warn('There is an empty cluster at the top level of k-means.', ClusteringWarning)
         else:
-            warn('There is an empty cluster.', ClusteringWarning)
+            warn('There is an empty cluster while running k-means.', ClusteringWarning)
 
     # At this point the means data is in means_next
     # We need to make sure that refers to the means_orig array or copy the data over
-    elif &means_orig[0,0] != &means_next[0,0]: means_orig[:,:] = means_next[:,:]
+    if &means_orig[0,0] != &means_next[0,0]: means_orig[:,:] = means_next[:,:]
 
     return rms2
 
@@ -302,12 +307,13 @@ cdef double[:,::1] random_subset(double[:,::1] data, Py_ssize_t n, double[:,::1]
     shuffle_partial(inds, n) # NOTE: shuffles n elements at the END of the array
     for i in xrange(n): out[i,:] = data[inds[total-n+i],:]
     return out
-    
+
 cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
                       intp[:] membership, intp[::1] counts, double[:,::1] dist) nogil:
     """
     K-Means updating. Combines the original private functions computeMembership and computeMeans.
-    Now returns RMS^2 instead of RMS.
+    Now returns RMS^2 instead of RMS. If the global variable higher_accuracy is True then thi uses
+    the distSqr_acc instead of distSqr function.
 
     Inputs:
         data        n-by-d C matrix, sample features
@@ -318,7 +324,7 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
         membership  n length vector, filled in with which samples belong to which clusters
         counts      k length vector, filled in with size of each cluster
         dist        k-by-n matrix used as a temporary
-        <return>    RMS^2 error
+        <return>    RMS^2 error or -1.0 if accuracy error
 
     Where:
         k           number of clusters
@@ -331,13 +337,16 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
     cdef double x, min_sum = 0.0
 
     # Compute cluster membership and RMS error
-    distSqr(data, means, dist)
+    if higher_accuracy: distSqr_acc(data, means, dist) # more accurate but slower, use as necessary
+    else:               distSqr(data, means, dist)
     cdef double[::1] mins = dist[0,:] # first row of z starts out as mins
     membership[:] = 0 # all mins are in row 0
     for j in xrange(1, k): # go through all other rows and check for minimums
         for i in xrange(n):
             if dist[j,i] < mins[i]: mins[i] = dist[j,i]; membership[i] = j
-    for i in xrange(n): min_sum += mins[i]
+    for i in xrange(n):
+        if mins[i] < 0: return -1.0 # found a negative value which means we need to increase accurac
+        min_sum += mins[i]
 
     # Compute new means and cluster counts
     means_next[:,:] = 0.0
@@ -356,14 +365,18 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
 cdef void distSqr(double[:,::1] x, double[:,::1] y, double[:,::1] z) nogil:
     """
     Return matrix of all-pairs squared distances between the vectors in the columns of x and y.
+    
     Equivilent to:
-        # approximately:  x^2 + y^2 - 2*x@y.T   (where @ is matrix multiplication)
+        # Slow method:
+        return ((x[None,:,:]-y[:,None,:])**2).sum(2)
+
+        # Fast method:
         z = x.dot(y.T).T
         z *= -2
         z += (x*x).sum(1)[None,:]
         z += (y*y).sum(1)[:,None]
         return z
-        
+
     INPUTS
         x       n-by-k C matrix
         y       m-by-k C matrix
@@ -374,26 +387,52 @@ cdef void distSqr(double[:,::1] x, double[:,::1] y, double[:,::1] z) nogil:
     This is an optimized version written in Cython. It works just like the original but is faster
     and uses less memory. The matrix multiplication is done with BLAS (using dgemm to be able to do
     the multiply and addition all at the same time). The squares and sums are done with looping.
+    The original uses O((n+m)*(k+1)) bytes of memory while this allocates no memory (besides what
+    dgemm uses internally).
 
-    The original uses O((n+m)*(k+1)) bytes of memory while this allocates no memory.
+    Note: this particular function uses the "fast" method listed above and has the tendency to
+    introduce numerical errors during calculation. Ultimately, under certain circumstances, this
+    will in fact return negative values (even though they should be squared distances)! If these
+    numerical issues are okay, then all negative values should just be simply set to 0 and ignored.
+    If not then the distSqr_acc function should be used instead.
     """
     # NOTE: this is a near-commutative operation, e.g. distSqr(x, y, z) is the same as distSqr(y, x, z.T)
-    cdef int n = x.shape[0], m = y.shape[0], d = x.shape[1], i, j, p
+    cdef int n = x.shape[0], m = y.shape[0], k = x.shape[1], i, j, p
     cdef double alpha = -2.0, beta = 1.0, sum2
     cdef double[:] temp = z[m-1,:] # last row in z is used as a temporary
     # temp = (x*x).sum(1)
     for i in xrange(n):
         sum2 = 0.0
-        for p in xrange(d): sum2 += x[i,p]*x[i,p]
+        for p in xrange(k): sum2 += x[i,p]*x[i,p]
         temp[i] = sum2
     # z = temp[None,:] + (y*y).sum(1)[:,None]
     for j in xrange(m):
         sum2 = 0.0
-        for p in xrange(d): sum2 += y[j,p]*y[j,p]
+        for p in xrange(k): sum2 += y[j,p]*y[j,p]
         for i in xrange(n): z[j,i] = sum2 + temp[i]
     # z += -2*x.dot(y.T)
-    dgemm("T", "N", &n, &m, &d, &alpha, &x[0,0], &d, &y[0,0], &d, &beta, &z[0,0], <int*>&z.shape[1])
-    
+    dgemm("T", "N", &n, &m, &k, &alpha, &x[0,0], &k, &y[0,0], &k, &beta, &z[0,0], <int*>&z.shape[1])
+   
+cdef void distSqr_acc(double[:,::1] x, double[:,::1] y, double[:,::1] z) nogil:
+    """
+    This is just like distSqr except that it is has greatly increased accuracy at the cost of
+    speed. These differences are due to performing the subtraction early instead of late. This uses
+    the concept of the "slow method" decribed in the documentation for distSqr.
+                    
+    This still does not allocate any extra memory (and doesn't use dgemm so no hidden memory
+    allocation may happen there). This is about 3x to 10x slower than distSqr.
+    """
+    cdef intp n = x.shape[0], m = y.shape[0], k = x.shape[1], i, j
+    for i in prange(m):
+        for j in xrange(n): z[i,j] = distSqr_vector(x[j], y[i], k)
+
+cdef inline double distSqr_vector(double[::1] x, double[::1] y, intp k) nogil:
+    """Squared distance between two k-length vectors x and y."""
+    cdef intp p
+    cdef double sum2 = 0.0
+    for p in xrange(k): sum2 += (x[p]-y[p])*(x[p]-y[p])
+    return sum2
+
 
 #################### Gradient Descent ####################
 
