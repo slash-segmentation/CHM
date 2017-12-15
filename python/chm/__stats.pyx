@@ -388,10 +388,12 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
         # Check the bins and calculate the values at the percentiles
         if nthreads == 1:
             for i in xrange(NK):
+                errno = 0
                 out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], i==NK-1)
                 if out[i] == -INFINITY and errno != 0: err = errno; break
         else:
             for i in prange(NK, num_threads=nthreads):
+                errno = 0
                 out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], False)
                 if out[i] == -INFINITY and errno != 0: p_err[0] = errno; break
             free(bins)
@@ -400,7 +402,7 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
     if err != 0:
         if   err == ENOMEM: raise MemoryError()
         elif err == ERANGE: raise ValueError()
-        raise OSError()
+        raise OSError(err, strerror(err))
     return 0
 
 cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, double bin_sz, intp k, double f, bint free_bins) nogil:
