@@ -27,7 +27,7 @@ from __future__ import print_function
 include "filters/filters.pxi"
 
 from libc.stdlib cimport malloc, free
-from libc.string cimport memset
+from libc.string cimport memset, strerror
 from libc.math cimport floor, sqrt, NAN, nextafter, INFINITY
 from libc.errno cimport errno, ENOMEM, ERANGE
 from cython.parallel cimport parallel, prange
@@ -388,12 +388,12 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
         # Check the bins and calculate the values at the percentiles
         if nthreads == 1:
             for i in xrange(NK):
-                errno = 0
+                clear_errno()
                 out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], i==NK-1)
                 if out[i] == -INFINITY and errno != 0: err = errno; break
         else:
             for i in prange(NK, num_threads=nthreads):
-                errno = 0
+                clear_errno()
                 out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], False)
                 if out[i] == -INFINITY and errno != 0: p_err[0] = errno; break
             free(bins)
@@ -405,6 +405,10 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
         raise OSError(err, strerror(err))
     return 0
 
+cdef inline void clear_errno() nogil:
+    global errno
+    errno = 0
+    
 cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, double bin_sz, intp k, double f, bint free_bins) nogil:
     """
     Finds the bin that contains the k-th smallest value and proceedes with quickselect or another
