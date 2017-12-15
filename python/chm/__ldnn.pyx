@@ -173,7 +173,7 @@ DEF KMEANS_ML_RATE          = 3
 DEF KMEANS_ML_MIN_N         = 50
 DEF KMEANS_ML_MAX_RETRIES   = 3 # TODO: or 300?
 
-cdef bint higher_accuracy = False # makes km_update use the slower but more accurate distSqr_acc function
+cdef bint kmeans_high_acc = False # makes k-means default to the slower but more accurate distSqr_acc function
 
 class ClusteringWarning(UserWarning): pass
 
@@ -201,31 +201,37 @@ cpdef kmeansML(intp k, double[:,::1] data):
     Jeffrey Bush, 2015-2017, NCMIR, UCSD
     Converted into Python/Cython and optimized greatly
     """
+    # Allocate memory
     cdef intp n = data.shape[0], d = data.shape[1]
     cdef ndarray means      = PyArray_EMPTY(2, [k, d], NPY_DOUBLE, False)
     cdef ndarray means_next = PyArray_EMPTY(2, [k, d], NPY_DOUBLE, False)
     cdef ndarray membership = PyArray_EMPTY(1, &n, NPY_INTP, False)
     cdef ndarray counts     = PyArray_EMPTY(1, &k, NPY_INTP, False)
     cdef ndarray temp       = PyArray_EMPTY(2, [k, n], NPY_DOUBLE, False)
-    cdef double rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp)
-    if rms2 == -1.0: # When ran into a negative value from distSqr or rms2 went up, need to increase accuracy
-        global higher_accuracy
-        if not higher_accuracy:
-            higher_accuracy = True
-            rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp)
-        if rms2 == -1.0: # Still problematic...
-            raise RuntimeError('internal calculation error: rms should always decrease and not be negative')
+    
+    # Run k-means
+    global kmeans_high_acc
+    cdef bint orig_high_acc = kmeans_high_acc
+    cdef double rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp, orig_high_acc)
+    if not orig_high_acc and rms2 == -1.0: # When ran into an accuracy issue, need to increase accuracy
+        kmeans_high_acc = True
+        rms2 = __kmeansML(k, data, means, means_next, membership, counts, temp, True)
+    if rms2 == -1.0: raise RuntimeError('K-Means error: RMS^2 should always decrease and not be negative')
+    
+    # All done
     return means, rms2
 
 cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
-                       intp[::1] membership, intp[::1] counts, double[:,::1] temp, int retry=1) except -2.0:
+                       intp[::1] membership, intp[::1] counts, double[:,::1] temp,
+                       bint high_acc=False, int retry=0) except -2.0:
     """
     Mulit-level K-Means core. Originally the private function kmeansInternal.
 
     Inputs:
         k           number of clusters
         data        n-by-d matrix where n is the number of samples and d is the features per sample
-        retry       the retry count, should be one except for recursive calls
+        high_acc    if True then use distSqr_acc which is slower but higher accuracy (default False)
+        retry       the retry count, should be 0 except for recursive calls
         
     Outputs:
         means       k-by-d matrix, cluster means/centroids
@@ -243,23 +249,23 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
     # Compute initial means
     cdef intp coarseN = (n+KMEANS_ML_RATE//2)//KMEANS_ML_RATE
     if coarseN < KMEANS_ML_MIN_N or coarseN < k:
-        # pick random points for means
+        # Pick random points for means
         random_subset(data, k, means)
-    else:
-        # recurse on random subsample to get means - O(coarseN) allocation
-        if __kmeansML(k, random_subset(data, coarseN), means, means_next, membership, counts, temp, 0) == 1.0:
-            return -1.0 # error - retry with higher accuracy
+    # Recurse on random subsample to get means - O(coarseN) allocation
+    elif __kmeansML(k, random_subset(data, coarseN), means, means_next, membership, counts, temp, high_acc) == -1.0:
+        return -1.0 # error - retry with higher accuracy
     
     # Iterate
     with nogil:
-        rms2 = km_update(data, means, means_next, membership, counts, temp)
+        rms2 = km_update(data, means, means_next, membership, counts, temp, high_acc)
+        if rms2 == -1.0: return -1.0 # error - retry with higher accuracy
         for _ in xrange(KMEANS_ML_MAX_ITER - 1):
             # Save last state
             prevRms2 = rms2
             means_tmp = means_next; means_next = means; means = means_tmp
 
             # Compute cluster membership, RMS^2 error, new means, and cluster counts
-            rms2 = km_update(data, means, means_next, membership, counts, temp)
+            rms2 = km_update(data, means, means_next, membership, counts, temp, high_acc)
             if rms2 == -1.0 or rms2 > prevRms2: return -1.0 # error - retry with higher accuracy
             
             # Check for convergence
@@ -282,15 +288,14 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
                 break
 
     if has_empty:
-        # If there is an empty cluster, then re-run kmeans.
+        # There is an empty cluster
+        if not high_acc: return -1.0 # switch to higher accuracy mode if not already high accuracy
         # Retry a fixed number of times
         from warnings import warn
         if retry < KMEANS_ML_MAX_RETRIES:
-            return __kmeansML(k, data, means_orig, means_next_orig, membership, counts, temp, retry+1)
-        if means.shape[1] == n:
-            warn('There is an empty cluster at the top level of k-means.', ClusteringWarning)
-        else:
-            warn('There is an empty cluster while running k-means.', ClusteringWarning)
+            return __kmeansML(k, data, means_orig, means_next_orig, membership, counts, temp, high_acc, retry+1)
+        # Otherwise produce a warning
+        warn('There is an empty cluster while running k-means'+(' (top level)' if membership.shape[0] == n else ''), ClusteringWarning)
 
     # At this point the means data is in means_next
     # We need to make sure that refers to the means_orig array or copy the data over
@@ -309,15 +314,15 @@ cdef double[:,::1] random_subset(double[:,::1] data, Py_ssize_t n, double[:,::1]
     return out
 
 cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
-                      intp[:] membership, intp[::1] counts, double[:,::1] dist) nogil:
+                      intp[:] membership, intp[::1] counts, double[:,::1] dist, bint high_acc=False) nogil:
     """
     K-Means updating. Combines the original private functions computeMembership and computeMeans.
-    Now returns RMS^2 instead of RMS. If the global variable higher_accuracy is True then thi uses
-    the distSqr_acc instead of distSqr function.
+    Now returns RMS^2 instead of RMS.
 
     Inputs:
         data        n-by-d C matrix, sample features
         means       k-by-d C matrix, current means
+        high_acc    if True then use distSqr_acc which is slower but higher accuracy (default False)
 
     Outputs:
         means_next  k-by-d C matrix, updated means
@@ -337,8 +342,8 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
     cdef double x, min_sum = 0.0
 
     # Compute cluster membership and RMS error
-    if higher_accuracy: distSqr_acc(data, means, dist) # more accurate but slower, use as necessary
-    else:               distSqr(data, means, dist)
+    if high_acc: distSqr_acc(data, means, dist) # more accurate but slower, use as necessary
+    else:        distSqr(data, means, dist)
     cdef double[::1] mins = dist[0,:] # first row of z starts out as mins
     membership[:] = 0 # all mins are in row 0
     for j in xrange(1, k): # go through all other rows and check for minimums
