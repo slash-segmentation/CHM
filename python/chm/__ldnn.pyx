@@ -17,6 +17,7 @@ import_array()
 
 from cython.parallel cimport prange
 
+from libc.stdlib cimport rand, RAND_MAX
 from libc.math cimport exp, sqrt
 from libc.float cimport DBL_MAX
 ctypedef double* dbl_p
@@ -171,7 +172,6 @@ DEF KMEANS_ML_DTOL          = 0.0
 
 DEF KMEANS_ML_RATE          = 3
 DEF KMEANS_ML_MIN_N         = 50
-DEF KMEANS_ML_MAX_RETRIES   = 3 # TODO: or 300?
 
 cdef bint kmeans_high_acc = False # makes k-means default to the slower but more accurate distSqr_acc function
 
@@ -222,8 +222,7 @@ cpdef kmeansML(intp k, double[:,::1] data):
     return means, rms2
 
 cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
-                       intp[::1] membership, intp[::1] counts, double[:,::1] temp,
-                       bint high_acc=False, int retry=0) except -2.0:
+                       intp[::1] membership, intp[::1] counts, double[:,::1] temp, bint high_acc=False) except -2.0:
     """
     Mulit-level K-Means core. Originally the private function kmeansInternal.
 
@@ -231,7 +230,6 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         k           number of clusters
         data        n-by-d matrix where n is the number of samples and d is the features per sample
         high_acc    if True then use distSqr_acc which is slower but higher accuracy (default False)
-        retry       the retry count, should be 0 except for recursive calls
         
     Outputs:
         means       k-by-d matrix, cluster means/centroids
@@ -242,8 +240,8 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
         <return>    RMS^2 error, -1.0 for accuracy error, and -2.0 for Python exception
     """
     cdef intp n = data.shape[0], d = data.shape[1], i, j
-    cdef bint has_empty = False, converged = False
-    cdef double S, max_sum
+    cdef bint converged = False
+    cdef double S, max_sum, rms2, prevRms2
     cdef double[:,::1] means_orig = means, means_next_orig = means_next, means_tmp
 
     # Compute initial means
@@ -266,14 +264,21 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
 
             # Compute cluster membership, RMS^2 error, new means, and cluster counts
             rms2 = km_update(data, means, means_next, membership, counts, temp, high_acc)
-            if rms2 == -1.0 or rms2 > prevRms2: return -1.0 # error - retry with higher accuracy
-            
-            # Check for convergence
-            IF KMEANS_ML_ETOL==0.0:
-                converged = prevRms2 == rms2 # actually <= but the < is checked above
-            ELSE:
-                # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
-                converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
+            if rms2 == -1.0 or rms2 > prevRms2:
+                if not high_acc: return -1.0 # error - retry with higher accuracy
+                with gil:
+                    from warnings import warn
+                    err = ('rms^2 had negative components even when using higher accuracy' if rms2 == -1.0 else
+                           'rms^2 increased by more than 0.5%% or at the top level even when using high accuracy: %f > %f' % (rms2, prevRms2))
+                    warn(err, ClusteringWarning)
+                    return -1.0
+            else:
+                # Check for convergence
+                IF KMEANS_ML_ETOL==0.0:
+                    converged = prevRms2 == rms2 # actually <= but the < is checked above
+                ELSE:
+                    # 2*(rmsPrev-rms)/(rmsPrev+rms) <= etol
+                    converged = sqrt(prevRms2/rms2) <= (2 + KMEANS_ML_ETOL) / (2 - KMEANS_ML_ETOL)
             if converged:
                 max_sum = 0.0
                 for i in xrange(k):
@@ -281,21 +286,6 @@ cdef double __kmeansML(intp k, double[:,::1] data, double[:,::1] means, double[:
                     for j in xrange(d): S += (means[i,j] - means_next[i,j]) * (means[i,j] - means_next[i,j])
                     if S > max_sum: max_sum = S
                 if max_sum <= KMEANS_ML_DTOL*KMEANS_ML_DTOL: break
-
-        for i in xrange(k):
-            if counts[i] == 0:
-                has_empty = True
-                break
-
-    if has_empty:
-        # There is an empty cluster
-        if not high_acc: return -1.0 # switch to higher accuracy mode if not already high accuracy
-        # Retry a fixed number of times
-        from warnings import warn
-        if retry < KMEANS_ML_MAX_RETRIES:
-            return __kmeansML(k, data, means_orig, means_next_orig, membership, counts, temp, high_acc, retry+1)
-        # Otherwise produce a warning
-        warn('There is an empty cluster while running k-means'+(' (top level)' if membership.shape[0] == n else ''), ClusteringWarning)
 
     # At this point the means data is in means_next
     # We need to make sure that refers to the means_orig array or copy the data over
@@ -313,8 +303,10 @@ cdef double[:,::1] random_subset(double[:,::1] data, Py_ssize_t n, double[:,::1]
     for i in xrange(n): out[i,:] = data[inds[total-n+i],:]
     return out
 
+from libc.math cimport isnan
+    
 cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] means_next,
-                      intp[:] membership, intp[::1] counts, double[:,::1] dist, bint high_acc=False) nogil:
+                      intp[:] membership, intp[::1] counts, double[:,::1] dist, bint high_acc=False) nogil except -2.0:
     """
     K-Means updating. Combines the original private functions computeMembership and computeMeans.
     Now returns RMS^2 instead of RMS.
@@ -338,8 +330,9 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
     """
 
     # CHANGED: returns the RMS^2 instead of RMS
-    cdef intp n = data.shape[0], d = data.shape[1], k = means.shape[0], i, j, p
+    cdef intp n = data.shape[0], d = data.shape[1], k = means.shape[0], i, j, p, ix
     cdef double x, min_sum = 0.0
+    cdef bint has_empty = False
 
     # Compute cluster membership and RMS error
     if high_acc: distSqr_acc(data, means, dist) # more accurate but slower, use as necessary
@@ -353,15 +346,54 @@ cdef double km_update(double[:,::1] data, double[:,::1] means, double[:,::1] mea
         if mins[i] < 0: return -1.0 # found a negative value which means we need to increase accurac
         min_sum += mins[i]
 
-    # Compute new means and cluster counts
-    means_next[:,:] = 0.0
+    # Compute cluster counts and new means (note: new means are not scaled until later)
     counts[:] = 0
+    means_next[:,:] = 0.0
     for i in xrange(n):
         j = membership[i]
-        for p in xrange(d): means_next[j,p] += data[i,p]
         counts[j] += 1
+        for p in xrange(d): means_next[j,p] += data[i,p]
+    
+    # Look for any empty clusters and move their means
     for j in xrange(k):
-        x = 1.0 / max(1, counts[j])
+        if counts[j] == 0:
+            # Found an empty cluster
+            if not high_acc: return -1.0 # switch to higher accuracy mode if not already high accuracy
+            has_empty = True
+            
+            # Pick the point that is furthest from its clusters mean
+            # NOTE: since we have eliminated the first row of dist this won't be able to steal a
+            # point from the first cluster.
+            x = 0.0
+            ix = -1
+            for i in xrange(n):
+                if counts[membership[i]] > 1 and dist[membership[i],i] > x:
+                    x = dist[membership[i],i]
+                    ix = i
+            i = ix
+            if i == -1:
+                # No clusters with >1 points found, just pick a random one?
+                i = rand() % n
+                while counts[membership[i]] == 1: i = rand() % n
+            
+            # Copy the found point as the new cluster mean
+            for p in xrange(d): means[j,p] = data[i,p]
+            
+            # Adjust memberships and counts
+            counts[membership[i]] -= 1
+            membership[i] = j
+            counts[j] += 1
+    # If there were any empty clusters, run km_update again with new means
+    # TODO: don't need to do this if we just use the dists already calculated
+    if has_empty:
+        with gil:
+            from warnings import warn
+            warn('An empty cluster was found so attempting to adjust for it (this may be an indication that the k is too large)', ClusteringWarning)
+        return km_update(data, means, means_next, membership, counts, dist, high_acc)
+        
+    # Scale new means
+    for j in xrange(k):
+        x = 1.0 / counts[j]
         for p in xrange(d): means_next[j,p] *= x
 
     # Return RMS^2 error
