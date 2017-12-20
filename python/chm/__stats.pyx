@@ -27,9 +27,8 @@ from __future__ import print_function
 include "filters/filters.pxi"
 
 from libc.stdlib cimport malloc, free
-from libc.string cimport memset, strerror
-from libc.math cimport floor, sqrt, NAN, nextafter, INFINITY
-from libc.errno cimport errno, ENOMEM, ERANGE
+from libc.string cimport memset
+from libc.math cimport floor, sqrt, nextafter, INFINITY, isnan, nan, NAN
 from cython.parallel cimport parallel, prange
 from cython.view cimport array
 
@@ -267,6 +266,11 @@ def cy_percentile(double[:] x, q, bint overwrite=False, int nthreads=1):
     The number of threads is only used during histogramming of the data and not during quickselect.
     It is used to get the min and max of the data (using cy_min_max) and if there is more than one
     percentile to calculate then each percentile will use a separate thread.
+    
+    TODO: if the given percentile falls between two values and those two values end up being in
+    different bins duing the hitsogramming process then the returned value will not return the
+    "observed" value by taking the weighted sum of the two closest values but instead return one
+    of the values only (likely the lower of the two values).
     """
     from numpy import empty
     
@@ -349,6 +353,21 @@ cdef tuple q2k(qs, intp N):
         fs[i] = k-ks[i]
     return ks, fs, scalar
 
+# The percentile_recurse function returns one of these special nan values in case of errors. They
+# can be checked for by using the are_payloads_equal function. To get these to work there are a few
+# hackish things being used here.
+cdef double MEMORY_ERROR = nan("0x55550001")
+cdef double VALUE_ERROR  = nan("0x55550002")
+cdef extern from * nogil: # not actually extern, instead these are used as macros
+    #cdef double MEMORY_ERROR "__builtin_nan(\"0x55550001\")" # GCC only but makes a compile-time constant
+    #cdef double VALUE_ERROR  "__builtin_nan(\"0x55550002\")"
+    #cdef double MEMORY_ERROR "nan(\"0x55550001\")" # C99 but runtime evaluation
+    #cdef double VALUE_ERROR  "nan(\"0x55550002\")"
+    #cdef inline unsigned long dbl_to_long_bits "reinterpret_cast<unsigned long&>" (double) # C++ only
+    cdef inline unsigned long dbl_to_long_bits "*(unsigned long*)&" (double) # may have aliasing issues
+cdef inline bint are_payloads_equal(double a, double b) nogil:
+    return (dbl_to_long_bits(a) & 0x7FFFFFFFFFFFFul) == (dbl_to_long_bits(b) & 0x7FFFFFFFFFFFFul)
+
 cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, int nthreads, bint overwrite) except -1:
     """Core internal function for cy_precentile, cy_precentile_0, cy_precentile_1."""
     cdef intp N = xs.shape[0], NK = ks.shape[0], i
@@ -374,8 +393,8 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
     if bins is NULL: raise MemoryError()
     # Adjust the number of threads
     nthreads = get_nthreads(nthreads, NK)
-    cdef int err = 0
-    cdef int* p_err = &err
+    cdef double err = 0.0
+    cdef double* p_err = &err
     with nogil:
         # Calculate the counts in the bins
         bs_inv = nbins/(max-min)
@@ -388,78 +407,84 @@ cdef int percentile(double[:] xs, intp[::1] ks, double[::1] fs, double[:] out, i
         # Check the bins and calculate the values at the percentiles
         if nthreads == 1:
             for i in xrange(NK):
-                clear_errno()
-                out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], i==NK-1)
-                if out[i] == -INFINITY and errno != 0: err = errno; break
+                out[i] = percentile_recurse(xs, bins, nbins, min, max, ks[i], fs[i], i==NK-1)
+                if isnan(out[i]):
+                    err = out[i]
+                    if i != NK-1: free(bins)
+                    break
         else:
             for i in prange(NK, num_threads=nthreads):
-                clear_errno()
-                out[i] = percentile_recurse(xs, bins, nbins, min, (max-min)/nbins, ks[i], fs[i], False)
-                if out[i] == -INFINITY and errno != 0: p_err[0] = errno; break
+                out[i] = percentile_recurse(xs, bins, nbins, min, max, ks[i], fs[i], False)
+                if isnan(out[i]): p_err[0] = out[i]; break
             free(bins)
             
     # Check for errors
-    if err != 0:
-        if   err == ENOMEM: raise MemoryError()
-        elif err == ERANGE: raise ValueError()
-        raise OSError(err, strerror(err))
+    if err != 0.0:
+        if are_payloads_equal(err, MEMORY_ERROR): raise MemoryError()
+        if are_payloads_equal(err, VALUE_ERROR):  raise ValueError()
+        raise RuntimeError()
     return 0
 
-cdef inline void clear_errno() nogil:
-    global errno
-    errno = 0
-    
-cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, double bin_sz, intp k, double f, bint free_bins) nogil:
+cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, double max, intp k, double f, bint free_bins) nogil:
     """
     Finds the bin that contains the k-th smallest value and proceedes with quickselect or another
     histogram run. If the bin that contains the value would still require more than 1MB of data to
     copy, then it recurses. Otherwise we copy the values out and perform quickselect. If free_bins
     is True then the bins pointer is given to free once it is no longer needed.
     
-    Some minor optimizations that could be done if recursing:
-        Record the minimum and maximum found in each bin and use those values to recurse with
-            (which would make bin_size smaller and thus more granular)
-        'Trim' the x data to automatically skip leading and trailing values not in the recursed bin
-            (gets tricky since k would also have to be updated as well)
-    However we are unlikely to recurse that much so these would likely be wasted.
+    Returns the special NAN values MEMORY_ERROR and VALUE_ERROR if there is a problem.
     """
     cdef intp i, j = 0, cnt = 0, N = x.shape[0], Nb
-    cdef double max, v
+    cdef double min_bin, max_bin, mn, mx, v, bin_sz = (max-min)/nbins
     cdef double* data
     for i in xrange(nbins):
         cnt += bins[i]
         if cnt > k:
             # Found the bin!
-            max = (i+1)*bin_sz+min; min += i*bin_sz # min/max of the bin
-            Nb = bins[i]; k -= cnt-Nb               # size of bin and k within the bin
+            min_bin = min+i*bin_sz; max_bin = min+(i+1)*bin_sz # min/max of the bin
+            Nb = bins[i]; k -= cnt-Nb # number of values and k within the bin
             if free_bins: free(bins)
-            if min == max: return min # found the value itself!
-            elif Nb <= COPY_SIZE:
+                            
+            # Check how to proceed: either quickselect or histselect
+            if Nb <= COPY_SIZE:
                 # Data has shrunk enough to be copied and sent to quickselect
                 data = <double*>malloc(Nb*sizeof(double))
-                if data is NULL: errno = ENOMEM; return -INFINITY
+                if data is NULL: return MEMORY_ERROR
                 for i in xrange(N):
-                    if min <= x[i] < max: data[j] = x[i]; j += 1
+                    if min_bin <= x[i] < max_bin: data[j] = x[i]; j += 1
                 v = quickselect_weighted(data, Nb, k, f)
                 free(data)
                 return v
-            # Data is still too large to be copied, histogram again
-            return histselect(x, min, max, Nb, k, f)
+            else:
+                # Data is still too large to be copied, histogram again
+                # First, we will get the actual min/max of the data within the bin. This is done so
+                # that we have faster converge due to smaller bins. Additionally, in case there is
+                # more than COPY_SIZE duplicates of the median then the final bin can never be
+                # split unless we update the overall bounds resulting either in an infinite
+                # recursion or rounding errors resulting in a VALUE_ERROR being returned.
+                mn = max_bin; mx = min_bin
+                for i in xrange(N):
+                    if min_bin <= x[i] < max_bin:
+                        if x[i] < mn: mn = x[i]
+                        elif x[i] > mx: mx = x[i]
+                if mn == mx: return mn # every value in the bin is the median!
+                return histselect(x, mn, mx, Nb, k, f)
+
+    # Should never get here, but if we do clean up and report a VALUE_ERROR
     if free_bins: free(bins)
-    errno = ERANGE
-    return -INFINITY
+    return VALUE_ERROR
 
 cdef double histselect(double[:] x, double min, double max, intp N, intp k, double f) nogil:
     """Histograms the data recursively to find the k-th smallest value."""
     cdef intp i, nbins = <intp>sqrt(N)
     cdef intp* bins = <intp*>malloc((nbins+1)*sizeof(intp))
-    if bins is NULL: errno = ENOMEM; return -INFINITY
+    if bins is NULL: return MEMORY_ERROR
     memset(bins, 0, (nbins+1)*sizeof(intp))
     cdef double bs_inv = nbins/(max-min)
     for i in xrange(x.shape[0]):
         if min <= x[i] < max: bins[<intp>((x[i]-min)*bs_inv)] += 1
     bins[nbins-1] += bins[nbins] # catch the overflow values without using ifs in the loop
-    return percentile_recurse(x, bins, nbins, min, (max-min)/nbins, k, f, True)
+    return percentile_recurse(x, bins, nbins, min, max, k, f, True)
 
 cdef inline double quickselect_weighted(double* x, intp N, intp k, double f) nogil:
     """
