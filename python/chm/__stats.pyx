@@ -321,7 +321,7 @@ cdef percentile_axis(list xs, q, int nthreads, bint overwrite):
         elif nthreads == 1:
             for i in xrange(N): percentile(xs[i], ks, fs, out[:,i], 1, overwrite)
         elif nthreads <= N:
-            for i in prange(N, num_threads=N, nogil=True, schedule='static'):
+            for i in prange(N, num_threads=nthreads, nogil=True, schedule='static'):
                 with gil: percentile(xs[i], ks, fs, out[:,i], 1, overwrite)
         else: # nthreads > N
             nts = divy_threads(nthreads, N)
