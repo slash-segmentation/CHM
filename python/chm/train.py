@@ -436,7 +436,12 @@ def __get_filter(f):
         if f <= 0: __chm_train_usage("Size of intensity filter must be a positive integer")
         return F(f)
     filters = {'haar':Haar, 'hog':HOG, 'edge':Edge, 'frangi':Frangi, 'gabor':Gabor, 'sift': SIFT}
+    compat = f.endswith('-compat')
+    if compat: f = f[:-7]
     if f not in filters: __chm_train_usage("Unknown filter '%s'"%f)
+    if compat:
+        try: return filters[f](compat=True)
+        except TypeError: __chm_train_usage("Unknown filter '%s-compat'"%f)
     return filters[f]()
 
 def __chm_train_usage(err=None):
