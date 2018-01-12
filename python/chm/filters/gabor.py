@@ -284,10 +284,12 @@ class Gabor(Filter):
         if len(sys.argv) == 1:
             print(
 """This program creates an FFTW wisdom cache for use with PyCHM. You must provide
-at least one comma-seperated list of height,width,num-threads to create an FFTW
-wisdom cache from. You may specify any number of these and each will be used in
-creating the cache. Additionally the num-threads may not be just a number but a
-range like 1-24.
+at least one comma-seperated list of height,width,num-threads or
+height,width,levels,num-threads to create an FFTW wisdom cache from. Levels
+specifies how many times to cut the image size in half automatically (default
+is 0). You may specify any number of these and each will be used in creating
+the cache. Additionally, the num-threads may not be just a number but a range
+such as 1-24.
 
 The cache will be saved to:
     %s
@@ -300,18 +302,25 @@ same for re-using.""" % Gabor.__fftw_wisdom_file)
             sys.exit(0)
         for arg in sys.argv[1:]:
             try:
-                h,w,n = arg.split(',')
-                sh = int(h,10),int(w,10)
-                if '-' in n:
-                    n1,n2 = n.split('-')
-                    for n in xrange(int(n1,0), int(n2,0)+1):
-                        print('Calculating wisdom for %s,%s,%d...'%(h,w,n))
-                        Gabor.__get_fftw_plans(sh, n)
-                        Gabor.__fftw_plans.clear()
+                vals = arg.split(',')
+                if len(vals) == 4:
+                    h,w,l,n = vals
                 else:
-                    print('Calculating wisdom for %s,%s,%s...'%(h,w,n))
-                    Gabor.__get_fftw_plans(sh, int(n,10))
-                    Gabor.__fftw_plans.clear()
+                    h,w,n = arg.split(',')
+                    l = 0
+                sh = int(h,10),int(w,10)
+                for i in xrange(l+1):
+                    if '-' in n:
+                        n1,n2 = n.split('-')
+                        for n in xrange(int(n1,0), int(n2,0)+1):
+                            print('Calculating wisdom for %s,%s,%d...'%(h,w,n))
+                            Gabor.__get_fftw_plans(sh, n)
+                            Gabor.__fftw_plans.clear()
+                    else:
+                        print('Calculating wisdom for %s,%s,%s...'%(h,w,n))
+                        Gabor.__get_fftw_plans(sh, int(n,10))
+                        Gabor.__fftw_plans.clear()
+                    sh = (sh[0] + 1) // 2, (sh[1] + 1) // 2
             except ValueError:
                 print('Invalid value "%s"'%arg)
         print('Completed')
