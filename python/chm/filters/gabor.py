@@ -305,20 +305,16 @@ same for re-using.""" % Gabor.__fftw_wisdom_file)
                 vals = arg.split(',')
                 if len(vals) == 4:
                     h,w,l,n = vals
+                    l = int(l,10)
                 else:
                     h,w,n = arg.split(',')
                     l = 0
                 sh = int(h,10),int(w,10)
+                n1,n2 = (int(n,10) for n in (n.split('-') if '-' in n else (n,n)))
                 for i in xrange(l+1):
-                    if '-' in n:
-                        n1,n2 = n.split('-')
-                        for n in xrange(int(n1,0), int(n2,0)+1):
-                            print('Calculating wisdom for %s,%s,%d...'%(h,w,n))
-                            Gabor.__get_fftw_plans(sh, n)
-                            Gabor.__fftw_plans.clear()
-                    else:
-                        print('Calculating wisdom for %s,%s,%s...'%(h,w,n))
-                        Gabor.__get_fftw_plans(sh, int(n,10))
+                    for n in xrange(n1, n2+1):
+                        print('Calculating wisdom for %d,%d,%d...'%(sh[0],sh[1],n))
+                        Gabor.__get_fftw_plans(sh, n)
                         Gabor.__fftw_plans.clear()
                     sh = (sh[0] + 1) // 2, (sh[1] + 1) // 2
             except ValueError:
