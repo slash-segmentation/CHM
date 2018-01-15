@@ -453,11 +453,11 @@ def _get_norm(X, method='mean-std', nthreads=1):
         return asarray((mn, __one_over(mx)))
     elif method == 'mean-std':
         mean,std = mean_std(X, 1, nthreads=nthreads)
-        std *= 2
+        std *= 5
         return asarray((mean, __one_over(std)))
     elif method == 'median-mad':
         med,mad = median_mad(X, 1, nthreads=nthreads)
-        mad *= 2
+        mad *= 5
         return asarray((med, __one_over(mad)))
     elif method == 'iqr':
         q1,q3 = percentile(X, [0.25, 0.75], 1, nthreads=nthreads)
@@ -477,7 +477,7 @@ def _normalize(X, norm, method='mean-std', nthreads=1):
         X -= mn[:,None]
         X *= mx[:,None]
     elif method in ('mean-std', 'median-mad'):
-        # new mean/median will be 0.5 and +/-2 std/MADs at 0 and 1
+        # new mean/median will be 0.5 and +/-2.5 std/MADs at 0 and 1
         mean,std = norm
         X -= mean[:,None]
         X *= std[:,None]

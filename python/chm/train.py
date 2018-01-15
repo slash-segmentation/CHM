@@ -484,8 +484,8 @@ Optional Arguments:
                 The methods that are available are:
                     none: no normalization is performed
                     min-max: minimum goes to 0, maximum goes to 1
-                    mean-std: mean to 0.5 and mean-/+2*std to 0 and 1
-                    median-mad: median to 0.5 and median-/+2*MAD to 0 and 1
+                    mean-std: mean to 0.5 and mean-/+2.5*std to 0 and 1
+                    median-mad: median to 0.5 and median-/+2.5*MAD to 0 and 1
                         where MAD is the standardized median abs diff (default)
                     iqr: Q1-1.5*IQR to 0 and Q3+1.5*IQR to 1
   -M mask       Specify a mask of the input images and labels for which pixels
