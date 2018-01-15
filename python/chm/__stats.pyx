@@ -435,13 +435,13 @@ cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, 
     Returns the special NAN values MEMORY_ERROR and VALUE_ERROR if there is a problem.
     """
     cdef intp i, j = 0, cnt = 0, N = x.shape[0], Nb
-    cdef double min_bin, max_bin, mn, mx, v, bin_sz = (max-min)/nbins
+    cdef double min_bin, max_bin, mn, mx, v
     cdef double* data
     for i in xrange(nbins):
         cnt += bins[i]
         if cnt > k:
             # Found the bin!
-            min_bin = min+i*bin_sz; max_bin = min+(i+1)*bin_sz # min/max of the bin
+            min_bin = (i*max+(nbins-i)*min)/nbins; max_bin = ((i+1)*max+(nbins-i-1)*min)/nbins # min/max of the bin (the formula is designed to decrease fp error
             Nb = bins[i]; k -= cnt-Nb # number of values and k within the bin
             if free_bins: free(bins)
                             
@@ -468,6 +468,7 @@ cdef double percentile_recurse(double[:] x, intp* bins, intp nbins, double min, 
                         if x[i] < mn: mn = x[i]
                         elif x[i] > mx: mx = x[i]
                 if mn == mx: return mn # every value in the bin is the median!
+                mx = nextafter(mx, INFINITY) # we need to make the max value *exclusive*
                 return histselect(x, mn, mx, Nb, k, f)
 
     # Should never get here, but if we do clean up and report a VALUE_ERROR
