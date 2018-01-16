@@ -143,7 +143,8 @@ def run_kmeans(intp k, X, Y, intp downsmpl=10, intp repeats=5, bint whiten=False
     # 'Whiten' the data (make variance of each feature equal to 1)
     if whiten:
         sd = stddev(data)
-        sd[sd == 0] = 1 # avoid divide-by-0, turning it into no-scaling (should only ever be 0 for the column of all 1s anyways)
+        sd[sd < 1e-10] = 1 # avoid divide-by-0 and blowing-up near-no-variance data by not scaling them
+        # TODO: the check above could be relative to the mean for that feature, which is already calculated when calculating the stddev
         data *= 1/sd
     
     # Calculate clusters using kmeans
