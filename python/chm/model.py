@@ -415,7 +415,7 @@ class SubModel(object):
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
             norms = []
-            for rng in _ranges(should_norm):
+            for rng in _ranges(self.__should_norm):
                 X_ = X[rng] # since rng is a slice this will be view of the data
                 norm = _get_norm(X_, self.__norm_method, nthreads)
                 _normalize(X_, norm, self.__norm_method, nthreads)
