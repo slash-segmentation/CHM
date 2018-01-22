@@ -388,7 +388,7 @@ class SubModel(object):
         
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
-            for rng in __ranges(self.__should_norm):
+            for rng in _ranges(self.__should_norm):
                 _normalize(X[rng], self.__norm[rng], self.__norm_method, nthreads)
         
         # Evaluation is very memory intensive, make sure we are ready
@@ -415,7 +415,7 @@ class SubModel(object):
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
             norms = []
-            for rng in __ranges(should_norm):
+            for rng in _ranges(should_norm):
                 X_ = X[rng] # since rng is a slice this will be view of the data
                 norm = _get_norm(X_, self.__norm_method, nthreads)
                 _normalize(X_, norm, self.__norm_method, nthreads)
@@ -428,7 +428,7 @@ class SubModel(object):
         # Run the classifier's learn method
         self.classifier.learn(X, Y, nthreads)
 
-def __ranges(mask):
+def _ranges(mask):
     """Generates slices for ranges of Trues in a 1D logical array/list."""
     from itertools import groupby
     off = 0
