@@ -388,10 +388,8 @@ class SubModel(object):
         
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
-            should_norm = self.__should_norm
-            X_ = X[should_norm] # TODO: is there a more efficient way to do this?
-            _normalize(X_, self.__norm, self.__norm_method, nthreads)
-            X[should_norm] = X_
+            for rng in __ranges(self.__should_norm):
+                _normalize(X[rng], self.__norm[rng], self.__norm_method, nthreads)
         
         # Evaluation is very memory intensive, make sure we are ready
         import gc; gc.collect()
@@ -407,7 +405,7 @@ class SubModel(object):
         if self.classifier.learned: raise ValueError('Model already loaded/learned')
         
         # Check the data and reshape it so it to ensure that it is features by pixel and boolean
-        from numpy import float64
+        from numpy import float64, hstack
         if X.ndim < 2: raise ValueError('X must be at least 2D')
         if X.shape[0] != self.features: raise ValueError('X has the wrong number of features')
         X = X.astype(float64, copy=False).reshape((X.shape[0], -1))
@@ -416,11 +414,13 @@ class SubModel(object):
 
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
-            should_norm = self.__should_norm
-            X_ = X[should_norm] # TODO: is there a more efficient way to do this?
-            self.__norm = _get_norm(X_, self.__norm_method, nthreads)
-            _normalize(X_, self.__norm, self.__norm_method, nthreads)
-            X[should_norm] = X_
+            norms = []
+            for rng in __ranges(should_norm):
+                X_ = X[rng] # since rng is a slice this will be view of the data
+                norm = _get_norm(X_, self.__norm_method, nthreads)
+                _normalize(X_, norm, self.__norm_method, nthreads)
+                norms.append(norm)
+            self.__norm = hstack(norms)
         
         # Learning is very memory intensive, make sure we are ready
         import gc; gc.collect()
@@ -428,6 +428,14 @@ class SubModel(object):
         # Run the classifier's learn method
         self.classifier.learn(X, Y, nthreads)
 
+def __ranges(mask):
+    """Generates slices for ranges of Trues in a 1D logical array/list."""
+    from itertools import groupby
+    off = 0
+    for k,g in groupby(mask):
+        l = sum(1 for _ in g)
+        if k: yield slice(off, off+l, 1)
+        off += l
 
 def __one_over(a):
     """
