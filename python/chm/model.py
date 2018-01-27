@@ -388,8 +388,11 @@ class SubModel(object):
         
         # Normalize the data
         if self.__norm_method != 'none' and self.__norm_method is not None:
+            off = 0
             for rng in _ranges(self.__should_norm):
-                _normalize(X[rng], self.__norm[rng], self.__norm_method, nthreads)
+                sz = rng.stop - rng.start
+                _normalize(X[rng], self.__norm[:,off:off+sz], self.__norm_method, nthreads)
+                off += sz
         
         # Evaluation is very memory intensive, make sure we are ready
         import gc; gc.collect()
