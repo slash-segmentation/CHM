@@ -24,7 +24,7 @@ mxArray *process(const mxArray *mxII, const mxArray *mxSize) {
 
   // input integral image (II)
   double *II = (double *)mxGetPr(mxII);
-  const int *IIsize = mxGetDimensions(mxII);
+  const size_t *IIsize = mxGetDimensions(mxII);
 
   // Haar feature size
   int size = (int)mxGetScalar(mxSize);
@@ -33,7 +33,7 @@ mxArray *process(const mxArray *mxII, const mxArray *mxSize) {
   int mid = (int)round((double)size/2);
  
   // output map
-  int out[3];
+  size_t out[3];
   out[0] = (int)(IIsize[0]-size);
   out[1] = (int)(IIsize[1]-size);
   out[2] = 2;
