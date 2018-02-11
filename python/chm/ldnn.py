@@ -75,6 +75,18 @@ class LDNN(Classifier):
         if weights is not None:
             assert(weights.shape[:2] == (self.__params['N'],self.__params['M']))
             self.__weights = weights.view(ndarray).astype(float64, copy=False)
+
+    def print(self, prnt=print):
+        super(LDNN, self).print(prnt)
+        prnt("Parameters:")
+        for item in sorted(self.__params.iteritems()): prnt("  %s: %s"%item)
+        if self.__weights is not None:
+            prnt("Weights:")
+            N,M,_ = self.__weights.shape
+            for i in xrange(N):
+                for j in xrange(M):
+                    prnt("  %2d-%2d: %s"%(i,j,' '.join(str(x) for x in self.__weights[i][j])))
+
     @property
     def params(self): return self.__params.copy()
     @property
