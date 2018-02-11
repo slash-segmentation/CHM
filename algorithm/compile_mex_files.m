@@ -1,12 +1,12 @@
 % Compile mex files
-mex -largeArrayDims UpdateDiscriminants.c
-mex -v -largeArrayDims genOutput.c -lmwblas
-mex -largeArrayDims genOutput_SB.c
-mex -largeArrayDims UpdateDiscriminants_SB.c
+mex UpdateDiscriminants.c COPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
+mex genOutput.c -lmwblas COPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
+mex genOutput_SB.c COPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
+mex UpdateDiscriminants_SB.c COPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
 cd FilterStuff/
 
-mex cc_cmp_II.cc
-mex cc_Haar_features.cc
-mex -largeArrayDims HoG.cpp
+mex cc_cmp_II.cc CXXOPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
+mex cc_Haar_features.cc CXXOPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
+mex HoG.cpp CXXOPTIMFLAGS="-O3 -DNDEBUG -fomit-frame-pointer" LDOPTIMFLAGS="-O3"
 
 cd ..

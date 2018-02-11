@@ -19,10 +19,10 @@ mxArray *process(const mxArray *mxImg) {
 
 	// input image	
 	double *img = (double *)mxGetPr(mxImg);
-	const int *imgSize = mxGetDimensions(mxImg);
+	const size_t *imgSize = mxGetDimensions(mxImg);
 
 	// integral image
-	int out[2];
+	size_t out[2];
 	out[0] = (int)imgSize[0];
 	out[1] = (int)imgSize[1];
 	mxArray *mxII = mxCreateNumericArray(2, out, mxDOUBLE_CLASS, mxREAL);
