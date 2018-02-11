@@ -164,12 +164,6 @@ stages or levels to a model. If the filters are changed from the original model,
 stages/levels will not use the new filters but new stages/levels will. The input images and labels
 must be the same when restarting.
 
-**Note:** while the training process is running several temporary files are saved in the same folder.
-If the training process crashes (for example due to insufficient memory) then this folder will not be
-cleaned up automatically. It can be manually removed and will be recreated as necessary if running in
-restart mode. It can become fairly large (100+ MiB). Without this folder models should only be
-10-20 MiB.
-
 The default number of stages and levels are 2 and 4 respectively. They can be set using `-S #` and
 `-L #` respectively. The number of stages must be at least 2 while the number of levels must be at
 least 1. Each additional stage will require very large amounts of time to compute, both while
