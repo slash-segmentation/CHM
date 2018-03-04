@@ -359,7 +359,7 @@ def __chm_train_main_parse_args():
     # Get defaults for optional arguments
     nstages, nlevels = 2, 4
     # TODO: SIFT should not need compat mode here!
-    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor',Gabor()),
+    fltrs = OrderedDict((('haar',Haar()), ('hog',HOG()), ('edge',Edge()), ('gabor-compat',Gabor(True)),
                          ('sift',SIFT(True)), ('intensity-stencil-10',Intensity.Stencil(10))))
     cntxt_fltr = Intensity.Stencil(7)
     norm_method = 'median-mad'
@@ -476,7 +476,7 @@ Optional Arguments:
                 the whole argument starts with + then it will add them to the
                 defaults. If the argument starts with - then they will be
                 removed from the defaults.
-                Defaults are: haar,hog,edge,gabor,sift,intensity-stencil-10
+                Default: haar,hog,edge,gabor-compat,sift,intensity-stencil-10
   -c filter     The filter used to generate features for context images. This
                 takes a single filter listed above.
                 Default is intensity-stencil-7
