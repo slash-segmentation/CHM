@@ -20,6 +20,15 @@ class Classifier(object):
     def __nonzero__(self): return self.learned
     def __bool__(self): return self.learned
     
+    def print(self, prnt=print):
+        """
+        Prints out the classifier data for human viewing. By default it uses the print function, but
+        any function which takes a single string argument will work. The base implementation prints
+        out the learned status and number of extra features.
+        """
+        prnt("Learned" if self.learned else "Not learned")
+        prnt("Extra features: %d"%self.extra_features)
+
     @abstractproperty
     def learned(self):
         """Returns True if the classifier has been learned."""

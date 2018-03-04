@@ -1,8 +1,4 @@
 /* mex -v -largeArrayDims genOutput.c -lmwblas */
-#if !defined(_WIN32)
-#define dgemm dgemm_
-#endif
-
 #include "mex.h"
 #include "math.h"
 #include "blas.h"

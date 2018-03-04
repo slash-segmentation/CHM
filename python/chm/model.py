@@ -12,14 +12,25 @@ from __future__ import print_function
         
 __all__ = ['Model', 'SubModel']
 
+if __name__ == "__main__":
+    # When run directly this module serves to print out the model information. This has to be first
+    # and exit because of the reflection-style loading of data in the model file to avoid issues with
+    # double importing.
+    import sys
+    if len(sys.argv) != 2: print("usage: %s model"%sys.argv[0])
+    else:
+        import chm.model # pylint: disable=import-self
+        chm.model.Model.load(sys.argv[1]).print()
+        sys.exit(0)
+
 class Model(object):
     """
     Represents an entire model, across all stages and levels. Has the properties path, nstages, and
     nlevels along with retrieving a sub-model through model[stage,level] and parameters of the
     model may also be available through model['param'].
     
-    In the default implementation all of the model metadata is stored in file which is a pickled
-    dictionary. Additional files may be saved with it containing various other pieces of data.
+    In the default implementation all of the model metadata is stored in file which is a
+    JSON-formatted dictionary with all data embded in the file.
     """
     def __init__(self, path, model=None, info=None):
         from os.path import abspath, isfile
@@ -45,6 +56,10 @@ class Model(object):
     def __contains__(self, name): return name in self._info
     def _get_param(self, name): return self._info[name]
     def __getitem__(self, i):
+        """
+        Get either the submodel (if given a tuple of stage [not 0, negatives allowed] and level
+        [negatives allowed]) or a model parameter.
+        """
         if isinstance(i, tuple) and len(i) == 2:
             s,l = i
             if s < -self._nstages or s > self._nstages or s == 0: raise IndexError('invalid stage')
@@ -52,9 +67,28 @@ class Model(object):
             return self._model[s-1 if s > 0 else s][l]
         return self._get_param(i)
     def __iter__(self):
+        """Iterates over all submodels, down the levels then across the stages."""
         for stage in self._model:
             for level in stage:
                 yield level
+    
+    def print(self, prnt=print):
+        """
+        Prints out the model data for human viewing of the contents of the model. By default it
+        uses the print function, but any function which takes a single string argument will work.
+        """
+        print_sub = _indent_print(prnt)
+        prnt("Stages: %d"%self._nstages)
+        prnt("Levels: %d"%self._nlevels)
+        prnt("Models:")
+        for sm in self: sm.print(print_sub)
+        first = True
+        for k,v in self._info.iteritems():
+            if k in ('nstages', 'Nstage', 'nlevels', 'Nlevel', 'submodels'): continue
+            if first:
+                prnt("Extra Data:")
+                first = False
+            prnt("  %s: %s"%(k,v))
     
     def save(self, path=None):
         """
@@ -278,6 +312,40 @@ class SubModel(object):
                       state['filter'], state['context_filter'], state['classifier'],
                       state['norm_method'], state['norm'])
     
+    def print(self, prnt=print):
+        """
+        Prints out the submodel data for human viewing. By default it uses the print function, but
+        any function which takes a single string argument will work.
+        """
+        print_sub = _indent_print(prnt)
+        prnt("Stage %d Level %d"%(self.__stage,self.__level))
+        prnt("  Number of features: %d"%(self.features))
+        SubModel.__print_filter("Filter", self.__filter, print_sub)
+        SubModel.__print_filter("Context Filter", self.__context_filter, print_sub)
+        if self.__norm is not None:
+            prnt("  Normalization: %s, feature transforms:"%self.__norm_method)
+            addl = '+0.5' if self.__norm_method in ('mean-std', 'median-mad') else ''
+            for i in xrange(self.__norm.shape[1]):
+                prnt("    y = %f*(x-%f)%s"%(self.__norm[1,i],self.__norm[0,i],addl))
+        else:
+            prnt("  Normalization: %s"%(self.__norm_method if self.__norm_method else 'none'))
+        prnt("  Classifier: "+self.__classifier.__class__.__name__)
+        self.__classifier.print(print_sub)
+        
+    @staticmethod
+    def __print_filter(title, fltr, prnt):
+        from .filters import FilterBank
+        prnt(fltr.__class__.__name__ if title is None else (title+": "+fltr.__class__.__name__))
+        if isinstance(fltr, FilterBank):
+            print_sub = _indent_print(prnt)
+            for f in fltr.filters: SubModel.__print_filter(None, f, print_sub)
+        else:
+            name = '_'+fltr.__class__.__name__+'__'
+            for k,v in sorted(fltr.__dict__.iteritems()):
+                if k.startswith(name): k = k[len(name):]
+                k = k.lstrip('_')
+                prnt("  %s: %s"%(k,v))
+    
     @property
     def model(self): return self.__model() # __model is a weak-reference and () gets the strong-reference
     @model.setter
@@ -431,6 +499,8 @@ class SubModel(object):
         # Run the classifier's learn method
         self.classifier.learn(X, Y, nthreads)
 
+def _indent_print(prnt): return lambda txt:prnt("  "+txt)
+        
 def _ranges(mask):
     """Generates slices for ranges of Trues in a 1D logical array/list."""
     from itertools import groupby
@@ -494,7 +564,7 @@ def _normalize(X, norm, method='mean-std', nthreads=1):
         X *= std[:,None]
         X += 0.5
     else: raise ValueError('method')
-    
+
 def __add_class_names():
     from pysegtools.general.json import add_class_name
     from .filters import Filter

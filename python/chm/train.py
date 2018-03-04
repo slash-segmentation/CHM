@@ -52,16 +52,13 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
         else:
             __downsample_images(ims, lbls, masks, contexts, clabels, nthreads)
 
-        if sm.classifier.learned and __load_clabels(sm, clabels):
-            disp('Skipping... (already completed)', 1)
-            continue
-
         ##### Feature Extraction #####
         disp('Extracting features...', 1)
         X_full, Y, M = __extract_features(sm, ims, lbls, masks, contexts, nthreads)
 
         ##### Learning the classifier #####
-        if not sm.classifier.learned:
+        if sm.classifier.learned: disp('Skipping learning... (already complete)', 1)
+        else:
             disp('Learning...', 1)
             # Apply masking and subsampling
             # OPT: parallelize compress or at least do something similar to LDNN's kmeans downsampling
@@ -73,19 +70,17 @@ def CHM_train(ims, lbls, model, subsamples=False, masks=None, nthreads=None, dis
             sm.learn(X, Y, nthreads=nthreads) # TODO: the disp method should using the logging module
             del X, Y
             model.save()
-        else: disp('Skipping learning... (already complete)', 1)
 
         ##### Generate the outputs #####
         disp('Generating outputs...', 1)
-        __generate_outputs(sm, X_full, shapes[sm.level], nthreads)
+        __generate_outputs(sm, X_full, shapes[sm.level], clabels, nthreads)
         del X_full
-        __load_clabels(sm, clabels)
         disp('Accuracy: %f, F-value: %f, G-mean: %f'%__calc_performance(clabels, lbls), 1)
         
     ########## Cleanup and return final labels ##########
     disp('Complete!')
     del ims, ims0, lbls, lbls0, masks, masks0, contexts
-    return __cleanup_outputs(model, clabels)
+    return [clbl[0] for clbl in clabels]
 
 def __check_and_load(ims, lbls, masks=None):
     """
@@ -236,65 +231,18 @@ def __subsample(X, Y, n=3000000, nthreads=1):
     else: keep |= ~Y
     return X[:,keep], Y[keep]
 
-def __generate_outputs(submodel, X, shapes, nthreads):
-    """Generates the outputs of the feature vector X from images that have the given shapes."""
-    from os.path import isdir, join
-    from os import makedirs
-    from errno import EEXIST
-    from numpy import save
-    start = 0
-    folder = __get_output_folder(submodel)
-    try: makedirs(folder)
-    except OSError as ex: 
-        if ex.errno != EEXIST or not isdir(folder): raise
-    for i,sh in enumerate(shapes):
-        path = join(folder, '%03d.npy'%i)
-        end = start + sh[0]*sh[1]
-        save(path, submodel.evaluate(X[:,start:end], nthreads).reshape(sh))
-        start = end
-
-def __load_clabels(submodel, clabels):
+def __generate_outputs(submodel, X, shapes, clabels, nthreads):
     """
-    Loads the clabels for the current submodel into the clabels list. These are loaded as
-    memory-mapped arrays from NPY files. The clabels list is a list-of-lists with the first index
-    being the image index and the second being the level. If the clabels are not available,
-    returns False.
+    Generates the outputs of the feature vector X from images that have the given shapes. The
+    results are stored in the clabels list. The clabels list is a list-of-lists with the first
+    index being the image index and the second being the level.
     """
-    from numpy import load, ndarray
-    from os.path import join, isfile
     from itertools import izip
-    folder = __get_output_folder(submodel)
-    paths = [join(folder, '%03d.npy'%i) for i in xrange(len(clabels))]
-    if not all(isfile(path) for path in paths): return False
-    for clbl,path in izip(clabels, paths):
-        # Load as a memory-mapped array viewed as an ndarray
-        # (should be using 'r' mode but then Cython typed memoryviews reject it)
-        clbl.append(load(path, 'r+').view(ndarray)) #pylint: disable=no-member
-    return True
-
-def __get_temp_folder(model):
-    """Get the folder where all temporary outputs are written to for a model."""
-    return model.path+'-temp'
-
-def __get_output_folder(submodel):
-    """Get the folder where outputs are written to for a specific submodel."""
-    from os.path import join
-    return join(__get_temp_folder(submodel.model), '%d-%d'%(submodel.stage, submodel.level))
-
-def __cleanup_outputs(model, clabels):
-    """
-    Cleanup the outputs. These are all stored in a temporary folder next to the model. We delete
-    all of these files since they only take a few minutes to recreate and it is unusual to need
-    them at all. On Windows this requires copying the data in clabels since the memory-mapped files
-    cannot be deleted while in-use.
-    """
-    from os import name
-    from shutil import rmtree
-    from warnings import warn
-    clabels = [clbl[0] for clbl in clabels]
-    if name == 'nt': clabels = [clbl.copy() for clbl in clabels] # On Windows we cannot remove memory-mapped files
-    rmtree(__get_temp_folder(model), onerror=lambda f,p,e:warn("Failed to remove temporary file %s"%p))
-    return clabels
+    start = 0
+    for sh,clbl in izip(shapes, clabels):
+        end = start + sh[0]*sh[1]
+        clbl.append(submodel.evaluate(X[:,start:end], nthreads).reshape(sh))
+        start = end
 
 def __calc_performance(clabels, lbls):
     """
@@ -453,8 +401,7 @@ def __chm_train_usage(err=None):
     print("""CHM Image Training Phase.  %s
 
 %s model inputs labels <optional arguments>
-  model         The file where the model data is saved to. A temporary folder
-                will be alongside this file as well and deleted in the end.
+  model         The file where the model data is saved to.
   inputs        The input image(s) to read
                 Accepts anything that can be given to `imstack -L` except that
                 the value must be quoted so it is a single argument.

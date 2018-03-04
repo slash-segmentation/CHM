@@ -681,7 +681,7 @@ def __best_grouping(H, W, G):
         #m = (W-2)*R - g[0] - g[-1] + sum(
         #        gi*hi + (W%gi)*abs(hi*(W//gi)-area+hi) + (gi-W%gi)*abs(hi*(W//gi)-area) for hi,gi in izip(h,g)
         #)
-        if m_min is None or m < m_min: m_min,g_min,h_min = p,g,h
+        if m_min is None or m < m_min: m_min,g_min,h_min = m,g,h
 
     # Return the best number of columns per row and row heights
     return g_min,h_min
