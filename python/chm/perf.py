@@ -31,7 +31,7 @@ def main():
         predicted = ThresholdImageStack(predicted, 'auto-stack')
     if not ground_truth.is_dtype_homogeneous or ground_truth.dtype != bool:
         ground_truth = ThresholdImageStack(ground_truth, 1)
-    if mask is not None and not mask.is_dtype_homogeneous or mask.dtype != bool:
+    if mask is not None and (not mask.is_dtype_homogeneous or mask.dtype != bool):
         mask = ThresholdImageStack(mask, 1)
 
     confusion_matrix = calc_confusion_matrix(predicted, ground_truth, mask)
@@ -41,3 +41,4 @@ def main():
     print("G-mean   = %f"%calc_gmean(*confusion_matrix))
 
 if __name__ == "__main__": main()
+
