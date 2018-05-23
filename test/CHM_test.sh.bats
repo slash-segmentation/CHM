@@ -102,7 +102,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP}
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'',0);');" ]
  
   # reset path
   export PATH=$A_TEMP_PATH
@@ -120,7 +120,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -h
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''false'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''false'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -139,7 +139,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP}
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -157,7 +157,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -s
 
   [ "$status" -eq 0 ]
-[ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'');');" ]
+[ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[],''true'',1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -174,7 +174,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 200x100
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -191,7 +191,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -s -b 200x100
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -nojvm -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'',1);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -211,7 +211,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 200x100
 
   [ "$status" -eq 1 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[50 50],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -229,7 +229,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 200x100 -o 3x1
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[100 200],[1 3],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -246,7 +246,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 50 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[50 50],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[50 50],''./temp/'',[],''true'',0);');" ]
   # reset path
   export PATH=$A_TEMP_PATH
 }
@@ -262,7 +262,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -b 50 -o 20
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[20 20],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[50 50],[20 20],''./temp/'',[],''true'',0);');" ]
   # reset path
   export PATH=$A_TEMP_PATH
 }
@@ -280,7 +280,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -o 3x1
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[1 3],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[1 3],''./temp/'',[],''true'',0);');" ]
 
   export PATH=$A_TEMP_PATH
 }
@@ -296,7 +296,7 @@ teardown() {
 
   run $CHM_TEST blah ${THE_TMP} -t 3,1
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[1 3],''true'');');" ]
+  [ "${lines[0]}" == "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',''auto'',[50 50],''./temp/'',[1 3],''true'',0);');" ]
 
   export PATH=$A_TEMP_PATH
 }
@@ -397,7 +397,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x2
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[2 0],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[2 0],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -417,7 +417,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 2x0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 2],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 2],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -436,7 +436,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -o 0x0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[0 0],''./temp/'',[],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -494,7 +494,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 0,0
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[0 0],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[0 0],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -514,7 +514,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t -1,-1
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[-1 -1],''true'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[-1 -1],''true'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH
@@ -536,7 +536,7 @@ teardown() {
   run $CHM_TEST blah ${THE_TMP} -b 10x1 -t 1,1 -t 2,3 -t 1,1 -h
 
   [ "$status" -eq 0 ]
-  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[1 1;3 2;1 1],''false'');');" ]
+  [ "${lines[0]}" = "-nodisplay -singleCompThread -r run_from_shell('CHM_test(''blah'',''$THE_TMP'',[1 10],[50 50],''./temp/'',[1 1;3 2;1 1],''false'',0);');" ]
 
   # reset path
   export PATH=$A_TEMP_PATH

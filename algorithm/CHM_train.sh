@@ -35,7 +35,7 @@ Optional Arguments:
                   after the last completed stage/level. You must give the same
                   parameters (data, labels, ...) as before for the model to
                   make sense.
-  -n              Number of threads." 1>&2;
+  -n nthreads     Number of threads." 1>&2;
   exit 1;
 }
 
@@ -56,7 +56,7 @@ shift 2
 while getopts ":n:rm:S:L:" o; do
   case "${o}" in
     s)
-      SINGLE_THREAD="-nojvm -singleCompThread";
+      NTHREADS=1;
       ;;
     n)
       NTHREADS="$((OPTARG * 1))";
@@ -116,3 +116,4 @@ stty sane >/dev/null 2>&1 # restore terminal settings
 if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
 
 exit $matlab_err
+

@@ -1,4 +1,4 @@
-function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc,hist_eq)
+function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_to_proc,hist_eq,nthreads)
 % CHM_test   CHM Image Testing Phase Script
 %   CHM_test(input_files, outputpath, [blocksize='auto'], [bordersize=50], [savingpath='./temp'], [tiles_to_proc=[]], [hist_eq=true])
 %
@@ -15,10 +15,12 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       By default all tiles are processed.
 %   hist_eq is either true or false if the testing data should be histogram-equalized to the training data or not.
 %       By default it is true if the model includes the histogram to equalize to.
+%   nthreads is either 0 for max threads (default) or a positive integer for the number of threads to use.
+%       When 1 then no parallel pool is used at all.
 %
 % input_files is either a cell-string or a single character string of comma-seperated lists of the following:
 %   path to a folder            - all PNGs and TIFFs in that folder
-%   path to a file              - only that file 
+%   path to a file              - only that file
 %   path with numerical pattern - get all files matching the pattern
 %       pattern must have #s in it and end with a semicolon and number range
 %       the #s are replaced by the values at the end with leading zeros
@@ -27,12 +29,13 @@ function CHM_test(input_files,outputpath,blocksize,bordersize,savingpath,tiles_t
 %       pattern has * in it which means any number of any characters
 %       example: in/lbl_*.tif does all TIFF images starting with lbl_ in "in"
 
-if nargin < 2 || nargin > 7; error('CHM_test must have 2 to 7 input arguments'); end
+if nargin < 2 || nargin > 8; error('CHM_test must have 2 to 8 input arguments'); end
 if nargin < 3; blocksize = 'auto'; end
 if nargin < 4; bordersize = 50; end
 if nargin < 5; savingpath = fullfile('.', 'temp'); end
 if nargin < 6; tiles_to_proc = []; end
 if nargin < 7; hist_eq = true; end
+if nargin < 8; nthreads = 0; end
 
 if ~ismcc && ~isdeployed
     % Add path to functions required for feature extraction (already included in compiled version)
@@ -82,7 +85,14 @@ end
 %args = {'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true};
 
 opened_pool = 0;
-try; if usejava('jvm') && ~matlabpool('size'); matlabpool open; opened_pool = 1; end; catch ex; end;
+try; if nthreads ~= 1 && usejava('jvm') && ~isempty(which('parpool'));
+    ps = parallel.Settings;
+    idleTimeout = ps.Pool.IdleTimeout;
+    ps.Pool.IdleTimeout = Inf;
+    if nthreads ~= 0; pool = parpool('local',nthreads);
+    else; pool = parpool('local'); end;
+    opened_pool = 1;
+end; catch ex; end;
 
 for i = 1:length(files_te)
     % Disabling all TIFF-specific code for now. Maybe one day we will re-add it.
@@ -106,23 +116,25 @@ for i = 1:length(files_te)
     imwrite(blockproc(my_imread(files_te{i}),bs,proc, 'BorderSize',brd, 'PadPartialBlocks',true, 'PadMethod','symmetric', 'TrimBorder',false, 'UseParallel',true), files_out{i});
 end
 
-if opened_pool; matlabpool close; end
-
+if opened_pool;
+    ps.Pool.IdleTimeout = idleTimeout;
+    delete(pool);
+end
 
 function output=ProcessBlock(block_struct, savingpath, param)
     % Designed to remove the extra padding added to the right and bottom blocks
-    
+
     %block_struct.border:    A two-element vector, [V H], that specifies the size of the vertical and horizontal padding around the block of data. (See the 'BorderSize' parameter in the Inputs section.)
     %block_struct.blockSize: A two-element vector, [rows cols], that specifies the size of the block data. If a border has been specified, the size does not include the border pixels.
     %block_struct.data:      M-by-N or M-by-N-by-P matrix of block data
     %block_struct.imageSize: A two-element vector, [rows cols], that specifies the full size of the input image.
     %block_struct.location:  A two-element vector, [row col], that specifies the position of the first pixel (minimum-row, minimum-column) of the block data in the input image. If a border has been specified, the location refers to the first pixel of the discrete block data, not the added border pixels.
-    
+
     brd = block_struct.border;
-    
+
     fprintf('Processing block at [%4d %4d] of size [%3d %3d] with border [%3d %3d] out of [%4d %4d]\n', ...
         block_struct.location(1), block_struct.location(2), size(block_struct.data,1)-2*brd(1), size(block_struct.data,2)-2*brd(2), brd(1), brd(2), block_struct.imageSize(1), block_struct.imageSize(2));
-    
+
     % Process block
     output = testCHM(block_struct.data, savingpath, param);
     %output = block_struct.data / 255.0;

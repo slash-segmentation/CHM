@@ -9,7 +9,7 @@ $0 <input_files> <output_folder> <optional arguments>
   output_folder   The folder to save the generated images to.
                   The images will have the same name and type as the input
                   files but be placed in this folder.
-	
+
 Optional Arguments:
   -m model_folder The folder that contains the model data. Default is ./temp/.
                   (contains param.mat and MODEL_level#_stage#.mat)
@@ -33,9 +33,7 @@ Optional Arguments:
                   image histogram (if provided in the model). This option
                   should only be used if the testing data has already been
                   equalized.
-  -s              Single-thread / non-parallel. Without this each block is
-                  done in parallel using all available physical cores after an
-                  initial few tiles are down by them selves (for each image).
+  -n nthreads     Number of threads.
 
 Input Files Specification
 The input files can be specified in multiple ways. It needs to be one of the
@@ -86,6 +84,7 @@ OUTPUT=$2;
 if [[ -f $OUTPUT ]]; then echo "Output directory already exists as a file." 1>&2; echo; usage; fi;
 MODEL_FOLDER=./temp/;
 SINGLE_THREAD=; # normally blank, "-nojvm" when single-threaded which disables parellism (along with other unnecessary things)
+NTHREADS=0;
 HIST_EQ=true;
 declare -i BLOCK_W=0; # temporary variables
 declare -i BLOCK_H=0;
@@ -96,10 +95,13 @@ declare -i TILE_ROW=0; # temporary variables
 declare -i TILE_COL=0;
 TILES=; # the tiles to do as row1 col1;row2 col2;...
 shift 2
-while getopts ":shm:b:o:t:" o; do
+while getopts ":sn:hm:b:o:t:" o; do
   case "${o}" in
     s)
-      SINGLE_THREAD=-nojvm;
+      NTHREADS=1;
+      ;;
+    n)
+      NTHREADS="$((OPTARG * 1))"; 
       ;;
     h)
       HIST_EQ=false;
@@ -147,14 +149,15 @@ else
   export MATLABPATH="$( cd -P "$( dirname "$SOURCE" )" && pwd -P )"
 fi
 
+if (( NTHREADS == 1 )); then SINGLE_THREAD="-nojvm"; fi
 
 # Run the main matlab script
-matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',$BLOCKSIZE,[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}],''${HIST_EQ}'');');";
+matlab -nodisplay -singleCompThread ${SINGLE_THREAD} -r "run_from_shell('CHM_test(''${INPUT}'',''${OUTPUT}'',$BLOCKSIZE,[${OVERLAP_H} ${OVERLAP_W}],''${MODEL_FOLDER}'',[${TILES}],''${HIST_EQ}'',${NTHREADS});');";
 matlab_err=$?;
-
 
 # Cleanup
 stty sane >/dev/null 2>&1 # restore terminal settings
 if [ -n "$MATLABPATH_ORIGINAL" ]; then export MATLABPATH=$MATLABPATH_ORIGINAL; fi
 
 exit $matlab_err
+
